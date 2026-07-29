@@ -103,15 +103,25 @@ function App() {
   }
 
   return (
-    <main>
+  <main className="page-shell">
+    <header className="page-header">
+      <p className="eyebrow">Phase 1 Prototype</p>
       <h1>Residential Management System</h1>
-      <p>Phase 1 full-stack prototype</p>
+      <p className="page-description">
+        Create and view properties through the React, ASP.NET Core
+        and SQL Server workflow.
+      </p>
+    </header>
 
-      <section>
-        <h2>Add Property</h2>
+    <div className="content-grid">
+      <section className="panel">
+        <div className="section-heading">
+          <h2>Add Property</h2>
+          <p>Create a new apartment or residential complex record.</p>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <div>
+        <form className="property-form" onSubmit={handleSubmit}>
+          <div className="form-field">
             <label htmlFor="name">Property name</label>
             <input
               id="name"
@@ -122,14 +132,13 @@ function App() {
                   name: event.target.value,
                 })
               }
+              placeholder="Olbia Residence"
               required
             />
           </div>
 
-          <div>
-            <label htmlFor="propertyType">
-              Property type
-            </label>
+          <div className="form-field">
+            <label htmlFor="propertyType">Property type</label>
             <input
               id="propertyType"
               value={form.propertyType}
@@ -139,11 +148,12 @@ function App() {
                   propertyType: event.target.value,
                 })
               }
+              placeholder="Apartment Building"
               required
             />
           </div>
 
-          <div>
+          <div className="form-field form-field-full">
             <label htmlFor="addressLine">Address</label>
             <input
               id="addressLine"
@@ -154,11 +164,12 @@ function App() {
                   addressLine: event.target.value,
                 })
               }
+              placeholder="Street, building number"
               required
             />
           </div>
 
-          <div>
+          <div className="form-field">
             <label htmlFor="city">City</label>
             <input
               id="city"
@@ -169,11 +180,12 @@ function App() {
                   city: event.target.value,
                 })
               }
+              placeholder="İzmir"
               required
             />
           </div>
 
-          <div>
+          <div className="form-field">
             <label htmlFor="district">District</label>
             <input
               id="district"
@@ -184,11 +196,12 @@ function App() {
                   district: event.target.value,
                 })
               }
+              placeholder="Konak"
               required
             />
           </div>
 
-          <div>
+          <div className="form-field form-field-full">
             <label htmlFor="description">Description</label>
             <textarea
               id="description"
@@ -199,49 +212,83 @@ function App() {
                   description: event.target.value,
                 })
               }
+              placeholder="Optional property description"
+              rows={4}
             />
           </div>
 
-          <button type="submit" disabled={isSubmitting}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Saving...' : 'Add property'}
           </button>
         </form>
       </section>
 
-      <section>
-        <h2>Properties</h2>
+      <section className="panel">
+        <div className="section-heading">
+          <h2>Properties</h2>
+          <p>{properties.length} property records found.</p>
+        </div>
 
-        {isLoading && <p>Loading...</p>}
+        {isLoading && <p className="status-message">Loading...</p>}
 
-        {errorMessage && <p>{errorMessage}</p>}
+        {errorMessage && (
+          <p className="status-message error-message">
+            {errorMessage}
+          </p>
+        )}
 
         {!isLoading &&
           !errorMessage &&
           properties.length === 0 && (
-            <p>No properties found.</p>
+            <p className="status-message">
+              No properties found.
+            </p>
           )}
 
-        <ul>
+        <div className="property-list">
           {properties.map((property) => (
-            <li key={property.id}>
-              <h3>{property.name}</h3>
+            <article className="property-card" key={property.id}>
+              <div className="property-card-header">
+                <div>
+                  <h3>{property.name}</h3>
+                  <p className="property-type">
+                    {property.propertyType}
+                  </p>
+                </div>
 
-              <p>
-                {property.propertyType} — {property.city}/
-                {property.district}
+                <span
+                  className={
+                    property.isActive
+                      ? 'status-badge active'
+                      : 'status-badge inactive'
+                  }
+                >
+                  {property.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+
+              <p className="property-location">
+                {property.city} / {property.district}
               </p>
 
               <p>{property.addressLine}</p>
 
               {property.description && (
-                <p>{property.description}</p>
+                <p className="property-description">
+                  {property.description}
+                </p>
               )}
-            </li>
+            </article>
           ))}
-        </ul>
+        </div>
       </section>
-    </main>
-  )
+    </div>
+  </main>
+)
 }
 
 export default App
