@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+secrets.json
+
+# .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Node / React
+node_modules/
+dist/
+build/
+.vite/
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+coverage/
+
+# SQL Server local files and backups
+*.mdf
+*.ldf
+*.bak
+*.trn
+
+# Temporary files
+*.tmp
+*.temp
