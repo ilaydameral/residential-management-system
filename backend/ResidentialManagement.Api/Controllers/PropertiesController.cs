@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ResidentialManagement.Api.Data;
-using ResidentialManagement.Api.Entities;
+using ResidentialManagement.Api.DTOs;
+using ResidentialManagement.Api.Services;
 
 namespace ResidentialManagement.Api.Controllers;
 
@@ -9,49 +8,85 @@ namespace ResidentialManagement.Api.Controllers;
 [Route("api/[controller]")]
 public class PropertiesController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IPropertyService _propertyService;
 
-    public PropertiesController(AppDbContext context)
+    public PropertiesController(IPropertyService propertyService)
     {
-        _context = context;
+        _propertyService = propertyService;
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<Property>>> GetProperties()
+    public async Task<ActionResult<List<PropertyDto>>> GetProperties()
     {
-        var properties = await _context.Properties
-            .OrderBy(property => property.Id)
-            .ToListAsync();
-
+        var properties = await _propertyService.GetAllPropertiesAsync();
         return Ok(properties);
     }
 
-    [HttpPost]
-    public async Task<ActionResult<Property>> CreateProperty(
-        Property property
-    )
-    {
-        _context.Properties.Add(property);
-
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(
-            nameof(GetPropertyById),
-            new { id = property.Id },
-            property
-        );
-    }
-
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<Property>> GetPropertyById(int id)
+    public async Task<ActionResult<PropertyDto>> GetPropertyById(int id)
     {
-        var property = await _context.Properties.FindAsync(id);
-
+        var property = await _propertyService.GetPropertyByIdAsync(id);
         if (property is null)
         {
-            return NotFound();
+            return NotFound(new ErrorResponse
+            {
+                StatusCode = 404,
+                Message = $"ID'si {id} olan gayrimenkul bulunamadı.",
+                Timestamp = DateTime.UtcNow
+            });
         }
 
         return Ok(property);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<PropertyDto>> CreateProperty(CreatePropertyDto createDto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var createdProperty = await _propertyService.CreatePropertyAsync(createDto);
+
+        return CreatedAtAction(
+            nameof(GetPropertyById),
+            new { id = createdProperty.Id },
+            createdProperty
+        );
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<PropertyDto>> UpdateProperty(int id, UpdatePropertyDto updateDto)
+    {
+        var updatedProperty = await _propertyService.UpdatePropertyAsync(id, updateDto);
+        if (updatedProperty is null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                StatusCode = 404,
+                Message = $"ID'si {id} olan gayrimenkul bulunamadı.",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        return Ok(updatedProperty);
+    }
+
+    [HttpPatch("{id:int}/deactivate")]
+    public async Task<IActionResult> DeactivateProperty(int id)
+    {
+        var success = await _propertyService.DeactivatePropertyAsync(id);
+        if (!success)
+        {
+            return NotFound(new ErrorResponse
+            {
+                StatusCode = 404,
+                Message = $"ID'si {id} olan gayrimenkul bulunamadı.",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        return NoContent();
     }
 }
