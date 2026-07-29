@@ -6,9 +6,3 @@ BEGIN
     CREATE DATABASE ApartmentManagementDb;
 END;
 GO
-
-USE ApartmentManagementDb;
-GO
-
-SELECT *
-FROM dbo.Properties;
