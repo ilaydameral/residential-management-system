@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { API_BASE_URL } from './config'
 
 type Property = {
   id: number
@@ -43,7 +44,7 @@ function App() {
     const fetchProperties = async () => {
       try {
         const response = await fetch(
-          'http://localhost:5006/api/properties',
+          `${API_BASE_URL}/api/properties`,
         )
 
         if (!response.ok) {
@@ -62,7 +63,9 @@ function App() {
     fetchProperties()
   }, [])
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault()
 
     setIsSubmitting(true)
@@ -70,7 +73,7 @@ function App() {
 
     try {
       const response = await fetch(
-        'http://localhost:5006/api/properties',
+        `${API_BASE_URL}/api/properties`,
         {
           method: 'POST',
           headers: {
@@ -124,7 +127,9 @@ function App() {
           </div>
 
           <div>
-            <label htmlFor="propertyType">Property type</label>
+            <label htmlFor="propertyType">
+              Property type
+            </label>
             <input
               id="propertyType"
               value={form.propertyType}
