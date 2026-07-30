@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<PropertyType> PropertyTypes { get; set; }
+    public DbSet<UnitType> UnitTypes { get; set; }
     public DbSet<Property> Properties { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -21,6 +22,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PropertyType>(entity =>
         {
             entity.HasIndex(pt => pt.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<UnitType>(entity =>
+        {
+            entity.HasIndex(ut => ut.Code).IsUnique();
         });
 
         modelBuilder.Entity<Property>(entity =>
@@ -65,6 +71,54 @@ public class AppDbContext : DbContext
                 Name = "Karma Kullanım",
                 Code = "MIXED_USE",
                 Description = "Hem konut hem ticari birimleri olan kompleks",
+                IsActive = true,
+                CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            }
+        );
+
+        modelBuilder.Entity<UnitType>().HasData(
+            new UnitType
+            {
+                Id = 1,
+                Name = "Daire",
+                Code = "APARTMENT",
+                Description = "Konut / Mesken birimi",
+                IsActive = true,
+                CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new UnitType
+            {
+                Id = 2,
+                Name = "Dükkan",
+                Code = "SHOP",
+                Description = "Ticari dükkan veya mağaza",
+                IsActive = true,
+                CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new UnitType
+            {
+                Id = 3,
+                Name = "Ofis",
+                Code = "OFFICE",
+                Description = "Büro veya çalışma alanı",
+                IsActive = true,
+                CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new UnitType
+            {
+                Id = 4,
+                Name = "Depo",
+                Code = "STORAGE",
+                Description = "Bağımsız depo veya sığınak alanı",
+                IsActive = true,
+                CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new UnitType
+            {
+                Id = 5,
+                Name = "Otopark Alanı",
+                Code = "PARKING_SPACE",
+                Description = "Tahsisli araç park yeri",
                 IsActive = true,
                 CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
             }
