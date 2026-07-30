@@ -72,7 +72,6 @@ public class PropertyService : IPropertyService
         property.City = updateDto.City;
         property.District = updateDto.District;
         property.Description = updateDto.Description;
-        property.IsActive = updateDto.IsActive;
         property.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

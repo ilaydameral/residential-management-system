@@ -26,6 +26,4 @@ public class UpdatePropertyDto
 
     [StringLength(500, ErrorMessage = "Açıklama en fazla 500 karakter olabilir.")]
     public string? Description { get; set; }
-
-    public bool IsActive { get; set; } = true;
 }
