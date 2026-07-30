@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ResidentialManagement.Api.Data;
+using ResidentialManagement.Api.Middleware;
+using ResidentialManagement.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,9 +28,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(connectionString)
 );
 
+// Register application services (Dependency Injection)
+builder.Services.AddScoped<IPropertyService, PropertyService>();
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Global Exception Handling Middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
