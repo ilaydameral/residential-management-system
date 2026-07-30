@@ -4,7 +4,7 @@ namespace ResidentialManagement.Api.Services;
 
 public interface IPropertyService
 {
-    Task<List<PropertyDto>> GetAllPropertiesAsync();
+    Task<List<PropertyDto>> GetAllPropertiesAsync(bool includeInactive = false);
     Task<PropertyDto?> GetPropertyByIdAsync(int id);
     Task<PropertyDto> CreatePropertyAsync(CreatePropertyDto createDto);
     Task<PropertyDto?> UpdatePropertyAsync(int id, UpdatePropertyDto updateDto);

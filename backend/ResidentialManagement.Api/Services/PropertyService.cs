@@ -14,10 +14,16 @@ public class PropertyService : IPropertyService
         _context = context;
     }
 
-    public async Task<List<PropertyDto>> GetAllPropertiesAsync()
+    public async Task<List<PropertyDto>> GetAllPropertiesAsync(bool includeInactive = false)
     {
-        return await _context.Properties
-            .AsNoTracking()
+        var query = _context.Properties.AsNoTracking();
+
+        if (!includeInactive)
+        {
+            query = query.Where(p => p.IsActive);
+        }
+
+        return await query
             .OrderBy(p => p.Id)
             .Select(p => MapToDto(p))
             .ToListAsync();

@@ -16,9 +16,9 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<PropertyDto>>> GetProperties()
+    public async Task<ActionResult<List<PropertyDto>>> GetProperties([FromQuery] bool includeInactive = false)
     {
-        var properties = await _propertyService.GetAllPropertiesAsync();
+        var properties = await _propertyService.GetAllPropertiesAsync(includeInactive);
         return Ok(properties);
     }
 
@@ -59,6 +59,11 @@ public class PropertiesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<PropertyDto>> UpdateProperty(int id, UpdatePropertyDto updateDto)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var updatedProperty = await _propertyService.UpdatePropertyAsync(id, updateDto);
         if (updatedProperty is null)
         {
