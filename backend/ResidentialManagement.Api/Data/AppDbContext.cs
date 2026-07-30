@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<PropertyType> PropertyTypes { get; set; }
     public DbSet<UnitType> UnitTypes { get; set; }
     public DbSet<Property> Properties { get; set; }
+    public DbSet<Building> Buildings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,21 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(p => p.PropertyTypeId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Building>(entity =>
+        {
+            entity.HasOne(b => b.Property)
+                .WithMany(p => p.Buildings)
+                .HasForeignKey(b => b.PropertyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(b => new { b.PropertyId, b.Code })
+                .IsUnique();
+
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_Buildings_FloorCount_Range",
+                "[FloorCount] >= 1 AND [FloorCount] <= 200"));
         });
 
         modelBuilder.Entity<PropertyType>().HasData(

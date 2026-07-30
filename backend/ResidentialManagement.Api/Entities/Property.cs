@@ -33,4 +33,6 @@ public class Property
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }
+
+    public ICollection<Building> Buildings { get; set; } = new List<Building>();
 }
