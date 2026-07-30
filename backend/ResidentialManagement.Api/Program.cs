@@ -33,6 +33,7 @@ builder.Services.AddScoped<IPropertyTypeService, PropertyTypeService>();
 builder.Services.AddScoped<IUnitTypeService, UnitTypeService>();
 builder.Services.AddScoped<IPropertyService, PropertyService>();
 builder.Services.AddScoped<IBuildingService, BuildingService>();
+builder.Services.AddScoped<IUnitService, UnitService>();
 
 builder.Services.AddOpenApi();
 
