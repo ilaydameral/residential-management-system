@@ -30,4 +30,6 @@ public class Building
     public DateTime? UpdatedAt { get; set; }
 
     public Property Property { get; set; } = null!;
+
+    public ICollection<Unit> Units { get; set; } = new List<Unit>();
 }

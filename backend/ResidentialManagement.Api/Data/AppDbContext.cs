@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<UnitType> UnitTypes { get; set; }
     public DbSet<Property> Properties { get; set; }
     public DbSet<Building> Buildings { get; set; }
+    public DbSet<Unit> Units { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,43 @@ public class AppDbContext : DbContext
             entity.ToTable(t => t.HasCheckConstraint(
                 "CK_Buildings_FloorCount_Range",
                 "[FloorCount] >= 1 AND [FloorCount] <= 200"));
+        });
+
+        modelBuilder.Entity<Unit>(entity =>
+        {
+            entity.HasOne(u => u.Building)
+                .WithMany(b => b.Units)
+                .HasForeignKey(u => u.BuildingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(u => u.UnitType)
+                .WithMany(ut => ut.Units)
+                .HasForeignKey(u => u.UnitTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(u => new { u.BuildingId, u.UnitNumber })
+                .IsUnique();
+
+            entity.Property(u => u.GrossArea)
+                .HasColumnType("decimal(10,2)");
+
+            entity.Property(u => u.NetArea)
+                .HasColumnType("decimal(10,2)");
+
+            entity.ToTable(t =>
+            {
+                t.HasCheckConstraint(
+                    "CK_Units_GrossArea_Positive",
+                    "[GrossArea] IS NULL OR [GrossArea] > 0");
+
+                t.HasCheckConstraint(
+                    "CK_Units_NetArea_Positive",
+                    "[NetArea] IS NULL OR [NetArea] > 0");
+
+                t.HasCheckConstraint(
+                    "CK_Units_NetArea_NotGreaterThanGrossArea",
+                    "[GrossArea] IS NULL OR [NetArea] IS NULL OR [NetArea] <= [GrossArea]");
+            });
         });
 
         modelBuilder.Entity<PropertyType>().HasData(
