@@ -40,6 +40,7 @@ public class ExceptionHandlingMiddleware
         var statusCode = exception switch
         {
             InvalidOperationException => (int)HttpStatusCode.Conflict,
+            KeyNotFoundException => (int)HttpStatusCode.NotFound,
             _ => (int)HttpStatusCode.InternalServerError
         };
 
@@ -48,7 +49,7 @@ public class ExceptionHandlingMiddleware
         var response = new ErrorResponse
         {
             StatusCode = statusCode,
-            Message = statusCode == (int)HttpStatusCode.Conflict ? exception.Message : "Sunucuda beklenmeyen bir hata oluştu.",
+            Message = statusCode != (int)HttpStatusCode.InternalServerError ? exception.Message : "Sunucuda beklenmeyen bir hata oluştu.",
             Details = _env.IsDevelopment() ? exception.Message : null,
             Timestamp = DateTime.UtcNow
         };
