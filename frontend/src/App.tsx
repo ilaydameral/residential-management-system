@@ -34,6 +34,50 @@ import type {
   UpdateUnitPayload,
 } from './types'
 
+function slugifyBlockName(name: string): string {
+  let str = name.trim()
+  str = str.replace(/\s+(Blok|Bloğu|Block)$/i, '')
+  const charMap: Record<string, string> = {
+    'ç': 'C', 'Ç': 'C',
+    'ğ': 'G', 'Ğ': 'G',
+    'ı': 'I', 'I': 'I', 'İ': 'I',
+    'ö': 'O', 'Ö': 'O',
+    'ş': 'S', 'Ş': 'S',
+    'ü': 'U', 'Ü': 'U',
+  }
+  str = str.replace(/[çÇğĞıIİöÖşŞüÜ]/g, (m) => charMap[m] || m)
+  str = str.toUpperCase()
+  str = str.replace(/[^A-Z0-9]/g, '-')
+  str = str.replace(/-+/g, '-')
+  str = str.replace(/^-|-$/g, '')
+  return str
+}
+
+function formatFloorDisplay(floorNumber: number): string {
+  const floor = Math.floor(Number(floorNumber))
+  if (floor === 0) return 'Zemin Kat'
+  if (floor < 0) return `Bodrum ${floor}`
+  return `${floor}. Kat`
+}
+
+function formatUnitDisplay(unitNumber: string, unitTypeName?: string): string {
+  const trimmed = unitNumber.trim()
+  if (/^(Daire|Dükkan|Depo|Ofis|D:)/i.test(trimmed)) {
+    return trimmed
+  }
+  if (unitTypeName) {
+    return `${unitTypeName} ${trimmed}`
+  }
+  return trimmed
+}
+
+const PROPERTY_TYPE_LABEL_MAP: Record<string, string> = {
+  SINGLE_APARTMENT: 'Tek Apartman',
+  RESIDENTIAL_COMPLEX: 'Rezidans / Konut Sitesi',
+  COMMERCIAL: 'Ticari Yapı',
+  MIXED_USE: 'Karma Kullanım',
+}
+
 const initialPropertyForm: CreatePropertyPayload & { id?: number; isActive?: boolean } = {
   name: '',
   propertyTypeId: null,
@@ -96,6 +140,9 @@ function App() {
   // Single Apartment Setup State
   const [singleApartmentFloorCount, setSingleApartmentFloorCount] = useState(1)
 
+  // Block Code User Input Override Flag
+  const [isBlockCodeUserEdited, setIsBlockCodeUserEdited] = useState(false)
+
   // Forms
   const [propertyForm, setPropertyForm] = useState(initialPropertyForm)
   const [buildingForm, setBuildingForm] = useState(initialBuildingForm)
@@ -130,6 +177,8 @@ function App() {
   const isSingleApartment =
     selectedPropertyTypeObj?.code === 'SINGLE_APARTMENT' ||
     selectedProperty?.propertyType === 'SINGLE_APARTMENT'
+
+  const selectableUnitTypes = unitTypes.filter((ut) => ut.code !== 'PARKING_SPACE')
 
   const cityNames = TURKEY_CITIES.map((c) => c.name)
   const matchedCity = TURKEY_CITIES.find(
@@ -182,6 +231,7 @@ function App() {
         const data = await getBuildingsByProperty(selectedProperty.id, true)
         setBuildings(data)
         setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
+        setIsBlockCodeUserEdited(false)
 
         if (selectedBuilding) {
           const updatedSelectedBuilding = data.find((b) => b.id === selectedBuilding.id)
@@ -218,7 +268,7 @@ function App() {
         setUnitForm({
           ...initialUnitForm,
           buildingId: selectedBuilding.id,
-          unitTypeId: unitTypes[0]?.id || 0,
+          unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
         })
       } catch (err) {
         setUnitError(err instanceof Error ? err.message : 'Bağımsız bölümler yüklenemedi.')
@@ -239,7 +289,7 @@ function App() {
         setUnitForm({
           ...initialUnitForm,
           buildingId: autoBuilding.id,
-          unitTypeId: unitTypes[0]?.id || 0,
+          unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
         })
       }
     }
@@ -266,6 +316,7 @@ function App() {
     setUnits([])
     setEditingBuildingId(null)
     setEditingUnitId(null)
+    setPropertyError('')
     setBuildingError('')
     setUnitError('')
 
@@ -281,6 +332,9 @@ function App() {
     setUnits([])
     setEditingBuildingId(null)
     setEditingUnitId(null)
+    setPropertyError('')
+    setBuildingError('')
+    setUnitError('')
   }
 
   const handleCityChange = (newCity: string) => {
@@ -344,12 +398,12 @@ function App() {
     try {
       if (editingPropertyId) {
         const payload: UpdatePropertyPayload = {
-          name: propertyForm.name,
+          name: propertyForm.name.trim(),
           propertyTypeId: propertyForm.propertyTypeId ? Number(propertyForm.propertyTypeId) : null,
-          addressLine: propertyForm.addressLine,
+          addressLine: propertyForm.addressLine.trim(),
           city: matchedCity.name,
           district: matchedDistrict,
-          description: propertyForm.description || null,
+          description: propertyForm.description ? propertyForm.description.trim() : null,
           isActive: propertyForm.isActive ?? true,
         }
         const updated = await updateProperty(editingPropertyId, payload)
@@ -360,12 +414,12 @@ function App() {
         setEditingPropertyId(null)
       } else {
         const payload: CreatePropertyPayload = {
-          name: propertyForm.name,
+          name: propertyForm.name.trim(),
           propertyTypeId: propertyForm.propertyTypeId ? Number(propertyForm.propertyTypeId) : null,
-          addressLine: propertyForm.addressLine,
+          addressLine: propertyForm.addressLine.trim(),
           city: matchedCity.name,
           district: matchedDistrict,
-          description: propertyForm.description || null,
+          description: propertyForm.description ? propertyForm.description.trim() : null,
         }
         const created = await createProperty(payload)
         setProperties((prev) => [...prev, created])
@@ -403,8 +457,13 @@ function App() {
   // ==========================================
   const handleSelectBuilding = (building: Building) => {
     setSelectedBuilding(building)
-    setUnitForm({ ...initialUnitForm, buildingId: building.id, unitTypeId: unitTypes[0]?.id || 0 })
+    setUnitForm({
+      ...initialUnitForm,
+      buildingId: building.id,
+      unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+    })
     setEditingUnitId(null)
+    setBuildingError('')
     setUnitError('')
 
     setTimeout(() => {
@@ -416,10 +475,32 @@ function App() {
     setSelectedBuilding(null)
     setUnits([])
     setEditingUnitId(null)
+    setUnitError('')
+  }
+
+  const handleBuildingNameChange = (name: string) => {
+    let autoCode = buildingForm.code
+    if (!isBlockCodeUserEdited && !editingBuildingId) {
+      autoCode = slugifyBlockName(name)
+    }
+    setBuildingForm((prev) => ({
+      ...prev,
+      name,
+      code: autoCode,
+    }))
+  }
+
+  const handleBuildingCodeChange = (code: string) => {
+    setIsBlockCodeUserEdited(true)
+    setBuildingForm((prev) => ({
+      ...prev,
+      code,
+    }))
   }
 
   const handleEditBuildingClick = (building: Building) => {
     setEditingBuildingId(building.id)
+    setIsBlockCodeUserEdited(true)
     setBuildingForm({
       propertyId: building.propertyId,
       name: building.name,
@@ -433,6 +514,7 @@ function App() {
 
   const handleCancelBuildingEdit = () => {
     setEditingBuildingId(null)
+    setIsBlockCodeUserEdited(false)
     setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
     setBuildingError('')
   }
@@ -448,10 +530,10 @@ function App() {
       if (editingBuildingId) {
         const payload: UpdateBuildingPayload = {
           propertyId: selectedProperty.id,
-          name: buildingForm.name,
-          code: buildingForm.code,
-          floorCount: Number(buildingForm.floorCount),
-          description: buildingForm.description || null,
+          name: buildingForm.name.trim(),
+          code: buildingForm.code.trim(),
+          floorCount: Math.floor(Number(buildingForm.floorCount)),
+          description: buildingForm.description ? buildingForm.description.trim() : null,
           isActive: buildingForm.isActive ?? true,
         }
         const updated = await updateBuilding(editingBuildingId, payload)
@@ -463,14 +545,15 @@ function App() {
       } else {
         const payload: CreateBuildingPayload = {
           propertyId: selectedProperty.id,
-          name: buildingForm.name,
-          code: buildingForm.code,
-          floorCount: Number(buildingForm.floorCount),
-          description: buildingForm.description || null,
+          name: buildingForm.name.trim(),
+          code: buildingForm.code.trim(),
+          floorCount: Math.floor(Number(buildingForm.floorCount)),
+          description: buildingForm.description ? buildingForm.description.trim() : null,
         }
         const created = await createBuilding(payload)
         setBuildings((prev) => [...prev, created])
       }
+      setIsBlockCodeUserEdited(false)
       setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Bina kaydedilemedi.')
@@ -491,7 +574,7 @@ function App() {
         propertyId: selectedProperty.id,
         name: selectedProperty.name,
         code: 'MAIN',
-        floorCount: Number(singleApartmentFloorCount),
+        floorCount: Math.floor(Number(singleApartmentFloorCount)),
         description: 'Tek Apartman Binası',
       }
 
@@ -544,7 +627,7 @@ function App() {
     setUnitForm({
       ...initialUnitForm,
       buildingId: selectedBuilding?.id || 0,
-      unitTypeId: unitTypes[0]?.id || 0,
+      unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
     })
     setUnitError('')
   }
@@ -552,6 +635,14 @@ function App() {
   const handleUnitSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!selectedBuilding) return
+
+    const trimmedUnitNumber = unitForm.unitNumber.trim()
+    if (!trimmedUnitNumber) {
+      setUnitError('Kapı / Bölüm No zorunludur.')
+      return
+    }
+
+    const normalizedFloorNumber = Math.floor(Number(unitForm.floorNumber))
 
     if (unitForm.grossArea != null && unitForm.netArea != null) {
       const gross = Number(unitForm.grossArea)
@@ -570,11 +661,11 @@ function App() {
         const payload: UpdateUnitPayload = {
           buildingId: selectedBuilding.id,
           unitTypeId: Number(unitForm.unitTypeId),
-          unitNumber: unitForm.unitNumber,
-          floorNumber: Number(unitForm.floorNumber),
+          unitNumber: trimmedUnitNumber,
+          floorNumber: normalizedFloorNumber,
           grossArea: unitForm.grossArea ? Number(unitForm.grossArea) : null,
           netArea: unitForm.netArea ? Number(unitForm.netArea) : null,
-          description: unitForm.description || null,
+          description: unitForm.description ? unitForm.description.trim() : null,
           isActive: unitForm.isActive ?? true,
         }
         const updated = await updateUnit(editingUnitId, payload)
@@ -584,11 +675,11 @@ function App() {
         const payload: CreateUnitPayload = {
           buildingId: selectedBuilding.id,
           unitTypeId: Number(unitForm.unitTypeId),
-          unitNumber: unitForm.unitNumber,
-          floorNumber: Number(unitForm.floorNumber),
+          unitNumber: trimmedUnitNumber,
+          floorNumber: normalizedFloorNumber,
           grossArea: unitForm.grossArea ? Number(unitForm.grossArea) : null,
           netArea: unitForm.netArea ? Number(unitForm.netArea) : null,
-          description: unitForm.description || null,
+          description: unitForm.description ? unitForm.description.trim() : null,
         }
         const created = await createUnit(payload)
         setUnits((prev) => [...prev, created])
@@ -596,7 +687,7 @@ function App() {
       setUnitForm({
         ...initialUnitForm,
         buildingId: selectedBuilding.id,
-        unitTypeId: unitTypes[0]?.id || 0,
+        unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
       })
     } catch (err) {
       setUnitError(err instanceof Error ? err.message : 'Bağımsız bölüm kaydedilemedi.')
@@ -637,8 +728,8 @@ function App() {
       </div>
 
       <header className="page-header">
-        <p className="eyebrow">Phase 4 — Authentication & Role-Based UI</p>
-        <h1>Residential Management System</h1>
+        <p className="eyebrow">Phase 5 — Residential Management System</p>
+        <h1>Site & Gayrimenkul Yönetimi</h1>
         <p className="page-description">
           Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.
         </p>
@@ -669,7 +760,7 @@ function App() {
             onClick={() => selectedBuilding && unitSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
           >
             <span>2. Bina / Blok:</span>
-            <strong>{selectedBuilding ? `${selectedBuilding.name} (${selectedBuilding.code})` : 'Seçilmedi'}</strong>
+            <strong>{selectedBuilding ? selectedBuilding.name : 'Seçilmedi'}</strong>
             {selectedBuilding && (
               <button
                 className="text-button"
@@ -726,7 +817,7 @@ function App() {
                     <option value="">-- Tür Seçiniz --</option>
                     {propertyTypes.map((pt) => (
                       <option key={pt.id} value={pt.id}>
-                        {pt.name} ({pt.code})
+                        {pt.name}
                       </option>
                     ))}
                   </select>
@@ -835,7 +926,9 @@ function App() {
                     <div className="card-header">
                       <div>
                         <h3>{prop.name}</h3>
-                        <p className="subtitle">{prop.propertyTypeName || prop.propertyType}</p>
+                        <p className="subtitle">
+                          {prop.propertyTypeName || PROPERTY_TYPE_LABEL_MAP[prop.propertyType] || prop.propertyType}
+                        </p>
                       </div>
 
                       <span className={`status-badge ${prop.isActive ? 'active' : 'inactive'}`}>
@@ -966,7 +1059,7 @@ function App() {
                   <div className="section-heading">
                     <h2>Tek Apartman Kaydı Hazır</h2>
                     <p>
-                      <strong>{buildings[0].name}</strong> ({buildings[0].floorCount} Kat) için bağımsız bölüm yönetimi aktifleştirildi. Aşağıdaki bölümden daire veya dükkan ekleyebilirsiniz.
+                      <strong>{buildings[0].name}</strong> ({formatFloorDisplay(buildings[0].floorCount)}) için bağımsız bölüm yönetimi aktifleştirildi. Aşağıdaki bölümden daire veya dükkan ekleyebilirsiniz.
                     </p>
                   </div>
                 </div>
@@ -991,21 +1084,24 @@ function App() {
                       <input
                         id="bld-name"
                         value={buildingForm.name}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, name: e.target.value })}
-                        placeholder="Örn: A Blok"
+                        onChange={(e) => handleBuildingNameChange(e.target.value)}
+                        placeholder="Örn: A Blok, Güney Rezidans"
                         required
                       />
                     </div>
 
                     <div className="form-field">
-                      <label htmlFor="bld-code">Bina Kodu *</label>
+                      <label htmlFor="bld-code">Blok Kodu *</label>
                       <input
                         id="bld-code"
                         value={buildingForm.code}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, code: e.target.value })}
-                        placeholder="Örn: A_BLOK"
+                        onChange={(e) => handleBuildingCodeChange(e.target.value)}
+                        placeholder="Örn: A, B, GUN-01"
                         required
                       />
+                      <small className="field-help" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                        Site içinde bloğu kısa ve benzersiz biçimde tanımlar. Örn: A, B, GUN-01
+                      </small>
                     </div>
 
                     <div className="form-field">
@@ -1016,7 +1112,7 @@ function App() {
                         min={1}
                         max={200}
                         value={buildingForm.floorCount}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Number(e.target.value) })}
+                        onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Math.floor(Number(e.target.value)) })}
                         required
                       />
                     </div>
@@ -1090,7 +1186,7 @@ function App() {
                         <div className="card-header">
                           <div>
                             <h3>{bld.name}</h3>
-                            <p className="subtitle">Kod: <code>{bld.code}</code> | {bld.floorCount} Kat</p>
+                            <p className="subtitle">Blok Kodu: {bld.code} | {formatFloorDisplay(bld.floorCount)} (Toplam Kat)</p>
                           </div>
 
                           <span className={`status-badge ${bld.isActive ? 'active' : 'inactive'}`}>
@@ -1171,7 +1267,7 @@ function App() {
                       id="unit-number"
                       value={unitForm.unitNumber}
                       onChange={(e) => setUnitForm({ ...unitForm, unitNumber: e.target.value })}
-                      placeholder="Örn: Daire 1, D:12"
+                      placeholder="Örn: 1, 12, A1, B-03"
                       required
                     />
                   </div>
@@ -1185,23 +1281,26 @@ function App() {
                       required
                     >
                       <option value="">-- Tür Seçiniz --</option>
-                      {unitTypes.map((ut) => (
+                      {selectableUnitTypes.map((ut) => (
                         <option key={ut.id} value={ut.id}>
-                          {ut.name} ({ut.code})
+                          {ut.name}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div className="form-field">
-                    <label htmlFor="unit-floor">Kat No (Bodrum için negatif) *</label>
+                    <label htmlFor="unit-floor">Kat No *</label>
                     <input
                       id="unit-floor"
                       type="number"
                       value={unitForm.floorNumber}
-                      onChange={(e) => setUnitForm({ ...unitForm, floorNumber: Number(e.target.value) })}
+                      onChange={(e) => setUnitForm({ ...unitForm, floorNumber: Math.floor(Number(e.target.value)) })}
                       required
                     />
+                    <small className="field-help" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      0: Zemin Kat, Negatif: Bodrum Kat (örn: -1), Pozitif: Normal Kat (örn: 2)
+                    </small>
                   </div>
 
                   <div className="form-field">
@@ -1303,9 +1402,9 @@ function App() {
                   <article className="item-card" key={u.id}>
                     <div className="card-header">
                       <div>
-                        <h3>{u.unitNumber}</h3>
+                        <h3>{formatUnitDisplay(u.unitNumber, u.unitTypeName)}</h3>
                         <p className="subtitle">
-                          Tür: <strong>{u.unitTypeName}</strong> | Kat: {u.floorNumber}
+                          Tür: <strong>{u.unitTypeName}</strong> | {formatFloorDisplay(u.floorNumber)}
                         </p>
                       </div>
 

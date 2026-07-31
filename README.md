@@ -48,6 +48,15 @@ Phase 5 introduces historical resident tracking between `User` and `Unit`:
    - Comprehensive verification and analytical SQL scripts (`verify_occupancy_schema.sql`, `occupancy_reporting_queries.sql`).
    - Resident data isolation and occupancy business rules will follow in subsequent commits.
 
+2. **Frontend UX & User-Facing Text Cleanup**:
+   - Technical codes (`SINGLE_APARTMENT`, `PARKING_SPACE`, `APARTMENT`, `SHOP`) hidden from user-facing selection dropdowns and cards.
+   - Parking spaces remain reserved for a future parking/common-area module and are hidden from the current Unit form.
+   - Unit number entry simplified with clear placeholders (`1, 12, A1, B-03`) and automatic whitespace trimming.
+   - Floor numbers formatted with user-friendly Turkish labels (`0: Zemin Kat`, `-1: Bodrum -1`, `2: 2. Kat`).
+   - Building Block Code helper text added with automatic Turkish-normalized slug suggestions (`A Blok` -> `A`, `Güney Rezidans` -> `GUNEY-REZIDANS`).
+   - Network failure messages standardized to friendly Turkish message (`Sunucuya ulaşılamadı. Backend servisinin çalıştığını kontrol edin.`).
+   - Generic 401 credential errors and global session expiration handling separated to avoid double error messages.
+
 ---
 
 ### Phase 4 — Authentication & Authorization Infrastructure
