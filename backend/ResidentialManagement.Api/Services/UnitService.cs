@@ -14,7 +14,9 @@ public class UnitService : IUnitService
         _context = context;
     }
 
-    public async Task<List<UnitDto>> GetAllUnitsAsync(bool includeInactive = false)
+    public async Task<List<UnitDto>> GetAllUnitsAsync(
+        bool includeInactive = false,
+        int? residentUserId = null)
     {
         var query = _context.Units
             .AsNoTracking()
@@ -23,10 +25,7 @@ public class UnitService : IUnitService
             .Include(u => u.UnitType)
             .AsQueryable();
 
-        if (!includeInactive)
-        {
-            query = query.Where(u => u.IsActive);
-        }
+        query = ApplyReadAccessFilter(query, includeInactive, residentUserId);
 
         return await query
             .OrderBy(u => u.Building.PropertyId)
@@ -36,19 +35,30 @@ public class UnitService : IUnitService
             .ToListAsync();
     }
 
-    public async Task<UnitDto?> GetUnitByIdAsync(int id)
+    public async Task<UnitDto?> GetUnitByIdAsync(int id, int? residentUserId = null)
     {
-        var unit = await _context.Units
+        var query = _context.Units
             .AsNoTracking()
             .Include(u => u.Building)
                 .ThenInclude(b => b.Property)
             .Include(u => u.UnitType)
-            .FirstOrDefaultAsync(u => u.Id == id);
+            .AsQueryable();
+
+        query = ApplyReadAccessFilter(
+            query,
+            includeInactive: true,
+            residentUserId: residentUserId
+        );
+
+        var unit = await query.FirstOrDefaultAsync(u => u.Id == id);
 
         return unit is null ? null : MapToDto(unit);
     }
 
-    public async Task<List<UnitDto>?> GetUnitsByBuildingIdAsync(int buildingId, bool includeInactive = false)
+    public async Task<List<UnitDto>?> GetUnitsByBuildingIdAsync(
+        int buildingId,
+        bool includeInactive = false,
+        int? residentUserId = null)
     {
         var buildingExists = await _context.Buildings
             .AsNoTracking()
@@ -66,10 +76,7 @@ public class UnitService : IUnitService
             .Include(u => u.UnitType)
             .Where(u => u.BuildingId == buildingId);
 
-        if (!includeInactive)
-        {
-            query = query.Where(u => u.IsActive);
-        }
+        query = ApplyReadAccessFilter(query, includeInactive, residentUserId);
 
         return await query
             .OrderBy(u => u.UnitNumber)
@@ -77,7 +84,10 @@ public class UnitService : IUnitService
             .ToListAsync();
     }
 
-    public async Task<List<UnitDto>?> GetUnitsByPropertyIdAsync(int propertyId, bool includeInactive = false)
+    public async Task<List<UnitDto>?> GetUnitsByPropertyIdAsync(
+        int propertyId,
+        bool includeInactive = false,
+        int? residentUserId = null)
     {
         var propertyExists = await _context.Properties
             .AsNoTracking()
@@ -95,10 +105,7 @@ public class UnitService : IUnitService
             .Include(u => u.UnitType)
             .Where(u => u.Building.PropertyId == propertyId);
 
-        if (!includeInactive)
-        {
-            query = query.Where(u => u.IsActive);
-        }
+        query = ApplyReadAccessFilter(query, includeInactive, residentUserId);
 
         return await query
             .OrderBy(u => u.Building.Code)
@@ -274,6 +281,28 @@ public class UnitService : IUnitService
         await _context.SaveChangesAsync();
 
         return true;
+    }
+
+    private static IQueryable<Unit> ApplyReadAccessFilter(
+        IQueryable<Unit> query,
+        bool includeInactive,
+        int? residentUserId)
+    {
+        if (residentUserId.HasValue)
+        {
+            var utcNow = DateTime.UtcNow;
+            return query.Where(u =>
+                u.IsActive &&
+                u.Building.IsActive &&
+                u.Building.Property.IsActive &&
+                u.UnitOccupancies.Any(uo =>
+                    uo.UserId == residentUserId.Value &&
+                    uo.IsActive &&
+                    uo.StartDate <= utcNow &&
+                    (!uo.EndDate.HasValue || uo.EndDate.Value >= utcNow)));
+        }
+
+        return includeInactive ? query : query.Where(u => u.IsActive);
     }
 
     private static UnitDto MapToDto(Unit unit)
