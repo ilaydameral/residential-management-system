@@ -38,6 +38,13 @@ public class AdminInitializer : IAdminInitializer
             return;
         }
 
+        await InitializeAdminUserAsync();
+        await InitializeDevRoleUserAsync("MANAGER", "manager", "manager@example.com", "Manager123!", "Operational", "Manager");
+        await InitializeDevRoleUserAsync("USER", "user", "user@example.com", "User123!", "Standard", "User");
+    }
+
+    private async Task InitializeAdminUserAsync()
+    {
         var userName = _configuration["BootstrapAdmin:UserName"]?.Trim();
         var email = _configuration["BootstrapAdmin:Email"]?.Trim();
         var password = _configuration["BootstrapAdmin:Password"];
@@ -50,23 +57,37 @@ public class AdminInitializer : IAdminInitializer
             return;
         }
 
+        await CreateUserIfNotExistsAsync("ADMIN", userName, email, password, firstName, lastName);
+    }
+
+    private async Task InitializeDevRoleUserAsync(string roleCode, string defaultUserName, string defaultEmail, string defaultPassword, string firstName, string lastName)
+    {
+        var userName = _configuration[$"Bootstrap{roleCode}:UserName"]?.Trim() ?? defaultUserName;
+        var email = _configuration[$"Bootstrap{roleCode}:Email"]?.Trim() ?? defaultEmail;
+        var password = _configuration[$"Bootstrap{roleCode}:Password"] ?? defaultPassword;
+
+        await CreateUserIfNotExistsAsync(roleCode, userName, email, password, firstName, lastName);
+    }
+
+    private async Task CreateUserIfNotExistsAsync(string roleCode, string userName, string email, string password, string firstName, string lastName)
+    {
         var existingUser = await _context.Users
             .AnyAsync(u => u.UserName.ToLower() == userName.ToLower() || u.Email.ToLower() == email.ToLower());
 
         if (existingUser)
         {
-            _logger.LogInformation("Bootstrap admin user '{UserName}' ({Email}) already exists. Skipping initialization.", userName, email);
+            _logger.LogInformation("Bootstrap user '{UserName}' ({Email}) already exists. Skipping initialization.", userName, email);
             return;
         }
 
-        var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Code == "ADMIN");
-        if (adminRole is null)
+        var role = await _context.Roles.FirstOrDefaultAsync(r => r.Code == roleCode);
+        if (role is null)
         {
-            _logger.LogWarning("ADMIN role not found in database. Cannot create bootstrap admin user.");
+            _logger.LogWarning("Role '{RoleCode}' not found in database. Cannot create bootstrap user.", roleCode);
             return;
         }
 
-        var adminUser = new User
+        var user = new User
         {
             UserName = userName,
             Email = email,
@@ -76,21 +97,21 @@ public class AdminInitializer : IAdminInitializer
             CreatedAt = DateTime.UtcNow
         };
 
-        adminUser.PasswordHash = _passwordService.HashPassword(adminUser, password);
+        user.PasswordHash = _passwordService.HashPassword(user, password);
 
-        _context.Users.Add(adminUser);
+        _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
         var userRole = new UserRole
         {
-            UserId = adminUser.Id,
-            RoleId = adminRole.Id,
+            UserId = user.Id,
+            RoleId = role.Id,
             AssignedAt = DateTime.UtcNow
         };
 
         _context.UserRoles.Add(userRole);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Development bootstrap admin user '{UserName}' ({Email}) successfully created.", userName, email);
+        _logger.LogInformation("Development bootstrap user '{UserName}' ({Email}) with role '{RoleCode}' successfully created.", userName, email, roleCode);
     }
 }

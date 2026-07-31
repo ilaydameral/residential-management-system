@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using ResidentialManagement.Api.Data;
 using ResidentialManagement.Api.Entities;
 using ResidentialManagement.Api.Middleware;
@@ -78,7 +79,22 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        var components = document.Components ??= new OpenApiComponents();
+        components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "JWT Access Token Authentication"
+        };
+        return Task.CompletedTask;
+    });
+});
 
 var app = builder.Build();
 
@@ -99,7 +115,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Execute Development Bootstrap Admin Initializer
+// Execute Development Bootstrap Admin / Test Users Initializer
 using (var scope = app.Services.CreateScope())
 {
     var adminInitializer = scope.ServiceProvider.GetRequiredService<IAdminInitializer>();

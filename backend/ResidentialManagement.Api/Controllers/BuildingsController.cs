@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.DTOs;
 using ResidentialManagement.Api.Services;
 
@@ -6,6 +8,7 @@ namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/buildings")]
+[Authorize]
 public class BuildingsController : ControllerBase
 {
     private readonly IBuildingService _buildingService;
@@ -16,6 +19,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<BuildingDto>>> GetBuildings([FromQuery] bool includeInactive = false)
     {
         var buildings = await _buildingService.GetAllBuildingsAsync(includeInactive);
@@ -23,6 +27,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<BuildingDto>> GetBuildingById(int id)
     {
         var building = await _buildingService.GetBuildingByIdAsync(id);
@@ -40,6 +45,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpGet("property/{propertyId:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<BuildingDto>>> GetBuildingsByPropertyId(int propertyId, [FromQuery] bool includeInactive = false)
     {
         var buildings = await _buildingService.GetBuildingsByPropertyIdAsync(propertyId, includeInactive);
@@ -57,6 +63,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<BuildingDto>> CreateBuilding(CreateBuildingDto createDto)
     {
         if (!ModelState.IsValid)
@@ -74,6 +81,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<BuildingDto>> UpdateBuilding(int id, UpdateBuildingDto updateDto)
     {
         if (!ModelState.IsValid)
@@ -96,6 +104,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> DeleteBuilding(int id)
     {
         var deleted = await _buildingService.DeleteBuildingAsync(id);

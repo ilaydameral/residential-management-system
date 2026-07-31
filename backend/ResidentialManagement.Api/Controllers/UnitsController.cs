@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.DTOs;
 using ResidentialManagement.Api.Services;
 
@@ -6,6 +8,7 @@ namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/units")]
+[Authorize]
 public class UnitsController : ControllerBase
 {
     private readonly IUnitService _unitService;
@@ -16,6 +19,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnits([FromQuery] bool includeInactive = false)
     {
         var units = await _unitService.GetAllUnitsAsync(includeInactive);
@@ -23,6 +27,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<UnitDto>> GetUnitById(int id)
     {
         var unit = await _unitService.GetUnitByIdAsync(id);
@@ -40,6 +45,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet("building/{buildingId:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByBuildingId(int buildingId, [FromQuery] bool includeInactive = false)
     {
         var units = await _unitService.GetUnitsByBuildingIdAsync(buildingId, includeInactive);
@@ -57,6 +63,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet("property/{propertyId:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByPropertyId(int propertyId, [FromQuery] bool includeInactive = false)
     {
         var units = await _unitService.GetUnitsByPropertyIdAsync(propertyId, includeInactive);
@@ -74,6 +81,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<UnitDto>> CreateUnit(CreateUnitDto createDto)
     {
         if (!ModelState.IsValid)
@@ -91,6 +99,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<UnitDto>> UpdateUnit(int id, UpdateUnitDto updateDto)
     {
         if (!ModelState.IsValid)
@@ -113,6 +122,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> DeleteUnit(int id)
     {
         var deleted = await _unitService.DeleteUnitAsync(id);

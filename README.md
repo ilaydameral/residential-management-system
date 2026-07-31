@@ -7,7 +7,7 @@ The project is being developed incrementally.
 - **Phase 1**: Full-stack prototype validating React, ASP.NET Core Web API, and SQL Server connectivity.
 - **Phase 2**: Service layer, DTO refactoring, standardized string lengths, and centralized exception handling middleware.
 - **Phase 3**: Complete Property Structure Management (`PropertyType` & `UnitType` lookups, `Building` & `Unit` entities, composite unique indexes, database CHECK constraints, Turkey 81 city-district searchable selection, real-world business rules enforcement, and full React hierarchy UI).
-- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, development bootstrap admin initializer, and SQL support scripts).
+- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, role-based authorization rules, development bootstrap admin initializer, and SQL support scripts).
 
 ---
 
@@ -52,6 +52,14 @@ Phase 4 introduces identity, role-based access control (RBAC), and authenticatio
    - Login API endpoint (`POST /api/auth/login`) returning `LoginResponseDto` with generic invalid credential response (`401 Unauthorized`) and inactive user check (`403 Forbidden`).
    - Development-only `AdminInitializer` bootstrapping initial `ADMIN` user safely via `user-secrets` or environment variables without hardcoded passwords. Production secrets must use environment variables or secret manager.
    - T-SQL support queries (`auth_login_support_queries.sql`).
+
+3. **Role-Based Authorization (RBAC)**:
+   - Endpoint protection via `[Authorize]` attributes and `AppRoles` constants (`ADMIN`, `MANAGER`, `USER`).
+   - `ADMIN`: Full CRUD access across all business endpoints and lookup tables.
+   - `MANAGER`: Operational create and update access (`Properties`, `Buildings`, `Units`), read-only lookup access (`PropertyTypes`, `UnitTypes`), no delete permissions.
+   - `USER`: Read-only access across all endpoints (`GET` only); write or delete attempts return `403 Forbidden`.
+   - `POST /api/auth/login` is explicitly marked `[AllowAnonymous]`; unauthenticated requests to protected endpoints return `401 Unauthorized`.
+   - Swagger / OpenAPI document transformer configured to support JWT Bearer token authorization UI.
 
 ---
 
@@ -113,8 +121,15 @@ Phase 3 introduces complete physical structure modeling for complex residential 
 residential-management-system/
 ├── backend/
 │   └── ResidentialManagement.Api/
+│       ├── Authorization/
+│       │   └── AppRoles.cs
 │       ├── Controllers/
-│       │   └── AuthController.cs
+│       │   ├── AuthController.cs
+│       │   ├── BuildingsController.cs
+│       │   ├── PropertiesController.cs
+│       │   ├── PropertyTypesController.cs
+│       │   ├── UnitsController.cs
+│       │   └── UnitTypesController.cs
 │       ├── Data/
 │       │   └── AppDbContext.cs
 │       ├── DTOs/
@@ -180,46 +195,46 @@ dotnet ef database update \
 
 ## API Endpoints
 
-### Auth API
+### Auth API (Anonymous)
 - `POST /api/auth/login`
 
-### Property Types API
-- `GET /api/property-types`
-- `GET /api/property-types/{id}`
-- `POST /api/property-types`
-- `PUT /api/property-types/{id}`
-- `DELETE /api/property-types/{id}`
+### Property Types API (Auth Required)
+- `GET /api/property-types` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/property-types/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/property-types` (`ADMIN`)
+- `PUT /api/property-types/{id}` (`ADMIN`)
+- `DELETE /api/property-types/{id}` (`ADMIN`)
 
-### Unit Types API
-- `GET /api/unit-types`
-- `GET /api/unit-types/{id}`
-- `POST /api/unit-types`
-- `PUT /api/unit-types/{id}`
-- `DELETE /api/unit-types/{id}`
+### Unit Types API (Auth Required)
+- `GET /api/unit-types` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/unit-types/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/unit-types` (`ADMIN`)
+- `PUT /api/unit-types/{id}` (`ADMIN`)
+- `DELETE /api/unit-types/{id}` (`ADMIN`)
 
-### Properties API
-- `GET /api/properties` (`?includeInactive=false`)
-- `GET /api/properties/{id}`
-- `POST /api/properties`
-- `PUT /api/properties/{id}`
-- `DELETE /api/properties/{id}`
+### Properties API (Auth Required)
+- `GET /api/properties` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/properties/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/properties` (`ADMIN`, `MANAGER`)
+- `PUT /api/properties/{id}` (`ADMIN`, `MANAGER`)
+- `DELETE /api/properties/{id}` (`ADMIN`)
 
-### Buildings API
-- `GET /api/buildings` (`?includeInactive=false`)
-- `GET /api/buildings/{id}`
-- `GET /api/buildings/property/{propertyId}`
-- `POST /api/buildings`
-- `PUT /api/buildings/{id}`
-- `DELETE /api/buildings/{id}`
+### Buildings API (Auth Required)
+- `GET /api/buildings` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/buildings/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/buildings/property/{propertyId}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/buildings` (`ADMIN`, `MANAGER`)
+- `PUT /api/buildings/{id}` (`ADMIN`, `MANAGER`)
+- `DELETE /api/buildings/{id}` (`ADMIN`)
 
-### Units API
-- `GET /api/units` (`?includeInactive=false`)
-- `GET /api/units/{id}`
-- `GET /api/units/building/{buildingId}`
-- `GET /api/units/property/{propertyId}`
-- `POST /api/units`
-- `PUT /api/units/{id}`
-- `DELETE /api/units/{id}`
+### Units API (Auth Required)
+- `GET /api/units` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/units/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/units/building/{buildingId}` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/units/property/{propertyId}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/units` (`ADMIN`, `MANAGER`)
+- `PUT /api/units/{id}` (`ADMIN`, `MANAGER`)
+- `DELETE /api/units/{id}` (`ADMIN`)
 
 ---
 

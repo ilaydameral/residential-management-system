@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.DTOs;
 using ResidentialManagement.Api.Services;
 
@@ -6,6 +8,7 @@ namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/unit-types")]
+[Authorize]
 public class UnitTypesController : ControllerBase
 {
     private readonly IUnitTypeService _unitTypeService;
@@ -16,6 +19,7 @@ public class UnitTypesController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitTypeDto>>> GetUnitTypes([FromQuery] bool includeInactive = false)
     {
         var unitTypes = await _unitTypeService.GetAllUnitTypesAsync(includeInactive);
@@ -23,6 +27,7 @@ public class UnitTypesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<UnitTypeDto>> GetUnitTypeById(int id)
     {
         var unitType = await _unitTypeService.GetUnitTypeByIdAsync(id);
@@ -40,6 +45,7 @@ public class UnitTypesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<ActionResult<UnitTypeDto>> CreateUnitType(CreateUnitTypeDto createDto)
     {
         if (!ModelState.IsValid)
@@ -57,6 +63,7 @@ public class UnitTypesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<ActionResult<UnitTypeDto>> UpdateUnitType(int id, UpdateUnitTypeDto updateDto)
     {
         if (!ModelState.IsValid)
@@ -79,6 +86,7 @@ public class UnitTypesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> DeleteUnitType(int id)
     {
         var deleted = await _unitTypeService.DeleteUnitTypeAsync(id);

@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.DTOs;
 using ResidentialManagement.Api.Services;
 
@@ -6,6 +8,7 @@ namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class PropertiesController : ControllerBase
 {
     private readonly IPropertyService _propertyService;
@@ -16,6 +19,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<PropertyDto>>> GetProperties([FromQuery] bool includeInactive = false)
     {
         var properties = await _propertyService.GetAllPropertiesAsync(includeInactive);
@@ -23,6 +27,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<PropertyDto>> GetPropertyById(int id)
     {
         var property = await _propertyService.GetPropertyByIdAsync(id);
@@ -40,6 +45,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<PropertyDto>> CreateProperty(CreatePropertyDto createDto)
     {
         if (!ModelState.IsValid)
@@ -57,6 +63,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<PropertyDto>> UpdateProperty(int id, UpdatePropertyDto updateDto)
     {
         if (!ModelState.IsValid)
@@ -79,6 +86,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpPatch("{id:int}/deactivate")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<IActionResult> DeactivateProperty(int id)
     {
         var success = await _propertyService.DeactivatePropertyAsync(id);
@@ -96,6 +104,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> DeleteProperty(int id)
     {
         var success = await _propertyService.DeletePropertyAsync(id);
