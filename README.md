@@ -46,7 +46,10 @@ Phase 5 introduces historical resident tracking between `User` and `Unit`:
    - Composite indexes on `(UnitId, IsActive)` and `(UserId, IsActive)` for efficient active residency queries.
    - Check constraint `CK_UnitOccupancies_EndDate_After_StartDate` enforcing `[EndDate] IS NULL OR [EndDate] >= [StartDate]`.
    - Comprehensive verification and analytical SQL scripts (`verify_occupancy_schema.sql`, `occupancy_reporting_queries.sql`).
-   - Resident data isolation and occupancy business rules will follow in subsequent commits.
+   - ADMIN/MANAGER occupancy API for listing, detail viewing, assignment, update, and relationship closure.
+   - Service-layer validation for active user/unit/building/property/type records, date overlaps, and one active primary record per unit.
+   - Historical relationships are closed with `EndDate` and `IsActive = false`; physical delete is not exposed.
+   - Resident data isolation will follow in a subsequent commit.
 
 2. **Frontend UX & User-Facing Text Cleanup**:
    - Technical codes (`SINGLE_APARTMENT`, `PARKING_SPACE`, `APARTMENT`, `SHOP`) hidden from user-facing selection dropdowns and cards.
@@ -287,6 +290,13 @@ dotnet ef database update \
 - `POST /api/units` (`ADMIN`, `MANAGER`)
 - `PUT /api/units/{id}` (`ADMIN`, `MANAGER`)
 - `DELETE /api/units/{id}` (`ADMIN`)
+
+### Unit Occupancies API (Auth Required)
+- `GET /api/units/{unitId}/occupancies` (`ADMIN`, `MANAGER`)
+- `GET /api/unit-occupancies/{id}` (`ADMIN`, `MANAGER`)
+- `POST /api/units/{unitId}/occupancies` (`ADMIN`, `MANAGER`)
+- `PUT /api/unit-occupancies/{id}` (`ADMIN`, `MANAGER`)
+- `POST /api/unit-occupancies/{id}/close` (`ADMIN`, `MANAGER`)
 
 ---
 
