@@ -7,6 +7,7 @@ The project is being developed incrementally.
 - **Phase 1**: Full-stack prototype validating React, ASP.NET Core Web API, and SQL Server connectivity.
 - **Phase 2**: Service layer, DTO refactoring, standardized string lengths, and centralized exception handling middleware.
 - **Phase 3**: Complete Property Structure Management (`PropertyType` & `UnitType` lookups, `Building` & `Unit` entities, composite unique indexes, database CHECK constraints, Turkey 81 city-district searchable selection, real-world business rules enforcement, and full React hierarchy UI).
+- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, role-based authorization rules, React AuthContext, Login screen, role-based UI rendering, development bootstrap admin initializer, and SQL support scripts).
 
 ---
 
@@ -31,7 +32,49 @@ The project is being developed incrementally.
 
 ---
 
-## Current Status: Phase 3 Completed
+## Current Status: Phase 4 In Progress
+
+### Phase 4 — Authentication & Authorization Infrastructure
+
+Phase 4 introduces identity, role-based access control (RBAC), and authentication:
+
+1. **User, Role, and UserRole Data Model**:
+   - `User`, `Role`, and `UserRole` entities configured via EF Core Fluent API.
+   - Unique constraints on `UserName`, `Email`, and `Role.Code`.
+   - Composite primary key on `UserRole` (`UserId`, `RoleId`) with `Cascade` delete behavior.
+   - Seeded system roles: `ADMIN` (Administrator), `MANAGER` (Property Manager), `RESIDENT` (Resident), `TECHNICAL_STAFF` (Technical Staff).
+   - Passwords stored strictly as `PasswordHash`.
+   - T-SQL verification scripts (`verify_auth_schema.sql`, `auth_user_role_queries.sql`).
+
+2. **JWT Authentication & Password Hashing**:
+   - Framework `PasswordHasher<User>` wrapper (`IPasswordService`) utilizing PBKDF2 password hashing. Passwords stored strictly as hashes; plain-text passwords never logged or persisted.
+   - JWT Access Token generation (`IJwtTokenService`) including `sub`, `unique_name`, `email`, `given_name`, `family_name`, and `role` claims.
+   - Login API endpoint (`POST /api/auth/login`) returning `LoginResponseDto` with generic invalid credential response (`401 Unauthorized`) and inactive user check (`403 Forbidden`).
+   - Development-only `AdminInitializer` bootstrapping initial `ADMIN`, `MANAGER`, `RESIDENT`, and `TECHNICAL_STAFF` users safely via `user-secrets` or environment variables without hardcoded passwords.
+   - T-SQL support queries (`auth_login_support_queries.sql`).
+
+3. **Role-Based Authorization (RBAC)**:
+   - Endpoint protection via `[Authorize]` attributes and `AppRoles` constants (`ADMIN`, `MANAGER`, `RESIDENT`, `TECHNICAL_STAFF`).
+   - `ADMIN`: Full CRUD access across all business endpoints and lookup tables.
+   - `MANAGER`: Operational create and update access (`Properties`, `Buildings`, `Units`), read-only lookup access (`PropertyTypes`, `UnitTypes`), no delete permissions.
+   - `RESIDENT`: Read-only access across all endpoints (`GET` only); write or delete attempts return `403 Forbidden`. Public registration assigns `RESIDENT` role by default.
+   - `TECHNICAL_STAFF`: Read-only access (`GET` only) across all endpoints until maintenance modules are implemented in future phases.
+   - `POST /api/auth/login` and `POST /api/auth/register` are explicitly marked `[AllowAnonymous]`; unauthenticated requests to protected endpoints return `401 Unauthorized`.
+   - Swagger / OpenAPI document transformer configured to support JWT Bearer token authorization UI.
+
+4. **Frontend Auth State & Role-Based UI**:
+   - `AuthContext` and `useAuth` hook managing authentication state, token persistence (`localStorage`), and session restoration.
+   - Modern Glassmorphism Login screen displaying generic backend error messages for invalid credentials (`401`) and inactive user accounts (`403`).
+   - Automatic `Authorization: Bearer <token>` header attached to all protected API calls.
+   - Header User Bar displaying authenticated user's name, role badges, and Logout button.
+   - Role-Based UI rendering:
+     - `ADMIN`: Sees all create, edit, and delete forms and buttons.
+     - `MANAGER`: Sees operational create and edit forms for Properties, Buildings, and Units; delete buttons and lookup creation forms are hidden.
+     - `RESIDENT` & `TECHNICAL_STAFF`: See read-only lists and details; all creation/edit/delete forms, buttons, and `SINGLE_APARTMENT` setup prompts are hidden.
+   - `401` responses trigger session cleanup and transition to Login screen with "Oturumunuz sona erdi. Lütfen tekrar giriş yapın." notice; `403` responses display inline permission error messages without clearing the session.
+   - Backend API remains the final authorization authority.
+
+---
 
 ### Phase 3 — Property Structure Management
 
@@ -91,7 +134,10 @@ Phase 3 introduces complete physical structure modeling for complex residential 
 residential-management-system/
 ├── backend/
 │   └── ResidentialManagement.Api/
+│       ├── Authorization/
+│       │   └── AppRoles.cs
 │       ├── Controllers/
+│       │   ├── AuthController.cs
 │       │   ├── BuildingsController.cs
 │       │   ├── PropertiesController.cs
 │       │   ├── PropertyTypesController.cs
@@ -100,35 +146,41 @@ residential-management-system/
 │       ├── Data/
 │       │   └── AppDbContext.cs
 │       ├── DTOs/
+│       │   ├── AuthenticatedUserDto.cs
+│       │   ├── LoginRequestDto.cs
+│       │   └── LoginResponseDto.cs
 │       ├── Entities/
-│       │   ├── Building.cs
-│       │   ├── Property.cs
-│       │   ├── PropertyType.cs
-│       │   ├── Unit.cs
-│       │   └── UnitType.cs
+│       │   ├── Role.cs
+│       │   ├── User.cs
+│       │   └── UserRole.cs
+│       ├── Exceptions/
+│       │   ├── ForbiddenException.cs
+│       │   └── UnauthorizedException.cs
 │       ├── Middleware/
 │       │   └── ExceptionHandlingMiddleware.cs
-│       ├── Migrations/
-│       └── Services/
+│       ├── Services/
+│       │   ├── AdminInitializer.cs
+│       │   ├── AuthService.cs
+│       │   ├── IAuthService.cs
+│       │   ├── IJwtTokenService.cs
+│       │   ├── IPasswordService.cs
+│       │   ├── JwtTokenService.cs
+│       │   └── PasswordService.cs
 ├── database/
-│   ├── 001_create_database.sql
 │   └── queries/
-│       ├── migrate_property_type_data.sql
-│       ├── verify_buildings.sql
-│       ├── verify_properties.sql
-│       ├── verify_property_types.sql
-│       ├── verify_unit_types.sql
-│       └── verify_units.sql
+│       ├── auth_login_support_queries.sql
+│       ├── auth_user_role_queries.sql
+│       └── verify_auth_schema.sql
 ├── frontend/
 │   ├── src/
-│   │   ├── api.ts
-│   │   ├── App.tsx
 │   │   ├── components/
+│   │   │   ├── Login.tsx
 │   │   │   └── SearchableSelect.tsx
-│   │   ├── config.ts
-│   │   ├── data/
-│   │   │   └── turkeyLocations.ts
-│   │   ├── index.css
+│   │   ├── context/
+│   │   │   └── AuthContext.tsx
+│   │   ├── App.tsx
+│   │   ├── api.ts
+│   │   ├── main.tsx
 │   │   └── types.ts
 └── README.md
 ```
@@ -141,7 +193,7 @@ The application database is `ApartmentManagementDb` running in Microsoft SQL Ser
 
 ### Apply Migrations
 
-To apply all EF Core migrations up to `AddUnits`:
+To apply all EF Core migrations:
 
 ```bash
 dotnet ef database update \
@@ -159,49 +211,55 @@ dotnet ef database update \
 5. 20260730133921_AddUnitTypesLookup
 6. 20260730200204_AddBuildings
 7. 20260730205710_AddUnits
+8. 20260731064656_AddAuthenticationEntities
 ```
 
 ---
 
 ## API Endpoints
 
-### Property Types API
-- `GET /api/property-types`
-- `GET /api/property-types/{id}`
-- `POST /api/property-types`
-- `PUT /api/property-types/{id}`
-- `DELETE /api/property-types/{id}`
+### Auth API (Anonymous)
+- `POST /api/auth/login`
+- `POST /api/auth/register`
 
-### Unit Types API
-- `GET /api/unit-types`
-- `GET /api/unit-types/{id}`
-- `POST /api/unit-types`
-- `PUT /api/unit-types/{id}`
-- `DELETE /api/unit-types/{id}`
 
-### Properties API
-- `GET /api/properties` (`?includeInactive=false`)
-- `GET /api/properties/{id}`
-- `POST /api/properties`
-- `PUT /api/properties/{id}`
-- `DELETE /api/properties/{id}`
+### Property Types API (Auth Required)
+- `GET /api/property-types` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/property-types/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/property-types` (`ADMIN`)
+- `PUT /api/property-types/{id}` (`ADMIN`)
+- `DELETE /api/property-types/{id}` (`ADMIN`)
 
-### Buildings API
-- `GET /api/buildings` (`?includeInactive=false`)
-- `GET /api/buildings/{id}`
-- `GET /api/buildings/property/{propertyId}`
-- `POST /api/buildings`
-- `PUT /api/buildings/{id}`
-- `DELETE /api/buildings/{id}`
+### Unit Types API (Auth Required)
+- `GET /api/unit-types` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/unit-types/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/unit-types` (`ADMIN`)
+- `PUT /api/unit-types/{id}` (`ADMIN`)
+- `DELETE /api/unit-types/{id}` (`ADMIN`)
 
-### Units API
-- `GET /api/units` (`?includeInactive=false`)
-- `GET /api/units/{id}`
-- `GET /api/units/building/{buildingId}`
-- `GET /api/units/property/{propertyId}`
-- `POST /api/units`
-- `PUT /api/units/{id}`
-- `DELETE /api/units/{id}`
+### Properties API (Auth Required)
+- `GET /api/properties` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/properties/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/properties` (`ADMIN`, `MANAGER`)
+- `PUT /api/properties/{id}` (`ADMIN`, `MANAGER`)
+- `DELETE /api/properties/{id}` (`ADMIN`)
+
+### Buildings API (Auth Required)
+- `GET /api/buildings` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/buildings/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/buildings/property/{propertyId}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/buildings` (`ADMIN`, `MANAGER`)
+- `PUT /api/buildings/{id}` (`ADMIN`, `MANAGER`)
+- `DELETE /api/buildings/{id}` (`ADMIN`)
+
+### Units API (Auth Required)
+- `GET /api/units` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/units/{id}` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/units/building/{buildingId}` (`ADMIN`, `MANAGER`, `USER`)
+- `GET /api/units/property/{propertyId}` (`ADMIN`, `MANAGER`, `USER`)
+- `POST /api/units` (`ADMIN`, `MANAGER`)
+- `PUT /api/units/{id}` (`ADMIN`, `MANAGER`)
+- `DELETE /api/units/{id}` (`ADMIN`)
 
 ---
 
@@ -214,6 +272,20 @@ dotnet run --project backend/ResidentialManagement.Api
 ```
 Runs at `http://localhost:5006`.
 
+### Local Development User-Secrets Setup
+
+Configure JWT signing key and development bootstrap admin credentials locally using .NET User Secrets:
+
+```bash
+# Set JWT signing key (minimum 32 characters)
+dotnet user-secrets set "Jwt:Key" "<minimum-32-character-development-secret>" --project backend/ResidentialManagement.Api
+
+# Set development bootstrap admin account credentials
+dotnet user-secrets set "BootstrapAdmin:UserName" "admin" --project backend/ResidentialManagement.Api
+dotnet user-secrets set "BootstrapAdmin:Email" "admin@example.com" --project backend/ResidentialManagement.Api
+dotnet user-secrets set "BootstrapAdmin:Password" "<secure-admin-password>" --project backend/ResidentialManagement.Api
+```
+
 ### 2. Run Frontend (React + Vite)
 
 ```bash
@@ -222,7 +294,25 @@ npm --prefix frontend run dev
 ```
 Runs at `http://localhost:5173`.
 
+### Local Development Ports & Process Management
+
+- **Backend**: Runs on `http://localhost:5006`
+- **Frontend**: Runs on `http://localhost:5173`
+
+If port conflict issues arise due to background processes remaining active:
+
+```bash
+# Check processes listening on ports 5006 and 5173
+lsof -i :5006
+lsof -i :5173
+
+# Terminate hanging backend or frontend processes if necessary
+pkill -f ResidentialManagement.Api
+pkill -f "vite"
+```
+
 ---
+
 
 ## Verification & Checks
 
@@ -230,6 +320,9 @@ Runs at `http://localhost:5173`.
 
 Execute T-SQL read-only verification scripts under `database/queries/`:
 
+- `auth_login_support_queries.sql`
+- `verify_auth_schema.sql`
+- `auth_user_role_queries.sql`
 - `verify_properties.sql`
 - `verify_property_types.sql`
 - `verify_unit_types.sql`

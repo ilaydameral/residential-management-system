@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using ResidentialManagement.Api.DTOs;
+using ResidentialManagement.Api.Exceptions;
 
 namespace ResidentialManagement.Api.Middleware;
 
@@ -39,6 +40,8 @@ public class ExceptionHandlingMiddleware
 
         var statusCode = exception switch
         {
+            UnauthorizedException => (int)HttpStatusCode.Unauthorized,
+            ForbiddenException => (int)HttpStatusCode.Forbidden,
             InvalidOperationException => (int)HttpStatusCode.Conflict,
             KeyNotFoundException => (int)HttpStatusCode.NotFound,
             _ => (int)HttpStatusCode.InternalServerError

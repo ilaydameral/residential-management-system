@@ -121,6 +121,35 @@ export interface UpdateUnitPayload {
   isActive: boolean
 }
 
+export interface LoginRequest {
+  userNameOrEmail: string
+  password: string
+}
+
+export interface RegisterRequest {
+  userName: string
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+}
+
+
+export interface AuthenticatedUser {
+  id: number
+  userName: string
+  email: string
+  firstName: string
+  lastName: string
+  roles: string[]
+}
+
+export interface LoginResponse {
+  accessToken: string
+  expiresAtUtc: string
+  user: AuthenticatedUser
+}
+
 export interface ApiErrorResponse {
   statusCode?: number
   message?: string

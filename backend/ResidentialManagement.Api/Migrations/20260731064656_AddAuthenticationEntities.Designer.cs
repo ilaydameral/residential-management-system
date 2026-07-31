@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResidentialManagement.Api.Data;
 
@@ -11,9 +12,11 @@ using ResidentialManagement.Api.Data;
 namespace ResidentialManagement.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260731064656_AddAuthenticationEntities")]
+    partial class AddAuthenticationEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -252,18 +255,10 @@ namespace ResidentialManagement.Api.Migrations
                         new
                         {
                             Id = 3,
-                            Code = "RESIDENT",
-                            Description = "Resident access to assigned property and unit information",
+                            Code = "USER",
+                            Description = "Basic authenticated system access",
                             IsActive = true,
-                            Name = "Resident"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Code = "TECHNICAL_STAFF",
-                            Description = "Handles maintenance and technical operations",
-                            IsActive = true,
-                            Name = "Technical Staff"
+                            Name = "Standard User"
                         });
                 });
 

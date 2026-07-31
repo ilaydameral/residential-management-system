@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.DTOs;
 using ResidentialManagement.Api.Services;
 
@@ -6,6 +8,7 @@ namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/property-types")]
+[Authorize]
 public class PropertyTypesController : ControllerBase
 {
     private readonly IPropertyTypeService _propertyTypeService;
@@ -16,6 +19,7 @@ public class PropertyTypesController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<PropertyTypeDto>>> GetPropertyTypes([FromQuery] bool includeInactive = false)
     {
         var propertyTypes = await _propertyTypeService.GetAllPropertyTypesAsync(includeInactive);
@@ -23,6 +27,7 @@ public class PropertyTypesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<PropertyTypeDto>> GetPropertyTypeById(int id)
     {
         var propertyType = await _propertyTypeService.GetPropertyTypeByIdAsync(id);
@@ -40,6 +45,7 @@ public class PropertyTypesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<ActionResult<PropertyTypeDto>> CreatePropertyType(CreatePropertyTypeDto createDto)
     {
         if (!ModelState.IsValid)
@@ -57,6 +63,7 @@ public class PropertyTypesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<ActionResult<PropertyTypeDto>> UpdatePropertyType(int id, UpdatePropertyTypeDto updateDto)
     {
         if (!ModelState.IsValid)
@@ -79,6 +86,7 @@ public class PropertyTypesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> DeletePropertyType(int id)
     {
         var deleted = await _propertyTypeService.DeletePropertyTypeAsync(id);
