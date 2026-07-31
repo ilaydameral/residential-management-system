@@ -42,7 +42,7 @@ Phase 4 introduces identity, role-based access control (RBAC), and authenticatio
    - `User`, `Role`, and `UserRole` entities configured via EF Core Fluent API.
    - Unique constraints on `UserName`, `Email`, and `Role.Code`.
    - Composite primary key on `UserRole` (`UserId`, `RoleId`) with `Cascade` delete behavior.
-   - Seeded system roles: `ADMIN` (Administrator), `MANAGER` (Property Manager), `USER` (Standard User).
+   - Seeded system roles: `ADMIN` (Administrator), `MANAGER` (Property Manager), `RESIDENT` (Resident), `TECHNICAL_STAFF` (Technical Staff).
    - Passwords stored strictly as `PasswordHash`.
    - T-SQL verification scripts (`verify_auth_schema.sql`, `auth_user_role_queries.sql`).
 
@@ -50,15 +50,16 @@ Phase 4 introduces identity, role-based access control (RBAC), and authenticatio
    - Framework `PasswordHasher<User>` wrapper (`IPasswordService`) utilizing PBKDF2 password hashing. Passwords stored strictly as hashes; plain-text passwords never logged or persisted.
    - JWT Access Token generation (`IJwtTokenService`) including `sub`, `unique_name`, `email`, `given_name`, `family_name`, and `role` claims.
    - Login API endpoint (`POST /api/auth/login`) returning `LoginResponseDto` with generic invalid credential response (`401 Unauthorized`) and inactive user check (`403 Forbidden`).
-   - Development-only `AdminInitializer` bootstrapping initial `ADMIN` user safely via `user-secrets` or environment variables without hardcoded passwords. Production secrets must use environment variables or secret manager.
+   - Development-only `AdminInitializer` bootstrapping initial `ADMIN`, `MANAGER`, `RESIDENT`, and `TECHNICAL_STAFF` users safely via `user-secrets` or environment variables without hardcoded passwords.
    - T-SQL support queries (`auth_login_support_queries.sql`).
 
 3. **Role-Based Authorization (RBAC)**:
-   - Endpoint protection via `[Authorize]` attributes and `AppRoles` constants (`ADMIN`, `MANAGER`, `USER`).
+   - Endpoint protection via `[Authorize]` attributes and `AppRoles` constants (`ADMIN`, `MANAGER`, `RESIDENT`, `TECHNICAL_STAFF`).
    - `ADMIN`: Full CRUD access across all business endpoints and lookup tables.
    - `MANAGER`: Operational create and update access (`Properties`, `Buildings`, `Units`), read-only lookup access (`PropertyTypes`, `UnitTypes`), no delete permissions.
-   - `USER`: Read-only access across all endpoints (`GET` only); write or delete attempts return `403 Forbidden`.
-   - `POST /api/auth/login` is explicitly marked `[AllowAnonymous]`; unauthenticated requests to protected endpoints return `401 Unauthorized`.
+   - `RESIDENT`: Read-only access across all endpoints (`GET` only); write or delete attempts return `403 Forbidden`. Public registration assigns `RESIDENT` role by default.
+   - `TECHNICAL_STAFF`: Read-only access (`GET` only) across all endpoints until maintenance modules are implemented in future phases.
+   - `POST /api/auth/login` and `POST /api/auth/register` are explicitly marked `[AllowAnonymous]`; unauthenticated requests to protected endpoints return `401 Unauthorized`.
    - Swagger / OpenAPI document transformer configured to support JWT Bearer token authorization UI.
 
 4. **Frontend Auth State & Role-Based UI**:
@@ -69,7 +70,7 @@ Phase 4 introduces identity, role-based access control (RBAC), and authenticatio
    - Role-Based UI rendering:
      - `ADMIN`: Sees all create, edit, and delete forms and buttons.
      - `MANAGER`: Sees operational create and edit forms for Properties, Buildings, and Units; delete buttons and lookup creation forms are hidden.
-     - `USER`: Sees read-only lists and details; all creation/edit/delete forms, buttons, and `SINGLE_APARTMENT` setup prompts are hidden.
+     - `RESIDENT` & `TECHNICAL_STAFF`: See read-only lists and details; all creation/edit/delete forms, buttons, and `SINGLE_APARTMENT` setup prompts are hidden.
    - `401` responses trigger session cleanup and transition to Login screen with "Oturumunuz sona erdi. Lütfen tekrar giriş yapın." notice; `403` responses display inline permission error messages without clearing the session.
    - Backend API remains the final authorization authority.
 

@@ -624,10 +624,21 @@ code {
   color: #3730a3;
 }
 
+.role-badge.resident {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.role-badge.technical_staff {
+  background: #ecfdf5;
+  color: #047857;
+}
+
 .role-badge.user {
   background: #f1f5f9;
   color: #475569;
 }
+
 
 /* Auth Screen Styles */
 .auth-page {

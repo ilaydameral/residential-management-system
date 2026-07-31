@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.Data;
 using ResidentialManagement.Api.DTOs;
 using ResidentialManagement.Api.Entities;
@@ -89,10 +90,10 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Bu e-posta adresi zaten kullanılmaktadır.");
         }
 
-        var defaultRole = await _context.Roles.FirstOrDefaultAsync(r => r.Code == "USER");
+        var defaultRole = await _context.Roles.FirstOrDefaultAsync(r => r.Code == AppRoles.Resident);
         if (defaultRole is null)
         {
-            throw new InvalidOperationException("Varsayılan kullanıcı rolü (USER) sistemde bulunamadı.");
+            throw new InvalidOperationException("Varsayılan kullanıcı rolü (RESIDENT) sistemde bulunamadı.");
         }
 
         var user = new User

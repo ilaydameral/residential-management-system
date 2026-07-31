@@ -227,9 +227,17 @@ public class AppDbContext : DbContext
             new Role
             {
                 Id = 3,
-                Code = "USER",
-                Name = "Standard User",
-                Description = "Basic authenticated system access",
+                Code = "RESIDENT",
+                Name = "Resident",
+                Description = "Resident access to assigned property and unit information",
+                IsActive = true
+            },
+            new Role
+            {
+                Id = 4,
+                Code = "TECHNICAL_STAFF",
+                Name = "Technical Staff",
+                Description = "Handles maintenance and technical operations",
                 IsActive = true
             }
         );

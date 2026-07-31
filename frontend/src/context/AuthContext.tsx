@@ -5,7 +5,8 @@ import type { AuthenticatedUser, LoginRequest } from '../types'
 export const ROLES = {
   ADMIN: 'ADMIN',
   MANAGER: 'MANAGER',
-  USER: 'USER',
+  RESIDENT: 'RESIDENT',
+  TECHNICAL_STAFF: 'TECHNICAL_STAFF',
 } as const
 
 interface AuthContextType {

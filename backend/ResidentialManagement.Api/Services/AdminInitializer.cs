@@ -40,7 +40,8 @@ public class AdminInitializer : IAdminInitializer
 
         await InitializeAdminUserAsync();
         await InitializeDevRoleUserAsync("MANAGER", "manager", "manager@example.com", "Manager123!", "Operational", "Manager");
-        await InitializeDevRoleUserAsync("USER", "user", "user@example.com", "User123!", "Standard", "User");
+        await InitializeDevRoleUserAsync("RESIDENT", "resident", "resident@example.com", "Resident123!", "Site", "Resident");
+        await InitializeDevRoleUserAsync("TECHNICAL_STAFF", "technical", "technical@example.com", "Tech123!", "Technical", "Staff");
     }
 
     private async Task InitializeAdminUserAsync()
