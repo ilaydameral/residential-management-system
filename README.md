@@ -8,6 +8,7 @@ The project is being developed incrementally.
 - **Phase 2**: Service layer, DTO refactoring, standardized string lengths, and centralized exception handling middleware.
 - **Phase 3**: Complete Property Structure Management (`PropertyType` & `UnitType` lookups, `Building` & `Unit` entities, composite unique indexes, database CHECK constraints, Turkey 81 city-district searchable selection, real-world business rules enforcement, and full React hierarchy UI).
 - **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, role-based authorization rules, React AuthContext, Login screen, role-based UI rendering, development bootstrap admin initializer, and SQL support scripts).
+- **Phase 5**: Occupancy & Resident Management (`OccupancyType` & `UnitOccupancy` entities, historical residency tracking, `OWNER`, `TENANT`, `HOUSEHOLD_MEMBER` lookup seeding, EF Core `DeleteBehavior.Restrict`, composite indexes, check constraints, and reporting queries).
 
 ---
 
@@ -32,7 +33,22 @@ The project is being developed incrementally.
 
 ---
 
-## Current Status: Phase 4 In Progress
+## Current Status: Phase 5 In Progress
+
+### Phase 5 — Occupancy & Resident Management
+
+Phase 5 introduces historical resident tracking between `User` and `Unit`:
+
+1. **Occupancy Data Model & Relationships**:
+   - `OccupancyType` lookup table (`OWNER`, `TENANT`, `HOUSEHOLD_MEMBER`).
+   - `UnitOccupancy` entity tracking historical and current resident relationships (`UserId`, `UnitId`, `OccupancyTypeId`, `StartDate`, `EndDate`, `IsActive`, `IsPrimary`).
+   - Foreign key delete behavior set to `DeleteBehavior.Restrict` on User, Unit, and OccupancyType.
+   - Composite indexes on `(UnitId, IsActive)` and `(UserId, IsActive)` for efficient active residency queries.
+   - Check constraint `CK_UnitOccupancies_EndDate_After_StartDate` enforcing `[EndDate] IS NULL OR [EndDate] >= [StartDate]`.
+   - Comprehensive verification and analytical SQL scripts (`verify_occupancy_schema.sql`, `occupancy_reporting_queries.sql`).
+   - Resident data isolation and occupancy business rules will follow in subsequent commits.
+
+---
 
 ### Phase 4 — Authentication & Authorization Infrastructure
 
@@ -212,6 +228,8 @@ dotnet ef database update \
 6. 20260730200204_AddBuildings
 7. 20260730205710_AddUnits
 8. 20260731064656_AddAuthenticationEntities
+9. 20260731080741_AlignSystemRoles
+10. 20260731090050_AddOccupancyManagement
 ```
 
 ---

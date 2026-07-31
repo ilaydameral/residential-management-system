@@ -32,4 +32,6 @@ public class Unit
     public Building Building { get; set; } = null!;
 
     public UnitType UnitType { get; set; } = null!;
+
+    public ICollection<UnitOccupancy> UnitOccupancies { get; set; } = new List<UnitOccupancy>();
 }

@@ -19,10 +19,43 @@ public class AppDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
+    public DbSet<OccupancyType> OccupancyTypes { get; set; }
+    public DbSet<UnitOccupancy> UnitOccupancies { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<OccupancyType>(entity =>
+        {
+            entity.HasIndex(ot => ot.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<UnitOccupancy>(entity =>
+        {
+            entity.HasOne(uo => uo.User)
+                .WithMany(u => u.UnitOccupancies)
+                .HasForeignKey(uo => uo.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(uo => uo.Unit)
+                .WithMany(u => u.UnitOccupancies)
+                .HasForeignKey(uo => uo.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(uo => uo.OccupancyType)
+                .WithMany(ot => ot.UnitOccupancies)
+                .HasForeignKey(uo => uo.OccupancyTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(uo => uo.UserId);
+            entity.HasIndex(uo => uo.UnitId);
+            entity.HasIndex(uo => uo.OccupancyTypeId);
+            entity.HasIndex(uo => new { uo.UnitId, uo.IsActive });
+            entity.HasIndex(uo => new { uo.UserId, uo.IsActive });
+
+            entity.ToTable(t => t.HasCheckConstraint("CK_UnitOccupancies_EndDate_After_StartDate", "[EndDate] IS NULL OR [EndDate] >= [StartDate]"));
+        });
 
         modelBuilder.Entity<PropertyType>(entity =>
         {
@@ -238,6 +271,33 @@ public class AppDbContext : DbContext
                 Code = "TECHNICAL_STAFF",
                 Name = "Technical Staff",
                 Description = "Handles maintenance and technical operations",
+                IsActive = true
+            }
+        );
+
+        modelBuilder.Entity<OccupancyType>().HasData(
+            new OccupancyType
+            {
+                Id = 1,
+                Code = "OWNER",
+                Name = "Owner",
+                Description = "Property owner associated with the unit",
+                IsActive = true
+            },
+            new OccupancyType
+            {
+                Id = 2,
+                Code = "TENANT",
+                Name = "Tenant",
+                Description = "Tenant currently or historically associated with the unit",
+                IsActive = true
+            },
+            new OccupancyType
+            {
+                Id = 3,
+                Code = "HOUSEHOLD_MEMBER",
+                Name = "Household Member",
+                Description = "Household member residing in the unit without ownership or tenancy responsibility",
                 IsActive = true
             }
         );
