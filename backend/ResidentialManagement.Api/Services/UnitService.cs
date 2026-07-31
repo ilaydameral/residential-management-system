@@ -128,6 +128,11 @@ public class UnitService : IUnitService
             throw new InvalidOperationException("Pasif durumdaki bir gayrimenkul altına yeni bölüm eklenemez.");
         }
 
+        if (createDto.FloorNumber > building.FloorCount)
+        {
+            throw new InvalidOperationException($"Kat numarası ({createDto.FloorNumber}), binanın toplam kat sayısından ({building.FloorCount}) büyük olamaz.");
+        }
+
         var unitType = await _context.UnitTypes.FindAsync(createDto.UnitTypeId);
         if (unitType is null)
         {
@@ -208,13 +213,18 @@ public class UnitService : IUnitService
             throw new InvalidOperationException("Pasif durumdaki bir gayrimenkule ait binaya bölüm taşınamaz veya güncellenemez.");
         }
 
+        if (updateDto.FloorNumber > targetBuilding.FloorCount)
+        {
+            throw new InvalidOperationException($"Kat numarası ({updateDto.FloorNumber}), binanın toplam kat sayısından ({targetBuilding.FloorCount}) büyük olamaz.");
+        }
+
         var targetUnitType = await _context.UnitTypes.FindAsync(updateDto.UnitTypeId);
         if (targetUnitType is null)
         {
             throw new KeyNotFoundException($"ID'si {updateDto.UnitTypeId} olan bölüm türü bulunamadı.");
         }
 
-        if (!targetUnitType.IsActive)
+        if (!targetUnitType.IsActive && unit.UnitTypeId != updateDto.UnitTypeId)
         {
             throw new InvalidOperationException("Pasif durumdaki bir bölüm türüne güncelleme yapılamaz.");
         }

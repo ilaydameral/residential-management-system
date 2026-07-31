@@ -83,6 +83,15 @@ public class PropertyService : IPropertyService
 
         var (propertyTypeId, propertyTypeCode, propertyTypeName) = await ResolvePropertyTypeAsync(updateDto.PropertyTypeId, updateDto.PropertyType);
 
+        if (property.PropertyTypeId != propertyTypeId || property.PropertyType != propertyTypeCode)
+        {
+            var hasBuildings = await _context.Buildings.AnyAsync(b => b.PropertyId == id);
+            if (hasBuildings)
+            {
+                throw new InvalidOperationException("Bağlı bina veya bağımsız bölümleri bulunan bir gayrimenkulün türü değiştirilemez. Önce bağlı yapıları kaldırınız.");
+            }
+        }
+
         property.Name = updateDto.Name.Trim();
         property.PropertyTypeId = propertyTypeId;
         property.PropertyType = propertyTypeCode;
@@ -114,6 +123,25 @@ public class PropertyService : IPropertyService
         property.IsActive = false;
         property.UpdatedAt = DateTime.UtcNow;
 
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeletePropertyAsync(int id)
+    {
+        var property = await _context.Properties.FindAsync(id);
+        if (property is null)
+        {
+            return false;
+        }
+
+        var hasBuildings = await _context.Buildings.AnyAsync(b => b.PropertyId == id);
+        if (hasBuildings)
+        {
+            throw new InvalidOperationException("Bu gayrimenkul altında bağlı bina(lar) bulunduğu için silinemez. Önce bağlı binaları silin veya kaydı pasifleştirin.");
+        }
+
+        _context.Properties.Remove(property);
         await _context.SaveChangesAsync();
         return true;
     }

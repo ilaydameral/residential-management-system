@@ -78,6 +78,7 @@ button {
   border-radius: 12px;
   font-size: 0.9rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
 }
 
 .breadcrumb-item.active {
@@ -138,6 +139,13 @@ button {
   color: #64748b;
 }
 
+.passive-notice {
+  color: #b91c1c;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -179,18 +187,38 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  position: relative;
 }
 
 .form-field-full {
   grid-column: 1 / -1;
 }
 
-.checkbox-field label {
+.checkbox-field {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  font-weight: 500;
+  margin-top: 4px;
+}
+
+.checkbox-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
   cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.checkbox-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+  cursor: pointer;
+  margin: 0;
 }
 
 .form-field label {
@@ -199,7 +227,12 @@ button {
   color: #374151;
 }
 
-.form-field input,
+.required-star {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.form-field input:not([type="checkbox"]),
 .form-field select,
 .form-field textarea {
   width: 100%;
@@ -214,7 +247,7 @@ button {
     box-shadow 0.2s ease;
 }
 
-.form-field input:focus,
+.form-field input:not([type="checkbox"]):focus,
 .form-field select:focus,
 .form-field textarea:focus {
   border-color: #2563eb;
@@ -225,6 +258,98 @@ button {
   resize: vertical;
 }
 
+/* SEARCHABLE SELECT STYLES */
+.searchable-select-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  width: 100%;
+}
+
+.searchable-select-label {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: #374151;
+}
+
+.searchable-select-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchable-select-input {
+  width: 100%;
+  padding-right: 36px !important;
+}
+
+.searchable-select-input:disabled {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  cursor: not-allowed;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 14px;
+  font-size: 0.65rem;
+  color: #64748b;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+.select-arrow.open {
+  transform: rotate(180deg);
+}
+
+.searchable-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+}
+
+.select-option {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #1e293b;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.select-option.highlighted {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.select-option.selected {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.no-options-item {
+  padding: 12px 14px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  text-align: center;
+  font-style: italic;
+}
+
+/* BUTTONS & CARDS */
 .button-group {
   display: flex;
   gap: 12px;
@@ -401,6 +526,15 @@ button {
   margin: 12px 0;
   color: #64748b;
   font-size: 0.9rem;
+}
+
+.empty-state-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  padding: 16px;
+  border-radius: 10px;
+  color: #475569;
+  line-height: 1.5;
 }
 
 .error-message {

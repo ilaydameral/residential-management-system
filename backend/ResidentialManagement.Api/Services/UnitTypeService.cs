@@ -120,6 +120,12 @@ public class UnitTypeService : IUnitTypeService
             return false;
         }
 
+        var isUsed = await _context.Units.AnyAsync(u => u.UnitTypeId == id);
+        if (isUsed)
+        {
+            throw new InvalidOperationException("Bu bağımsız bölüm türü en az bir bağımsız bölüm tarafından kullanıldığı için silinemez. Önce bağlı bölümleri silin veya pasifleştirin.");
+        }
+
         _context.UnitTypes.Remove(unitType);
         await _context.SaveChangesAsync();
 

@@ -94,4 +94,21 @@ public class PropertiesController : ControllerBase
 
         return NoContent();
     }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteProperty(int id)
+    {
+        var success = await _propertyService.DeletePropertyAsync(id);
+        if (!success)
+        {
+            return NotFound(new ErrorResponse
+            {
+                StatusCode = 404,
+                Message = $"ID'si {id} olan gayrimenkul bulunamadı.",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        return NoContent();
+    }
 }

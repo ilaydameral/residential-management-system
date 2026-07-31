@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   createBuilding,
   createProperty,
@@ -15,6 +15,8 @@ import {
   updateProperty,
   updateUnit,
 } from './api'
+import { SearchableSelect } from './components/SearchableSelect'
+import { TURKEY_CITIES } from './data/turkeyLocations'
 import type {
   Building,
   CreateBuildingPayload,
@@ -73,6 +75,9 @@ function App() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null)
 
+  // Single Apartment Setup State
+  const [singleApartmentFloorCount, setSingleApartmentFloorCount] = useState(1)
+
   // Forms
   const [propertyForm, setPropertyForm] = useState(initialPropertyForm)
   const [buildingForm, setBuildingForm] = useState(initialBuildingForm)
@@ -95,6 +100,23 @@ function App() {
   const [propertyError, setPropertyError] = useState('')
   const [buildingError, setBuildingError] = useState('')
   const [unitError, setUnitError] = useState('')
+
+  // Section references for smooth scrolling & accessibility
+  const buildingSectionRef = useRef<HTMLElement>(null)
+  const unitSectionRef = useRef<HTMLElement>(null)
+
+  // City & District options calculation
+  const cityNames = TURKEY_CITIES.map((c) => c.name)
+  const selectedCityObj = TURKEY_CITIES.find((c) => c.name === propertyForm.city)
+  const availableDistricts = selectedCityObj ? selectedCityObj.districts : []
+
+  // Check if selected property is a Single Apartment
+  const isSingleApartment =
+    selectedProperty != null &&
+    (selectedProperty.propertyType === 'SINGLE_APARTMENT' ||
+      selectedProperty.propertyType === 'Apartman' ||
+      selectedProperty.propertyTypeName === 'Apartman' ||
+      propertyTypes.find((pt) => pt.id === selectedProperty.propertyTypeId)?.code === 'SINGLE_APARTMENT')
 
   // 1. Initial Load: PropertyTypes, UnitTypes, Properties
   useEffect(() => {
@@ -135,6 +157,17 @@ function App() {
       try {
         const data = await getBuildingsByProperty(selectedProperty.id, true)
         setBuildings(data)
+
+        // Single Apartment auto-select if building exists
+        if (
+          selectedProperty &&
+          data.length > 0 &&
+          (selectedProperty.propertyType === 'SINGLE_APARTMENT' ||
+            selectedProperty.propertyType === 'Apartman' ||
+            selectedProperty.propertyTypeName === 'Apartman')
+        ) {
+          setSelectedBuilding(data[0])
+        }
       } catch (err) {
         setBuildingError(err instanceof Error ? err.message : 'Bina listesi yüklenemedi.')
       } finally {
@@ -171,6 +204,25 @@ function App() {
   // ==========================================
   // PROPERTY HANDLERS
   // ==========================================
+  const handleCityChange = (newCity: string) => {
+    const cityObj = TURKEY_CITIES.find((c) => c.name === newCity)
+    const validDistricts = cityObj ? cityObj.districts : []
+    const isCurrentDistrictValid = validDistricts.includes(propertyForm.district)
+
+    setPropertyForm((prev) => ({
+      ...prev,
+      city: newCity,
+      district: isCurrentDistrictValid ? prev.district : '',
+    }))
+  }
+
+  const handleDistrictChange = (newDistrict: string) => {
+    setPropertyForm((prev) => ({
+      ...prev,
+      district: newDistrict,
+    }))
+  }
+
   const handleSelectProperty = (property: Property) => {
     setSelectedProperty(property)
     setSelectedBuilding(null)
@@ -178,6 +230,11 @@ function App() {
     setBuildingForm({ ...initialBuildingForm, propertyId: property.id })
     setEditingBuildingId(null)
     setBuildingError('')
+
+    // Smooth scroll to Building section for better UX
+    setTimeout(() => {
+      buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
 
   const handleClearPropertySelection = () => {
@@ -211,8 +268,24 @@ function App() {
 
   const handlePropertySubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setIsSubmittingProperty(true)
     setPropertyError('')
+
+    // Validation: City and District must be valid
+    const matchedCity = TURKEY_CITIES.find((c) => c.name.toLowerCase() === propertyForm.city.trim().toLowerCase())
+    if (!matchedCity) {
+      setPropertyError('Lütfen listeden geçerli bir şehir seçiniz.')
+      return
+    }
+
+    const matchedDistrict = matchedCity.districts.find(
+      (d) => d.toLowerCase() === propertyForm.district.trim().toLowerCase()
+    )
+    if (!matchedDistrict) {
+      setPropertyError(`Lütfen ${matchedCity.name} ili için geçerli bir ilçe seçiniz.`)
+      return
+    }
+
+    setIsSubmittingProperty(true)
 
     try {
       if (editingPropertyId) {
@@ -220,8 +293,8 @@ function App() {
           name: propertyForm.name,
           propertyTypeId: propertyForm.propertyTypeId ? Number(propertyForm.propertyTypeId) : null,
           addressLine: propertyForm.addressLine,
-          city: propertyForm.city,
-          district: propertyForm.district,
+          city: matchedCity.name,
+          district: matchedDistrict,
           description: propertyForm.description || null,
           isActive: propertyForm.isActive ?? true,
         }
@@ -236,8 +309,8 @@ function App() {
           name: propertyForm.name,
           propertyTypeId: propertyForm.propertyTypeId ? Number(propertyForm.propertyTypeId) : null,
           addressLine: propertyForm.addressLine,
-          city: propertyForm.city,
-          district: propertyForm.district,
+          city: matchedCity.name,
+          district: matchedDistrict,
           description: propertyForm.description || null,
         }
         const created = await createProperty(payload)
@@ -276,6 +349,11 @@ function App() {
     setUnitForm({ ...initialUnitForm, buildingId: building.id, unitTypeId: unitTypes[0]?.id || 0 })
     setEditingUnitId(null)
     setUnitError('')
+
+    // Smooth scroll to Unit section for better UX
+    setTimeout(() => {
+      unitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
 
   const handleClearBuildingSelection = () => {
@@ -340,6 +418,31 @@ function App() {
       setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Bina kaydedilemedi.')
+    } finally {
+      setIsSubmittingBuilding(false)
+    }
+  }
+
+  const handleCreateSingleApartmentBuilding = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!selectedProperty) return
+
+    setIsSubmittingBuilding(true)
+    setBuildingError('')
+
+    try {
+      const payload: CreateBuildingPayload = {
+        propertyId: selectedProperty.id,
+        name: selectedProperty.name,
+        code: 'MAIN_BUILDING',
+        floorCount: Number(singleApartmentFloorCount),
+        description: 'Teknik bina kaydı',
+      }
+      const created = await createBuilding(payload)
+      setBuildings([created])
+      handleSelectBuilding(created)
+    } catch (err) {
+      setBuildingError(err instanceof Error ? err.message : 'Apartman yapısı oluşturulamadı.')
     } finally {
       setIsSubmittingBuilding(false)
     }
@@ -469,21 +572,39 @@ function App() {
 
         {/* Selection Breadcrumbs */}
         <div className="selection-breadcrumbs">
-          <div className={`breadcrumb-item ${selectedProperty ? 'active' : ''}`}>
+          <div
+            className={`breadcrumb-item ${selectedProperty ? 'active' : ''}`}
+            onClick={() => selectedProperty && buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          >
             <span>1. Gayrimenkul:</span>
             <strong>{selectedProperty ? selectedProperty.name : 'Seçilmedi'}</strong>
             {selectedProperty && (
-              <button className="text-button" onClick={handleClearPropertySelection}>
+              <button
+                className="text-button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleClearPropertySelection()
+                }}
+              >
                 Değiştir
               </button>
             )}
           </div>
 
-          <div className={`breadcrumb-item ${selectedBuilding ? 'active' : ''}`}>
+          <div
+            className={`breadcrumb-item ${selectedBuilding ? 'active' : ''}`}
+            onClick={() => selectedBuilding && unitSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          >
             <span>2. Bina / Blok:</span>
             <strong>{selectedBuilding ? `${selectedBuilding.name} (${selectedBuilding.code})` : 'Seçilmedi'}</strong>
             {selectedBuilding && (
-              <button className="text-button" onClick={handleClearBuildingSelection}>
+              <button
+                className="text-button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleClearBuildingSelection()
+                }}
+              >
                 Değiştir
               </button>
             )}
@@ -505,7 +626,7 @@ function App() {
 
             <form className="property-form" onSubmit={handlePropertySubmit}>
               <div className="form-field form-field-full">
-                <label htmlFor="prop-name">Gayrimenkul Adı</label>
+                <label htmlFor="prop-name">Gayrimenkul Adı *</label>
                 <input
                   id="prop-name"
                   value={propertyForm.name}
@@ -516,7 +637,7 @@ function App() {
               </div>
 
               <div className="form-field form-field-full">
-                <label htmlFor="prop-type">Gayrimenkul Türü</label>
+                <label htmlFor="prop-type">Gayrimenkul Türü *</label>
                 <select
                   id="prop-type"
                   value={propertyForm.propertyTypeId || ''}
@@ -538,7 +659,7 @@ function App() {
               </div>
 
               <div className="form-field form-field-full">
-                <label htmlFor="prop-address">Adres</label>
+                <label htmlFor="prop-address">Adres *</label>
                 <input
                   id="prop-address"
                   value={propertyForm.addressLine}
@@ -549,24 +670,27 @@ function App() {
               </div>
 
               <div className="form-field">
-                <label htmlFor="prop-city">Şehir</label>
-                <input
+                <SearchableSelect
                   id="prop-city"
+                  label="İl"
                   value={propertyForm.city}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })}
-                  placeholder="İzmir"
+                  options={cityNames}
+                  placeholder="İl ara veya seç"
                   required
+                  onChange={handleCityChange}
                 />
               </div>
 
               <div className="form-field">
-                <label htmlFor="prop-district">İlçe</label>
-                <input
+                <SearchableSelect
                   id="prop-district"
+                  label="İlçe"
                   value={propertyForm.district}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, district: e.target.value })}
-                  placeholder="Konak"
+                  options={availableDistricts}
+                  placeholder="İlçe ara veya seç"
+                  disabled={!propertyForm.city}
                   required
+                  onChange={handleDistrictChange}
                 />
               </div>
 
@@ -583,13 +707,14 @@ function App() {
 
               {editingPropertyId && (
                 <div className="form-field form-field-full checkbox-field">
-                  <label>
+                  <label htmlFor="prop-is-active">
                     <input
+                      id="prop-is-active"
                       type="checkbox"
                       checked={propertyForm.isActive ?? true}
                       onChange={(e) => setPropertyForm({ ...propertyForm, isActive: e.target.checked })}
                     />
-                    Aktif Kayıt
+                    <span>Aktif Kayıt</span>
                   </label>
                 </div>
               )}
@@ -683,172 +808,249 @@ function App() {
 
       {/* SECTION 2: BUILDINGS (Requires Selected Property) */}
       {selectedProperty && (
-        <section className="section-container highlight-section">
+        <section
+          ref={buildingSectionRef}
+          className="section-container highlight-section"
+          id="buildings-section"
+        >
           <div className="section-header-banner">
             <div>
-              <h2>Binalar / Bloklar</h2>
-              <p>Seçili Gayrimenkul: <strong>{selectedProperty.name}</strong></p>
+              <h2>{isSingleApartment ? 'Apartman Yapısı' : 'Binalar / Bloklar'}</h2>
+              <p>
+                Seçili Gayrimenkul: <strong>{selectedProperty.name}</strong>{' '}
+                {!selectedProperty.isActive && (
+                  <span className="passive-notice">(Pasif Kayıt)</span>
+                )}
+              </p>
             </div>
             <button className="secondary-button" onClick={handleClearPropertySelection}>
               ← Gayrimenkul Seçimine Dön
             </button>
           </div>
 
-          <div className="content-grid">
-            {/* Building Form */}
-            <section className="panel">
-              <div className="section-heading">
-                <h2>{editingBuildingId ? 'Binayı Düzenle' : 'Yeni Bina / Blok Ekle'}</h2>
-                <p>"{selectedProperty.name}" altına bina veya blok kaydedin.</p>
-              </div>
+          {/* SINGLE APARTMENT SPECIAL FLOW */}
+          {isSingleApartment ? (
+            <div className="panel single-apartment-panel">
+              {buildings.length === 0 ? (
+                !selectedProperty.isActive ? (
+                  <div>
+                    <div className="section-heading">
+                      <h2>Apartman Yapısı Hazırlanamıyor</h2>
+                    </div>
 
-              {buildingError && <p className="status-message error-message">{buildingError}</p>}
-
-              <form className="property-form" onSubmit={handleBuildingSubmit}>
-                <div className="form-field">
-                  <label htmlFor="bld-name">Bina / Blok Adı</label>
-                  <input
-                    id="bld-name"
-                    value={buildingForm.name}
-                    onChange={(e) => setBuildingForm({ ...buildingForm, name: e.target.value })}
-                    placeholder="Örn: A Blok"
-                    required
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="bld-code">Bina Kodu</label>
-                  <input
-                    id="bld-code"
-                    value={buildingForm.code}
-                    onChange={(e) => setBuildingForm({ ...buildingForm, code: e.target.value })}
-                    placeholder="Örn: A_BLOK"
-                    required
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="bld-floor">Kat Sayısı (1-200)</label>
-                  <input
-                    id="bld-floor"
-                    type="number"
-                    min={1}
-                    max={200}
-                    value={buildingForm.floorCount}
-                    onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Number(e.target.value) })}
-                    required
-                  />
-                </div>
-
-                <div className="form-field form-field-full">
-                  <label htmlFor="bld-desc">Açıklama</label>
-                  <textarea
-                    id="bld-desc"
-                    value={buildingForm.description || ''}
-                    onChange={(e) => setBuildingForm({ ...buildingForm, description: e.target.value })}
-                    placeholder="İsteğe bağlı bina açıklaması"
-                    rows={2}
-                  />
-                </div>
-
-                {editingBuildingId && (
-                  <div className="form-field form-field-full checkbox-field">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={buildingForm.isActive ?? true}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, isActive: e.target.checked })}
-                      />
-                      Aktif Bina
-                    </label>
+                    <p className="status-message empty-state-box">
+                      Bu apartman pasif durumdadır. Bina yapısını hazırlamak ve bağımsız bölüm eklemek için önce yukarıdaki listeden gayrimenkulün "Düzenle" butonuna tıklayarak aktifleştirin.
+                    </p>
                   </div>
+                ) : (
+                  <div>
+                    <div className="section-heading">
+                      <h2>Apartman Yapısını Hazırla</h2>
+                      <p>
+                        "{selectedProperty.name}" tek bir apartmandır. Bölümleri yönetebilmek için lütfen binanın gerçek kat sayısını girip onaylayınız.
+                      </p>
+                    </div>
+
+                    {buildingError && <p className="status-message error-message">{buildingError}</p>}
+
+                    <form className="property-form" onSubmit={handleCreateSingleApartmentBuilding}>
+                      <div className="form-field">
+                        <label htmlFor="single-floor">Kat Sayısı (1-200) *</label>
+                        <input
+                          id="single-floor"
+                          type="number"
+                          min={1}
+                          max={200}
+                          value={singleApartmentFloorCount}
+                          onChange={(e) => setSingleApartmentFloorCount(Number(e.target.value))}
+                          required
+                        />
+                      </div>
+
+                      <div className="button-group form-field-full" style={{ marginTop: '12px' }}>
+                        <button className="primary-button" type="submit" disabled={isSubmittingBuilding}>
+                          {isSubmittingBuilding ? 'Hazırlanıyor...' : 'Apartman Yapısını Oluştur ve Bölümlere Geç →'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )
+              ) : (
+                <div>
+                  <div className="section-heading">
+                    <h2>Tek Apartman Kaydı Hazır</h2>
+                    <p>
+                      <strong>{buildings[0].name}</strong> ({buildings[0].floorCount} Kat) için bağımsız bölüm yönetimi aktifleştirildi. Aşağıdaki bölümden daire veya dükkan ekleyebilirsiniz.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* RESIDENTIAL COMPLEX / COMMERCIAL / MIXED USE REGULAR FLOW */
+            <div className="content-grid">
+              {/* Building Form */}
+              <section className="panel">
+                <div className="section-heading">
+                  <h2>{editingBuildingId ? 'Binayı Düzenle' : 'Yeni Bina / Blok Ekle'}</h2>
+                  <p>"{selectedProperty.name}" altına bina veya blok kaydedin.</p>
+                </div>
+
+                {buildingError && <p className="status-message error-message">{buildingError}</p>}
+
+                <form className="property-form" onSubmit={handleBuildingSubmit}>
+                  <div className="form-field">
+                    <label htmlFor="bld-name">Bina / Blok Adı *</label>
+                    <input
+                      id="bld-name"
+                      value={buildingForm.name}
+                      onChange={(e) => setBuildingForm({ ...buildingForm, name: e.target.value })}
+                      placeholder="Örn: A Blok"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label htmlFor="bld-code">Bina Kodu *</label>
+                    <input
+                      id="bld-code"
+                      value={buildingForm.code}
+                      onChange={(e) => setBuildingForm({ ...buildingForm, code: e.target.value })}
+                      placeholder="Örn: A_BLOK"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label htmlFor="bld-floor">Kat Sayısı (1-200) *</label>
+                    <input
+                      id="bld-floor"
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={buildingForm.floorCount}
+                      onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Number(e.target.value) })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-field form-field-full">
+                    <label htmlFor="bld-desc">Açıklama</label>
+                    <textarea
+                      id="bld-desc"
+                      value={buildingForm.description || ''}
+                      onChange={(e) => setBuildingForm({ ...buildingForm, description: e.target.value })}
+                      placeholder="İsteğe bağlı bina açıklaması"
+                      rows={2}
+                    />
+                  </div>
+
+                  {editingBuildingId && (
+                    <div className="form-field form-field-full checkbox-field">
+                      <label htmlFor="bld-is-active">
+                        <input
+                          id="bld-is-active"
+                          type="checkbox"
+                          checked={buildingForm.isActive ?? true}
+                          onChange={(e) => setBuildingForm({ ...buildingForm, isActive: e.target.checked })}
+                        />
+                        <span>Aktif Bina</span>
+                      </label>
+                    </div>
+                  )}
+
+                  <div className="button-group form-field-full">
+                    <button className="primary-button" type="submit" disabled={isSubmittingBuilding}>
+                      {isSubmittingBuilding
+                        ? 'Kaydediliyor...'
+                        : editingBuildingId
+                        ? 'Güncelle'
+                        : 'Bina Ekle'}
+                    </button>
+                    {editingBuildingId && (
+                      <button className="secondary-button" type="button" onClick={handleCancelBuildingEdit}>
+                        İptal
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </section>
+
+              {/* Building List */}
+              <section className="panel">
+                <div className="section-heading">
+                  <h2>Bina Listesi</h2>
+                  <p>{buildings.length} bina bulundu. Birini seçerek bağımsız bölümlerini yönetin.</p>
+                </div>
+
+                {isLoadingBuildings && <p className="status-message">Binalar yükleniyor...</p>}
+
+                {!isLoadingBuildings && buildings.length === 0 && (
+                  <p className="status-message empty-state-box">
+                    Bu gayrimenkule ait henüz bina/blok bulunmuyor. Sol taraftaki formu kullanarak ilk binayı ekleyebilirsiniz.
+                  </p>
                 )}
 
-                <div className="button-group form-field-full">
-                  <button className="primary-button" type="submit" disabled={isSubmittingBuilding}>
-                    {isSubmittingBuilding
-                      ? 'Kaydediliyor...'
-                      : editingBuildingId
-                      ? 'Güncelle'
-                      : 'Bina Ekle'}
-                  </button>
-                  {editingBuildingId && (
-                    <button className="secondary-button" type="button" onClick={handleCancelBuildingEdit}>
-                      İptal
-                    </button>
-                  )}
-                </div>
-              </form>
-            </section>
+                <div className="card-list">
+                  {buildings.map((bld) => {
+                    const isSelected = selectedBuilding?.id === bld.id
+                    return (
+                      <article
+                        className={`item-card ${isSelected ? 'selected-card' : ''}`}
+                        key={bld.id}
+                      >
+                        <div className="card-header">
+                          <div>
+                            <h3>{bld.name}</h3>
+                            <p className="subtitle">Kod: <code>{bld.code}</code> | {bld.floorCount} Kat</p>
+                          </div>
 
-            {/* Building List */}
-            <section className="panel">
-              <div className="section-heading">
-                <h2>Bina Listesi</h2>
-                <p>{buildings.length} bina bulundu. Birini seçerek bağımsız bölümlerini yönetin.</p>
-              </div>
-
-              {isLoadingBuildings && <p className="status-message">Binalar yükleniyor...</p>}
-
-              {!isLoadingBuildings && buildings.length === 0 && (
-                <p className="status-message">Bu gayrimenkul altında henüz kayıtlı bina bulunmamaktadır.</p>
-              )}
-
-              <div className="card-list">
-                {buildings.map((bld) => {
-                  const isSelected = selectedBuilding?.id === bld.id
-                  return (
-                    <article
-                      className={`item-card ${isSelected ? 'selected-card' : ''}`}
-                      key={bld.id}
-                    >
-                      <div className="card-header">
-                        <div>
-                          <h3>{bld.name}</h3>
-                          <p className="subtitle">Kod: <code>{bld.code}</code> | {bld.floorCount} Kat</p>
+                          <span className={`status-badge ${bld.isActive ? 'active' : 'inactive'}`}>
+                            {bld.isActive ? 'Aktif' : 'Pasif'}
+                          </span>
                         </div>
 
-                        <span className={`status-badge ${bld.isActive ? 'active' : 'inactive'}`}>
-                          {bld.isActive ? 'Aktif' : 'Pasif'}
-                        </span>
-                      </div>
+                        {bld.description && <p className="desc-text">{bld.description}</p>}
 
-                      {bld.description && <p className="desc-text">{bld.description}</p>}
+                        <div className="card-actions">
+                          <button
+                            className={`action-button ${isSelected ? 'active-select' : 'select-btn'}`}
+                            onClick={() => handleSelectBuilding(bld)}
+                          >
+                            {isSelected ? '✓ Seçili Bina' : 'Bölümleri Yönet →'}
+                          </button>
 
-                      <div className="card-actions">
-                        <button
-                          className={`action-button ${isSelected ? 'active-select' : 'select-btn'}`}
-                          onClick={() => handleSelectBuilding(bld)}
-                        >
-                          {isSelected ? '✓ Seçili Bina' : 'Bölümleri Yönet →'}
-                        </button>
+                          <button
+                            className="action-button edit-btn"
+                            onClick={() => handleEditBuildingClick(bld)}
+                          >
+                            Düzenle
+                          </button>
 
-                        <button
-                          className="action-button edit-btn"
-                          onClick={() => handleEditBuildingClick(bld)}
-                        >
-                          Düzenle
-                        </button>
-
-                        <button
-                          className="action-button danger-btn"
-                          onClick={() => handleDeleteBuildingClick(bld.id)}
-                        >
-                          Sil
-                        </button>
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            </section>
-          </div>
+                          <button
+                            className="action-button danger-btn"
+                            onClick={() => handleDeleteBuildingClick(bld.id)}
+                          >
+                            Sil
+                          </button>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              </section>
+            </div>
+          )}
         </section>
       )}
 
       {/* SECTION 3: UNITS (Requires Selected Building) */}
       {selectedBuilding && (
-        <section className="section-container highlight-section-units">
+        <section
+          ref={unitSectionRef}
+          className="section-container highlight-section-units"
+          id="units-section"
+        >
           <div className="section-header-banner">
             <div>
               <h2>Bağımsız Bölümler (Daire, Dükkan, vb.)</h2>
@@ -871,7 +1073,7 @@ function App() {
 
               <form className="property-form" onSubmit={handleUnitSubmit}>
                 <div className="form-field">
-                  <label htmlFor="unit-number">Kapı / Bölüm No</label>
+                  <label htmlFor="unit-number">Kapı / Bölüm No *</label>
                   <input
                     id="unit-number"
                     value={unitForm.unitNumber}
@@ -882,7 +1084,7 @@ function App() {
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="unit-type">Bölüm Türü</label>
+                  <label htmlFor="unit-type">Bölüm Türü *</label>
                   <select
                     id="unit-type"
                     value={unitForm.unitTypeId || ''}
@@ -899,7 +1101,7 @@ function App() {
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="unit-floor">Kat No (Bodrum için negatif)</label>
+                  <label htmlFor="unit-floor">Kat No (Bodrum için negatif) *</label>
                   <input
                     id="unit-floor"
                     type="number"
@@ -958,13 +1160,14 @@ function App() {
 
                 {editingUnitId && (
                   <div className="form-field form-field-full checkbox-field">
-                    <label>
+                    <label htmlFor="unit-is-active">
                       <input
+                        id="unit-is-active"
                         type="checkbox"
                         checked={unitForm.isActive ?? true}
                         onChange={(e) => setUnitForm({ ...unitForm, isActive: e.target.checked })}
                       />
-                      Aktif Bölüm
+                      <span>Aktif Bölüm</span>
                     </label>
                   </div>
                 )}
@@ -996,7 +1199,9 @@ function App() {
               {isLoadingUnits && <p className="status-message">Bölümler yükleniyor...</p>}
 
               {!isLoadingUnits && units.length === 0 && (
-                <p className="status-message">Bu bina altında henüz kayıtlı bağımsız bölüm bulunmamaktadır.</p>
+                <p className="status-message empty-state-box">
+                  Bu bina altında henüz kayıtlı bağımsız bölüm bulunmamaktadır. Sol taraftaki formu kullanarak ilk bölümü ekleyebilirsiniz.
+                </p>
               )}
 
               <div className="card-list">
