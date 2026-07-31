@@ -6,7 +6,11 @@ public class PropertyDto
 
     public string Name { get; set; } = string.Empty;
 
+    public int? PropertyTypeId { get; set; }
+
     public string PropertyType { get; set; } = string.Empty;
+
+    public string? PropertyTypeName { get; set; }
 
     public string AddressLine { get; set; } = string.Empty;
 

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResidentialManagement.Api.Data;
 
@@ -11,9 +12,11 @@ using ResidentialManagement.Api.Data;
 namespace ResidentialManagement.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260730200204_AddBuildings")]
+    partial class AddBuildings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -200,64 +203,6 @@ namespace ResidentialManagement.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ResidentialManagement.Api.Entities.Unit", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BuildingId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("FloorNumber")
-                        .HasColumnType("int");
-
-                    b.Property<decimal?>("GrossArea")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<decimal?>("NetArea")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<string>("UnitNumber")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("UnitTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UnitTypeId");
-
-                    b.HasIndex("BuildingId", "UnitNumber")
-                        .IsUnique();
-
-                    b.ToTable("Units", t =>
-                        {
-                            t.HasCheckConstraint("CK_Units_GrossArea_Positive", "[GrossArea] IS NULL OR [GrossArea] > 0");
-
-                            t.HasCheckConstraint("CK_Units_NetArea_NotGreaterThanGrossArea", "[GrossArea] IS NULL OR [NetArea] IS NULL OR [NetArea] <= [GrossArea]");
-
-                            t.HasCheckConstraint("CK_Units_NetArea_Positive", "[NetArea] IS NULL OR [NetArea] > 0");
-                        });
-                });
-
             modelBuilder.Entity("ResidentialManagement.Api.Entities.UnitType", b =>
                 {
                     b.Property<int>("Id")
@@ -362,38 +307,9 @@ namespace ResidentialManagement.Api.Migrations
                     b.Navigation("PropertyTypeLookup");
                 });
 
-            modelBuilder.Entity("ResidentialManagement.Api.Entities.Unit", b =>
-                {
-                    b.HasOne("ResidentialManagement.Api.Entities.Building", "Building")
-                        .WithMany("Units")
-                        .HasForeignKey("BuildingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ResidentialManagement.Api.Entities.UnitType", "UnitType")
-                        .WithMany("Units")
-                        .HasForeignKey("UnitTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Building");
-
-                    b.Navigation("UnitType");
-                });
-
-            modelBuilder.Entity("ResidentialManagement.Api.Entities.Building", b =>
-                {
-                    b.Navigation("Units");
-                });
-
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Property", b =>
                 {
                     b.Navigation("Buildings");
-                });
-
-            modelBuilder.Entity("ResidentialManagement.Api.Entities.UnitType", b =>
-                {
-                    b.Navigation("Units");
                 });
 #pragma warning restore 612, 618
         }

@@ -36,12 +36,20 @@ public class ExceptionHandlingMiddleware
     private Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         context.Response.ContentType = "application/json";
-        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+
+        var statusCode = exception switch
+        {
+            InvalidOperationException => (int)HttpStatusCode.Conflict,
+            KeyNotFoundException => (int)HttpStatusCode.NotFound,
+            _ => (int)HttpStatusCode.InternalServerError
+        };
+
+        context.Response.StatusCode = statusCode;
 
         var response = new ErrorResponse
         {
-            StatusCode = context.Response.StatusCode,
-            Message = "Sunucuda beklenmeyen bir hata oluştu.",
+            StatusCode = statusCode,
+            Message = statusCode != (int)HttpStatusCode.InternalServerError ? exception.Message : "Sunucuda beklenmeyen bir hata oluştu.",
             Details = _env.IsDevelopment() ? exception.Message : null,
             Timestamp = DateTime.UtcNow
         };

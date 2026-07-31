@@ -2,15 +2,16 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ResidentialManagement.Api.DTOs;
 
-public class CreatePropertyDto
+public class CreatePropertyDto : IValidatableObject
 {
     [Required(ErrorMessage = "Gayrimenkul adı zorunludur.")]
     [StringLength(150, ErrorMessage = "Gayrimenkul adı en fazla 150 karakter olabilir.")]
     public string Name { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Gayrimenkul türü zorunludur.")]
+    public int? PropertyTypeId { get; set; }
+
     [StringLength(50, ErrorMessage = "Gayrimenkul türü en fazla 50 karakter olabilir.")]
-    public string PropertyType { get; set; } = string.Empty;
+    public string? PropertyType { get; set; }
 
     [Required(ErrorMessage = "Adres satırı zorunludur.")]
     [StringLength(500, ErrorMessage = "Adres satırı en fazla 500 karakter olabilir.")]
@@ -26,4 +27,15 @@ public class CreatePropertyDto
 
     [StringLength(500, ErrorMessage = "Açıklama en fazla 500 karakter olabilir.")]
     public string? Description { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!PropertyTypeId.HasValue && string.IsNullOrWhiteSpace(PropertyType))
+        {
+            yield return new ValidationResult(
+                "Gayrimenkul türü seçilmeli veya belirtilmelidir.",
+                new[] { nameof(PropertyTypeId), nameof(PropertyType) }
+            );
+        }
+    }
 }

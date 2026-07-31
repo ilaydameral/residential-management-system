@@ -12,6 +12,10 @@ public class Property
     [MaxLength(50)]
     public string PropertyType { get; set; } = string.Empty;
 
+    public int? PropertyTypeId { get; set; }
+
+    public PropertyType? PropertyTypeLookup { get; set; }
+
     [MaxLength(500)]
     public string AddressLine { get; set; } = string.Empty;
 
@@ -29,4 +33,6 @@ public class Property
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }
+
+    public ICollection<Building> Buildings { get; set; } = new List<Building>();
 }
