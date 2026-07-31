@@ -7,6 +7,7 @@ The project is being developed incrementally.
 - **Phase 1**: Full-stack prototype validating React, ASP.NET Core Web API, and SQL Server connectivity.
 - **Phase 2**: Service layer, DTO refactoring, standardized string lengths, and centralized exception handling middleware.
 - **Phase 3**: Complete Property Structure Management (`PropertyType` & `UnitType` lookups, `Building` & `Unit` entities, composite unique indexes, database CHECK constraints, Turkey 81 city-district searchable selection, real-world business rules enforcement, and full React hierarchy UI).
+- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, seed roles, and SQL verification scripts).
 
 ---
 
@@ -31,7 +32,22 @@ The project is being developed incrementally.
 
 ---
 
-## Current Status: Phase 3 Completed
+## Current Status: Phase 4 In Progress
+
+### Phase 4 — Authentication & Authorization Infrastructure
+
+Phase 4 introduces identity, role-based access control (RBAC), and authentication:
+
+1. **User, Role, and UserRole Data Model**:
+   - `User`, `Role`, and `UserRole` entities configured via EF Core Fluent API.
+   - Unique constraints on `UserName`, `Email`, and `Role.Code`.
+   - Composite primary key on `UserRole` (`UserId`, `RoleId`) with `Cascade` delete behavior.
+   - Seeded system roles: `ADMIN` (Administrator), `MANAGER` (Property Manager), `USER` (Standard User).
+   - Passwords stored strictly as `PasswordHash`.
+   - T-SQL verification scripts (`verify_auth_schema.sql`, `auth_user_role_queries.sql`).
+   - JWT authentication, password hashing service, and login endpoints will follow in subsequent commits.
+
+---
 
 ### Phase 3 — Property Structure Management
 
@@ -92,11 +108,6 @@ residential-management-system/
 ├── backend/
 │   └── ResidentialManagement.Api/
 │       ├── Controllers/
-│       │   ├── BuildingsController.cs
-│       │   ├── PropertiesController.cs
-│       │   ├── PropertyTypesController.cs
-│       │   ├── UnitsController.cs
-│       │   └── UnitTypesController.cs
 │       ├── Data/
 │       │   └── AppDbContext.cs
 │       ├── DTOs/
@@ -104,32 +115,26 @@ residential-management-system/
 │       │   ├── Building.cs
 │       │   ├── Property.cs
 │       │   ├── PropertyType.cs
+│       │   ├── Role.cs
 │       │   ├── Unit.cs
-│       │   └── UnitType.cs
+│       │   ├── UnitType.cs
+│       │   ├── User.cs
+│       │   └── UserRole.cs
 │       ├── Middleware/
-│       │   └── ExceptionHandlingMiddleware.cs
 │       ├── Migrations/
 │       └── Services/
 ├── database/
 │   ├── 001_create_database.sql
 │   └── queries/
+│       ├── auth_user_role_queries.sql
 │       ├── migrate_property_type_data.sql
+│       ├── verify_auth_schema.sql
 │       ├── verify_buildings.sql
 │       ├── verify_properties.sql
 │       ├── verify_property_types.sql
 │       ├── verify_unit_types.sql
 │       └── verify_units.sql
 ├── frontend/
-│   ├── src/
-│   │   ├── api.ts
-│   │   ├── App.tsx
-│   │   ├── components/
-│   │   │   └── SearchableSelect.tsx
-│   │   ├── config.ts
-│   │   ├── data/
-│   │   │   └── turkeyLocations.ts
-│   │   ├── index.css
-│   │   └── types.ts
 └── README.md
 ```
 
@@ -141,7 +146,7 @@ The application database is `ApartmentManagementDb` running in Microsoft SQL Ser
 
 ### Apply Migrations
 
-To apply all EF Core migrations up to `AddUnits`:
+To apply all EF Core migrations:
 
 ```bash
 dotnet ef database update \
@@ -159,6 +164,7 @@ dotnet ef database update \
 5. 20260730133921_AddUnitTypesLookup
 6. 20260730200204_AddBuildings
 7. 20260730205710_AddUnits
+8. 20260731064656_AddAuthenticationEntities
 ```
 
 ---
@@ -230,6 +236,8 @@ Runs at `http://localhost:5173`.
 
 Execute T-SQL read-only verification scripts under `database/queries/`:
 
+- `verify_auth_schema.sql`
+- `auth_user_role_queries.sql`
 - `verify_properties.sql`
 - `verify_property_types.sql`
 - `verify_unit_types.sql`

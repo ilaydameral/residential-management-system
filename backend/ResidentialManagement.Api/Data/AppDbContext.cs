@@ -16,6 +16,9 @@ public class AppDbContext : DbContext
     public DbSet<Property> Properties { get; set; }
     public DbSet<Building> Buildings { get; set; }
     public DbSet<Unit> Units { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<UserRole> UserRoles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -89,6 +92,32 @@ public class AppDbContext : DbContext
                     "CK_Units_NetArea_NotGreaterThanGrossArea",
                     "[GrossArea] IS NULL OR [NetArea] IS NULL OR [NetArea] <= [GrossArea]");
             });
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(u => u.UserName).IsUnique();
+            entity.HasIndex(u => u.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.HasIndex(r => r.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasKey(ur => new { ur.UserId, ur.RoleId });
+
+            entity.HasOne(ur => ur.User)
+                .WithMany(u => u.UserRoles)
+                .HasForeignKey(ur => ur.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ur => ur.Role)
+                .WithMany(r => r.UserRoles)
+                .HasForeignKey(ur => ur.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PropertyType>().HasData(
@@ -175,6 +204,33 @@ public class AppDbContext : DbContext
                 Description = "Tahsisli araç park yeri",
                 IsActive = true,
                 CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            }
+        );
+
+        modelBuilder.Entity<Role>().HasData(
+            new Role
+            {
+                Id = 1,
+                Code = "ADMIN",
+                Name = "Administrator",
+                Description = "Full system administration access",
+                IsActive = true
+            },
+            new Role
+            {
+                Id = 2,
+                Code = "MANAGER",
+                Name = "Property Manager",
+                Description = "Manages assigned properties and operational records",
+                IsActive = true
+            },
+            new Role
+            {
+                Id = 3,
+                Code = "USER",
+                Name = "Standard User",
+                Description = "Basic authenticated system access",
+                IsActive = true
             }
         );
     }

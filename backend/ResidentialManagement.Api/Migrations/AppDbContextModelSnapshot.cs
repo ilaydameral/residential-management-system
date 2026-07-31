@@ -200,6 +200,65 @@ namespace ResidentialManagement.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.Role", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Roles");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Code = "ADMIN",
+                            Description = "Full system administration access",
+                            IsActive = true,
+                            Name = "Administrator"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "MANAGER",
+                            Description = "Manages assigned properties and operational records",
+                            IsActive = true,
+                            Name = "Property Manager"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "USER",
+                            Description = "Basic authenticated system access",
+                            IsActive = true,
+                            Name = "Standard User"
+                        });
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Unit", b =>
                 {
                     b.Property<int>("Id")
@@ -341,6 +400,77 @@ namespace ResidentialManagement.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(75)
+                        .HasColumnType("nvarchar(75)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(75)
+                        .HasColumnType("nvarchar(75)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("UserName")
+                        .IsUnique();
+
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.UserRole", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("UserRoles");
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Building", b =>
                 {
                     b.HasOne("ResidentialManagement.Api.Entities.Property", "Property")
@@ -381,6 +511,25 @@ namespace ResidentialManagement.Api.Migrations
                     b.Navigation("UnitType");
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.UserRole", b =>
+                {
+                    b.HasOne("ResidentialManagement.Api.Entities.Role", "Role")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ResidentialManagement.Api.Entities.User", "User")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Building", b =>
                 {
                     b.Navigation("Units");
@@ -391,9 +540,19 @@ namespace ResidentialManagement.Api.Migrations
                     b.Navigation("Buildings");
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.Role", b =>
+                {
+                    b.Navigation("UserRoles");
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.UnitType", b =>
                 {
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.User", b =>
+                {
+                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }
