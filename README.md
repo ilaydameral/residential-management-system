@@ -293,7 +293,25 @@ npm --prefix frontend run dev
 ```
 Runs at `http://localhost:5173`.
 
+### Local Development Ports & Process Management
+
+- **Backend**: Runs on `http://localhost:5006`
+- **Frontend**: Runs on `http://localhost:5173`
+
+If port conflict issues arise due to background processes remaining active:
+
+```bash
+# Check processes listening on ports 5006 and 5173
+lsof -i :5006
+lsof -i :5173
+
+# Terminate hanging backend or frontend processes if necessary
+pkill -f ResidentialManagement.Api
+pkill -f "vite"
+```
+
 ---
+
 
 ## Verification & Checks
 
