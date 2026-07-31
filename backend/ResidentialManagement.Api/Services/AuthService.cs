@@ -1,0 +1,73 @@
+using Microsoft.EntityFrameworkCore;
+using ResidentialManagement.Api.Data;
+using ResidentialManagement.Api.DTOs;
+using ResidentialManagement.Api.Exceptions;
+
+namespace ResidentialManagement.Api.Services;
+
+public class AuthService : IAuthService
+{
+    private readonly AppDbContext _context;
+    private readonly IPasswordService _passwordService;
+    private readonly IJwtTokenService _jwtTokenService;
+
+    public AuthService(
+        AppDbContext context,
+        IPasswordService passwordService,
+        IJwtTokenService jwtTokenService)
+    {
+        _context = context;
+        _passwordService = passwordService;
+        _jwtTokenService = jwtTokenService;
+    }
+
+    public async Task<LoginResponseDto> LoginAsync(LoginRequestDto loginDto)
+    {
+        var normalizedInput = loginDto.UserNameOrEmail.Trim().ToLower();
+
+        var user = await _context.Users
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.UserName.ToLower() == normalizedInput || u.Email.ToLower() == normalizedInput);
+
+        if (user is null || !_passwordService.VerifyPassword(user, user.PasswordHash, loginDto.Password, out var rehashNeeded))
+        {
+            throw new UnauthorizedException("Kullanıcı adı/e-posta veya parola hatalı.");
+        }
+
+        if (!user.IsActive)
+        {
+            throw new ForbiddenException("Kullanıcı hesabı pasif durumdadır.");
+        }
+
+        if (rehashNeeded)
+        {
+            user.PasswordHash = _passwordService.HashPassword(user, loginDto.Password);
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        var activeRoleCodes = user.UserRoles
+            .Where(ur => ur.Role.IsActive)
+            .Select(ur => ur.Role.Code)
+            .Distinct()
+            .ToList();
+
+        var (token, expiresAtUtc) = _jwtTokenService.GenerateToken(user, activeRoleCodes);
+
+        return new LoginResponseDto
+        {
+            AccessToken = token,
+            ExpiresAtUtc = expiresAtUtc,
+            User = new AuthenticatedUserDto
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Roles = activeRoleCodes
+            }
+        };
+    }
+}

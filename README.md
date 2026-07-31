@@ -7,7 +7,7 @@ The project is being developed incrementally.
 - **Phase 1**: Full-stack prototype validating React, ASP.NET Core Web API, and SQL Server connectivity.
 - **Phase 2**: Service layer, DTO refactoring, standardized string lengths, and centralized exception handling middleware.
 - **Phase 3**: Complete Property Structure Management (`PropertyType` & `UnitType` lookups, `Building` & `Unit` entities, composite unique indexes, database CHECK constraints, Turkey 81 city-district searchable selection, real-world business rules enforcement, and full React hierarchy UI).
-- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, seed roles, and SQL verification scripts).
+- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, development bootstrap admin initializer, and SQL support scripts).
 
 ---
 
@@ -45,7 +45,13 @@ Phase 4 introduces identity, role-based access control (RBAC), and authenticatio
    - Seeded system roles: `ADMIN` (Administrator), `MANAGER` (Property Manager), `USER` (Standard User).
    - Passwords stored strictly as `PasswordHash`.
    - T-SQL verification scripts (`verify_auth_schema.sql`, `auth_user_role_queries.sql`).
-   - JWT authentication, password hashing service, and login endpoints will follow in subsequent commits.
+
+2. **JWT Authentication & Password Hashing**:
+   - Framework `PasswordHasher<User>` wrapper (`IPasswordService`) utilizing PBKDF2 password hashing. Passwords stored strictly as hashes; plain-text passwords never logged or persisted.
+   - JWT Access Token generation (`IJwtTokenService`) including `sub`, `unique_name`, `email`, `given_name`, `family_name`, and `role` claims.
+   - Login API endpoint (`POST /api/auth/login`) returning `LoginResponseDto` with generic invalid credential response (`401 Unauthorized`) and inactive user check (`403 Forbidden`).
+   - Development-only `AdminInitializer` bootstrapping initial `ADMIN` user safely via `user-secrets` or environment variables without hardcoded passwords. Production secrets must use environment variables or secret manager.
+   - T-SQL support queries (`auth_login_support_queries.sql`).
 
 ---
 
@@ -108,32 +114,35 @@ residential-management-system/
 ├── backend/
 │   └── ResidentialManagement.Api/
 │       ├── Controllers/
+│       │   └── AuthController.cs
 │       ├── Data/
 │       │   └── AppDbContext.cs
 │       ├── DTOs/
+│       │   ├── AuthenticatedUserDto.cs
+│       │   ├── LoginRequestDto.cs
+│       │   └── LoginResponseDto.cs
 │       ├── Entities/
-│       │   ├── Building.cs
-│       │   ├── Property.cs
-│       │   ├── PropertyType.cs
 │       │   ├── Role.cs
-│       │   ├── Unit.cs
-│       │   ├── UnitType.cs
 │       │   ├── User.cs
 │       │   └── UserRole.cs
+│       ├── Exceptions/
+│       │   ├── ForbiddenException.cs
+│       │   └── UnauthorizedException.cs
 │       ├── Middleware/
-│       ├── Migrations/
-│       └── Services/
+│       │   └── ExceptionHandlingMiddleware.cs
+│       ├── Services/
+│       │   ├── AdminInitializer.cs
+│       │   ├── AuthService.cs
+│       │   ├── IAuthService.cs
+│       │   ├── IJwtTokenService.cs
+│       │   ├── IPasswordService.cs
+│       │   ├── JwtTokenService.cs
+│       │   └── PasswordService.cs
 ├── database/
-│   ├── 001_create_database.sql
 │   └── queries/
+│       ├── auth_login_support_queries.sql
 │       ├── auth_user_role_queries.sql
-│       ├── migrate_property_type_data.sql
-│       ├── verify_auth_schema.sql
-│       ├── verify_buildings.sql
-│       ├── verify_properties.sql
-│       ├── verify_property_types.sql
-│       ├── verify_unit_types.sql
-│       └── verify_units.sql
+│       └── verify_auth_schema.sql
 ├── frontend/
 └── README.md
 ```
@@ -170,6 +179,9 @@ dotnet ef database update \
 ---
 
 ## API Endpoints
+
+### Auth API
+- `POST /api/auth/login`
 
 ### Property Types API
 - `GET /api/property-types`
@@ -220,6 +232,20 @@ dotnet run --project backend/ResidentialManagement.Api
 ```
 Runs at `http://localhost:5006`.
 
+### Local Development User-Secrets Setup
+
+Configure JWT signing key and development bootstrap admin credentials locally using .NET User Secrets:
+
+```bash
+# Set JWT signing key (minimum 32 characters)
+dotnet user-secrets set "Jwt:Key" "<minimum-32-character-development-secret>" --project backend/ResidentialManagement.Api
+
+# Set development bootstrap admin account credentials
+dotnet user-secrets set "BootstrapAdmin:UserName" "admin" --project backend/ResidentialManagement.Api
+dotnet user-secrets set "BootstrapAdmin:Email" "admin@example.com" --project backend/ResidentialManagement.Api
+dotnet user-secrets set "BootstrapAdmin:Password" "<secure-admin-password>" --project backend/ResidentialManagement.Api
+```
+
 ### 2. Run Frontend (React + Vite)
 
 ```bash
@@ -236,6 +262,7 @@ Runs at `http://localhost:5173`.
 
 Execute T-SQL read-only verification scripts under `database/queries/`:
 
+- `auth_login_support_queries.sql`
 - `verify_auth_schema.sql`
 - `auth_user_role_queries.sql`
 - `verify_properties.sql`
