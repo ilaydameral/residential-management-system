@@ -15,7 +15,10 @@ import {
   updateProperty,
   updateUnit,
 } from './api'
+
+import { Login } from './components/Login'
 import { SearchableSelect } from './components/SearchableSelect'
+import { useAuth } from './context/AuthContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
 import type {
   Building,
@@ -62,6 +65,21 @@ const initialUnitForm: CreateUnitPayload & { id?: number; isActive?: boolean } =
 }
 
 function App() {
+  const { user, isAuthenticated, loading, logout, hasRole, hasAnyRole } = useAuth()
+
+  // Role permissions
+  const canCreateProperty = hasAnyRole(['ADMIN', 'MANAGER'])
+  const canEditProperty = hasAnyRole(['ADMIN', 'MANAGER'])
+  const canDeleteProperty = hasRole('ADMIN')
+
+  const canCreateBuilding = hasAnyRole(['ADMIN', 'MANAGER'])
+  const canEditBuilding = hasAnyRole(['ADMIN', 'MANAGER'])
+  const canDeleteBuilding = hasRole('ADMIN')
+
+  const canCreateUnit = hasAnyRole(['ADMIN', 'MANAGER'])
+  const canEditUnit = hasAnyRole(['ADMIN', 'MANAGER'])
+  const canDeleteUnit = hasRole('ADMIN')
+
   // Lookups
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([])
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([])
@@ -101,48 +119,54 @@ function App() {
   const [buildingError, setBuildingError] = useState('')
   const [unitError, setUnitError] = useState('')
 
-  // Section references for smooth scrolling & accessibility
-  const buildingSectionRef = useRef<HTMLElement>(null)
-  const unitSectionRef = useRef<HTMLElement>(null)
+  // Section Refs
+  const buildingSectionRef = useRef<HTMLElement | null>(null)
+  const unitSectionRef = useRef<HTMLElement | null>(null)
 
-  // City & District options calculation
-  const cityNames = TURKEY_CITIES.map((c) => c.name)
-  const selectedCityObj = TURKEY_CITIES.find((c) => c.name === propertyForm.city)
-  const availableDistricts = selectedCityObj ? selectedCityObj.districts : []
-
-  // Check if selected property is a Single Apartment
+  // Computed Values
+  const selectedPropertyTypeObj = propertyTypes.find(
+    (pt) => pt.id === selectedProperty?.propertyTypeId
+  )
   const isSingleApartment =
-    selectedProperty != null &&
-    (selectedProperty.propertyType === 'SINGLE_APARTMENT' ||
-      selectedProperty.propertyType === 'Apartman' ||
-      selectedProperty.propertyTypeName === 'Apartman' ||
-      propertyTypes.find((pt) => pt.id === selectedProperty.propertyTypeId)?.code === 'SINGLE_APARTMENT')
+    selectedPropertyTypeObj?.code === 'SINGLE_APARTMENT' ||
+    selectedProperty?.propertyType === 'SINGLE_APARTMENT'
 
-  // 1. Initial Load: PropertyTypes, UnitTypes, Properties
+  const cityNames = TURKEY_CITIES.map((c) => c.name)
+  const matchedCity = TURKEY_CITIES.find(
+    (c) => c.name.toLowerCase() === (propertyForm.city || '').toLowerCase()
+  )
+  const availableDistricts = matchedCity ? matchedCity.districts : []
+
+  // Load Initial Lookups and Properties when authenticated
   useEffect(() => {
-    const loadInitialData = async () => {
+    if (!isAuthenticated) return
+
+    const loadData = async () => {
       setIsLoadingProperties(true)
-      setPropertyError('')
       try {
-        const [ptData, utData, propData] = await Promise.all([
+        const [propsData, propTypesData, unitTypesData] = await Promise.all([
+          getProperties(true),
           getPropertyTypes(false),
           getUnitTypes(false),
-          getProperties(true),
         ])
-        setPropertyTypes(ptData)
-        setUnitTypes(utData)
-        setProperties(propData)
+        setProperties(propsData)
+        setPropertyTypes(propTypesData)
+        setUnitTypes(unitTypesData)
+
+        if (propTypesData.length > 0) {
+          setPropertyForm((prev) => ({ ...prev, propertyTypeId: propTypesData[0].id }))
+        }
       } catch (err) {
-        setPropertyError(err instanceof Error ? err.message : 'Veriler yüklenirken bir hata oluştu.')
+        setPropertyError(err instanceof Error ? err.message : 'Veriler yüklenirken hata oluştu.')
       } finally {
         setIsLoadingProperties(false)
       }
     }
 
-    loadInitialData()
-  }, [])
+    loadData()
+  }, [isAuthenticated])
 
-  // 2. Fetch Buildings when a Property is selected
+  // Load Buildings when Property is Selected
   useEffect(() => {
     if (!selectedProperty) {
       setBuildings([])
@@ -157,19 +181,19 @@ function App() {
       try {
         const data = await getBuildingsByProperty(selectedProperty.id, true)
         setBuildings(data)
+        setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
 
-        // Single Apartment auto-select if building exists
-        if (
-          selectedProperty &&
-          data.length > 0 &&
-          (selectedProperty.propertyType === 'SINGLE_APARTMENT' ||
-            selectedProperty.propertyType === 'Apartman' ||
-            selectedProperty.propertyTypeName === 'Apartman')
-        ) {
-          setSelectedBuilding(data[0])
+        if (selectedBuilding) {
+          const updatedSelectedBuilding = data.find((b) => b.id === selectedBuilding.id)
+          if (updatedSelectedBuilding) {
+            setSelectedBuilding(updatedSelectedBuilding)
+          } else {
+            setSelectedBuilding(null)
+            setUnits([])
+          }
         }
       } catch (err) {
-        setBuildingError(err instanceof Error ? err.message : 'Bina listesi yüklenemedi.')
+        setBuildingError(err instanceof Error ? err.message : 'Binalar yüklenemedi.')
       } finally {
         setIsLoadingBuildings(false)
       }
@@ -178,7 +202,7 @@ function App() {
     loadBuildings()
   }, [selectedProperty])
 
-  // 3. Fetch Units when a Building is selected
+  // Load Units when Building is Selected
   useEffect(() => {
     if (!selectedBuilding) {
       setUnits([])
@@ -191,47 +215,60 @@ function App() {
       try {
         const data = await getUnitsByBuilding(selectedBuilding.id, true)
         setUnits(data)
+        setUnitForm({
+          ...initialUnitForm,
+          buildingId: selectedBuilding.id,
+          unitTypeId: unitTypes[0]?.id || 0,
+        })
       } catch (err) {
-        setUnitError(err instanceof Error ? err.message : 'Bağımsız bölüm listesi yüklenemedi.')
+        setUnitError(err instanceof Error ? err.message : 'Bağımsız bölümler yüklenemedi.')
       } finally {
         setIsLoadingUnits(false)
       }
     }
 
     loadUnits()
-  }, [selectedBuilding])
+  }, [selectedBuilding, unitTypes])
+
+  // Automatic Single Apartment Building Selection
+  useEffect(() => {
+    if (isSingleApartment && buildings.length > 0) {
+      const autoBuilding = buildings[0]
+      if (selectedBuilding?.id !== autoBuilding.id) {
+        setSelectedBuilding(autoBuilding)
+        setUnitForm({
+          ...initialUnitForm,
+          buildingId: autoBuilding.id,
+          unitTypeId: unitTypes[0]?.id || 0,
+        })
+      }
+    }
+  }, [isSingleApartment, buildings, selectedBuilding, unitTypes])
+
+  if (loading) {
+    return (
+      <div className="login-container">
+        <p className="status-message">Oturum kontrol ediliyor...</p>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Login />
+  }
 
   // ==========================================
   // PROPERTY HANDLERS
   // ==========================================
-  const handleCityChange = (newCity: string) => {
-    const cityObj = TURKEY_CITIES.find((c) => c.name === newCity)
-    const validDistricts = cityObj ? cityObj.districts : []
-    const isCurrentDistrictValid = validDistricts.includes(propertyForm.district)
-
-    setPropertyForm((prev) => ({
-      ...prev,
-      city: newCity,
-      district: isCurrentDistrictValid ? prev.district : '',
-    }))
-  }
-
-  const handleDistrictChange = (newDistrict: string) => {
-    setPropertyForm((prev) => ({
-      ...prev,
-      district: newDistrict,
-    }))
-  }
-
   const handleSelectProperty = (property: Property) => {
     setSelectedProperty(property)
     setSelectedBuilding(null)
     setUnits([])
-    setBuildingForm({ ...initialBuildingForm, propertyId: property.id })
     setEditingBuildingId(null)
+    setEditingUnitId(null)
     setBuildingError('')
+    setUnitError('')
 
-    // Smooth scroll to Building section for better UX
     setTimeout(() => {
       buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
@@ -246,11 +283,26 @@ function App() {
     setEditingUnitId(null)
   }
 
+  const handleCityChange = (newCity: string) => {
+    setPropertyForm((prev) => ({
+      ...prev,
+      city: newCity,
+      district: '',
+    }))
+  }
+
+  const handleDistrictChange = (newDistrict: string) => {
+    setPropertyForm((prev) => ({
+      ...prev,
+      district: newDistrict,
+    }))
+  }
+
   const handleEditPropertyClick = (property: Property) => {
     setEditingPropertyId(property.id)
     setPropertyForm({
       name: property.name,
-      propertyTypeId: property.propertyTypeId || (propertyTypes.find((pt) => pt.name === property.propertyType)?.id ?? null),
+      propertyTypeId: property.propertyTypeId || null,
       addressLine: property.addressLine,
       city: property.city,
       district: property.district,
@@ -262,30 +314,32 @@ function App() {
 
   const handleCancelPropertyEdit = () => {
     setEditingPropertyId(null)
-    setPropertyForm(initialPropertyForm)
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
     setPropertyError('')
   }
 
   const handlePropertySubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setPropertyError('')
 
-    // Validation: City and District must be valid
-    const matchedCity = TURKEY_CITIES.find((c) => c.name.toLowerCase() === propertyForm.city.trim().toLowerCase())
     if (!matchedCity) {
-      setPropertyError('Lütfen listeden geçerli bir şehir seçiniz.')
+      setPropertyError('Lütfen listeden geçerli bir il seçiniz.')
       return
     }
 
-    const matchedDistrict = matchedCity.districts.find(
-      (d) => d.toLowerCase() === propertyForm.district.trim().toLowerCase()
+    const matchedDistrict = availableDistricts.find(
+      (d) => d.toLowerCase() === (propertyForm.district || '').toLowerCase()
     )
+
     if (!matchedDistrict) {
-      setPropertyError(`Lütfen ${matchedCity.name} ili için geçerli bir ilçe seçiniz.`)
+      setPropertyError('Lütfen seçilen ile ait geçerli bir ilçe seçiniz.')
       return
     }
 
     setIsSubmittingProperty(true)
+    setPropertyError('')
 
     try {
       if (editingPropertyId) {
@@ -316,7 +370,10 @@ function App() {
         const created = await createProperty(payload)
         setProperties((prev) => [...prev, created])
       }
-      setPropertyForm(initialPropertyForm)
+      setPropertyForm({
+        ...initialPropertyForm,
+        propertyTypeId: propertyTypes[0]?.id || null,
+      })
     } catch (err) {
       setPropertyError(err instanceof Error ? err.message : 'Gayrimenkul kaydedilemedi.')
     } finally {
@@ -350,7 +407,6 @@ function App() {
     setEditingUnitId(null)
     setUnitError('')
 
-    // Smooth scroll to Unit section for better UX
     setTimeout(() => {
       unitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
@@ -434,13 +490,14 @@ function App() {
       const payload: CreateBuildingPayload = {
         propertyId: selectedProperty.id,
         name: selectedProperty.name,
-        code: 'MAIN_BUILDING',
+        code: 'MAIN',
         floorCount: Number(singleApartmentFloorCount),
-        description: 'Teknik bina kaydı',
+        description: 'Tek Apartman Binası',
       }
+
       const created = await createBuilding(payload)
       setBuildings([created])
-      handleSelectBuilding(created)
+      setSelectedBuilding(created)
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Apartman yapısı oluşturulamadı.')
     } finally {
@@ -496,7 +553,6 @@ function App() {
     e.preventDefault()
     if (!selectedBuilding) return
 
-    // Frontend validation: NetArea <= GrossArea
     if (unitForm.grossArea != null && unitForm.netArea != null) {
       const gross = Number(unitForm.grossArea)
       const net = Number(unitForm.netArea)
@@ -563,11 +619,28 @@ function App() {
 
   return (
     <main className="page-shell">
+      {/* Header Auth Bar */}
+      <div className="auth-bar">
+        <div className="user-info">
+          <span className="user-name">
+            {user?.firstName} {user?.lastName} ({user?.userName})
+          </span>
+          {user?.roles?.map((role) => (
+            <span key={role} className={`role-badge ${role.toLowerCase()}`}>
+              {role}
+            </span>
+          ))}
+        </div>
+        <button className="secondary-button" onClick={() => logout()}>
+          Çıkış Yap
+        </button>
+      </div>
+
       <header className="page-header">
-        <p className="eyebrow">Phase 3 — Property Structure Integration</p>
+        <p className="eyebrow">Phase 4 — Authentication & Role-Based UI</p>
         <h1>Residential Management System</h1>
         <p className="page-description">
-          Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini tek bir yönetim paneli üzerinden yönetin.
+          Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.
         </p>
 
         {/* Selection Breadcrumbs */}
@@ -614,127 +687,129 @@ function App() {
 
       {/* SECTION 1: PROPERTIES */}
       <section className="section-container">
-        <div className="content-grid">
-          {/* Property Form */}
-          <section className="panel">
-            <div className="section-heading">
-              <h2>{editingPropertyId ? 'Gayrimenkulü Düzenle' : 'Yeni Gayrimenkul Ekle'}</h2>
-              <p>Site, apartman veya ticari kompleks kaydı oluşturun veya güncelleyin.</p>
-            </div>
-
-            {propertyError && <p className="status-message error-message">{propertyError}</p>}
-
-            <form className="property-form" onSubmit={handlePropertySubmit}>
-              <div className="form-field form-field-full">
-                <label htmlFor="prop-name">Gayrimenkul Adı *</label>
-                <input
-                  id="prop-name"
-                  value={propertyForm.name}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
-                  placeholder="Örn: Olbia Residence"
-                  required
-                />
+        <div className={`content-grid ${!canCreateProperty && !editingPropertyId ? 'single-column-grid' : ''}`}>
+          {/* Property Form - Rendered only for ADMIN and MANAGER */}
+          {(canCreateProperty || (editingPropertyId && canEditProperty)) && (
+            <section className="panel">
+              <div className="section-heading">
+                <h2>{editingPropertyId ? 'Gayrimenkulü Düzenle' : 'Yeni Gayrimenkul Ekle'}</h2>
+                <p>Sisteme yeni bir site, apartman veya ticari yapı kaydedin.</p>
               </div>
 
-              <div className="form-field form-field-full">
-                <label htmlFor="prop-type">Gayrimenkul Türü *</label>
-                <select
-                  id="prop-type"
-                  value={propertyForm.propertyTypeId || ''}
-                  onChange={(e) =>
-                    setPropertyForm({
-                      ...propertyForm,
-                      propertyTypeId: e.target.value ? Number(e.target.value) : null,
-                    })
-                  }
-                  required
-                >
-                  <option value="">-- Tür Seçiniz --</option>
-                  {propertyTypes.map((pt) => (
-                    <option key={pt.id} value={pt.id}>
-                      {pt.name} ({pt.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {propertyError && <p className="status-message error-message">{propertyError}</p>}
 
-              <div className="form-field form-field-full">
-                <label htmlFor="prop-address">Adres *</label>
-                <input
-                  id="prop-address"
-                  value={propertyForm.addressLine}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, addressLine: e.target.value })}
-                  placeholder="Cadde, sokak, no"
-                  required
-                />
-              </div>
-
-              <div className="form-field">
-                <SearchableSelect
-                  id="prop-city"
-                  label="İl"
-                  value={propertyForm.city}
-                  options={cityNames}
-                  placeholder="İl ara veya seç"
-                  required
-                  onChange={handleCityChange}
-                />
-              </div>
-
-              <div className="form-field">
-                <SearchableSelect
-                  id="prop-district"
-                  label="İlçe"
-                  value={propertyForm.district}
-                  options={availableDistricts}
-                  placeholder="İlçe ara veya seç"
-                  disabled={!propertyForm.city}
-                  required
-                  onChange={handleDistrictChange}
-                />
-              </div>
-
-              <div className="form-field form-field-full">
-                <label htmlFor="prop-desc">Açıklama</label>
-                <textarea
-                  id="prop-desc"
-                  value={propertyForm.description || ''}
-                  onChange={(e) => setPropertyForm({ ...propertyForm, description: e.target.value })}
-                  placeholder="İsteğe bağlı açıklama"
-                  rows={3}
-                />
-              </div>
-
-              {editingPropertyId && (
-                <div className="form-field form-field-full checkbox-field">
-                  <label htmlFor="prop-is-active">
-                    <input
-                      id="prop-is-active"
-                      type="checkbox"
-                      checked={propertyForm.isActive ?? true}
-                      onChange={(e) => setPropertyForm({ ...propertyForm, isActive: e.target.checked })}
-                    />
-                    <span>Aktif Kayıt</span>
-                  </label>
+              <form className="property-form" onSubmit={handlePropertySubmit}>
+                <div className="form-field">
+                  <label htmlFor="prop-name">Gayrimenkul Adı *</label>
+                  <input
+                    id="prop-name"
+                    value={propertyForm.name}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
+                    placeholder="Örn: Akdeniz Sitesi"
+                    required
+                  />
                 </div>
-              )}
 
-              <div className="button-group form-field-full">
-                <button className="primary-button" type="submit" disabled={isSubmittingProperty}>
-                  {isSubmittingProperty
-                    ? 'Kaydediliyor...'
-                    : editingPropertyId
-                    ? 'Güncelle'
-                    : 'Gayrimenkul Ekle'}
-                </button>
+                <div className="form-field">
+                  <label htmlFor="prop-type">Gayrimenkul Türü *</label>
+                  <select
+                    id="prop-type"
+                    value={propertyForm.propertyTypeId || ''}
+                    onChange={(e) =>
+                      setPropertyForm({
+                        ...propertyForm,
+                        propertyTypeId: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    required
+                  >
+                    <option value="">-- Tür Seçiniz --</option>
+                    {propertyTypes.map((pt) => (
+                      <option key={pt.id} value={pt.id}>
+                        {pt.name} ({pt.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-field form-field-full">
+                  <label htmlFor="prop-address">Adres *</label>
+                  <input
+                    id="prop-address"
+                    value={propertyForm.addressLine}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, addressLine: e.target.value })}
+                    placeholder="Cadde, sokak, no"
+                    required
+                  />
+                </div>
+
+                <div className="form-field">
+                  <SearchableSelect
+                    id="prop-city"
+                    label="İl"
+                    value={propertyForm.city}
+                    options={cityNames}
+                    placeholder="İl ara veya seç"
+                    required
+                    onChange={handleCityChange}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <SearchableSelect
+                    id="prop-district"
+                    label="İlçe"
+                    value={propertyForm.district}
+                    options={availableDistricts}
+                    placeholder="İlçe ara veya seç"
+                    disabled={!propertyForm.city}
+                    required
+                    onChange={handleDistrictChange}
+                  />
+                </div>
+
+                <div className="form-field form-field-full">
+                  <label htmlFor="prop-desc">Açıklama</label>
+                  <textarea
+                    id="prop-desc"
+                    value={propertyForm.description || ''}
+                    onChange={(e) => setPropertyForm({ ...propertyForm, description: e.target.value })}
+                    placeholder="İsteğe bağlı açıklama"
+                    rows={3}
+                  />
+                </div>
+
                 {editingPropertyId && (
-                  <button className="secondary-button" type="button" onClick={handleCancelPropertyEdit}>
-                    İptal
-                  </button>
+                  <div className="form-field form-field-full checkbox-field">
+                    <label htmlFor="prop-is-active">
+                      <input
+                        id="prop-is-active"
+                        type="checkbox"
+                        checked={propertyForm.isActive ?? true}
+                        onChange={(e) => setPropertyForm({ ...propertyForm, isActive: e.target.checked })}
+                      />
+                      <span>Aktif Kayıt</span>
+                    </label>
+                  </div>
                 )}
-              </div>
-            </form>
-          </section>
+
+                <div className="button-group form-field-full">
+                  <button className="primary-button" type="submit" disabled={isSubmittingProperty}>
+                    {isSubmittingProperty
+                      ? 'Kaydediliyor...'
+                      : editingPropertyId
+                      ? 'Güncelle'
+                      : 'Gayrimenkul Ekle'}
+                  </button>
+                  {editingPropertyId && (
+                    <button className="secondary-button" type="button" onClick={handleCancelPropertyEdit}>
+                      İptal
+                    </button>
+                  )}
+                </div>
+              </form>
+            </section>
+          )}
 
           {/* Property List */}
           <section className="panel">
@@ -782,14 +857,16 @@ function App() {
                         {isSelected ? '✓ Seçili Gayrimenkul' : 'Yönet →'}
                       </button>
 
-                      <button
-                        className="action-button edit-btn"
-                        onClick={() => handleEditPropertyClick(prop)}
-                      >
-                        Düzenle
-                      </button>
+                      {canEditProperty && (
+                        <button
+                          className="action-button edit-btn"
+                          onClick={() => handleEditPropertyClick(prop)}
+                        >
+                          Düzenle
+                        </button>
+                      )}
 
-                      {prop.isActive && (
+                      {canDeleteProperty && prop.isActive && (
                         <button
                           className="action-button danger-btn"
                           onClick={() => handleDeactivateProperty(prop.id)}
@@ -839,10 +916,10 @@ function App() {
                     </div>
 
                     <p className="status-message empty-state-box">
-                      Bu apartman pasif durumdadır. Bina yapısını hazırlamak ve bağımsız bölüm eklemek için önce yukarıdaki listeden gayrimenkulün "Düzenle" butonuna tıklayarak aktifleştirin.
+                      Bu apartman pasif durumdadır. Bina yapısını hazırlamak ve bağımsız bölüm eklemek için önce gayrimenkulü aktifleştirin.
                     </p>
                   </div>
-                ) : (
+                ) : canCreateBuilding ? (
                   <div>
                     <div className="section-heading">
                       <h2>Apartman Yapısını Hazırla</h2>
@@ -874,6 +951,15 @@ function App() {
                       </div>
                     </form>
                   </div>
+                ) : (
+                  <div>
+                    <div className="section-heading">
+                      <h2>Apartman Yapısı Henüz Tanımlanmamış</h2>
+                      <p className="status-message empty-state-box">
+                        Bu apartmanın kat sayısı henüz yöneticiler tarafından belirlenmemiştir.
+                      </p>
+                    </div>
+                  </div>
                 )
               ) : (
                 <div>
@@ -888,93 +974,95 @@ function App() {
             </div>
           ) : (
             /* RESIDENTIAL COMPLEX / COMMERCIAL / MIXED USE REGULAR FLOW */
-            <div className="content-grid">
-              {/* Building Form */}
-              <section className="panel">
-                <div className="section-heading">
-                  <h2>{editingBuildingId ? 'Binayı Düzenle' : 'Yeni Bina / Blok Ekle'}</h2>
-                  <p>"{selectedProperty.name}" altına bina veya blok kaydedin.</p>
-                </div>
-
-                {buildingError && <p className="status-message error-message">{buildingError}</p>}
-
-                <form className="property-form" onSubmit={handleBuildingSubmit}>
-                  <div className="form-field">
-                    <label htmlFor="bld-name">Bina / Blok Adı *</label>
-                    <input
-                      id="bld-name"
-                      value={buildingForm.name}
-                      onChange={(e) => setBuildingForm({ ...buildingForm, name: e.target.value })}
-                      placeholder="Örn: A Blok"
-                      required
-                    />
+            <div className={`content-grid ${!canCreateBuilding && !editingBuildingId ? 'single-column-grid' : ''}`}>
+              {/* Building Form - Rendered only for ADMIN and MANAGER */}
+              {(canCreateBuilding || (editingBuildingId && canEditBuilding)) && (
+                <section className="panel">
+                  <div className="section-heading">
+                    <h2>{editingBuildingId ? 'Binayı Düzenle' : 'Yeni Bina / Blok Ekle'}</h2>
+                    <p>"{selectedProperty.name}" altına bina veya blok kaydedin.</p>
                   </div>
 
-                  <div className="form-field">
-                    <label htmlFor="bld-code">Bina Kodu *</label>
-                    <input
-                      id="bld-code"
-                      value={buildingForm.code}
-                      onChange={(e) => setBuildingForm({ ...buildingForm, code: e.target.value })}
-                      placeholder="Örn: A_BLOK"
-                      required
-                    />
-                  </div>
+                  {buildingError && <p className="status-message error-message">{buildingError}</p>}
 
-                  <div className="form-field">
-                    <label htmlFor="bld-floor">Kat Sayısı (1-200) *</label>
-                    <input
-                      id="bld-floor"
-                      type="number"
-                      min={1}
-                      max={200}
-                      value={buildingForm.floorCount}
-                      onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Number(e.target.value) })}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-field form-field-full">
-                    <label htmlFor="bld-desc">Açıklama</label>
-                    <textarea
-                      id="bld-desc"
-                      value={buildingForm.description || ''}
-                      onChange={(e) => setBuildingForm({ ...buildingForm, description: e.target.value })}
-                      placeholder="İsteğe bağlı bina açıklaması"
-                      rows={2}
-                    />
-                  </div>
-
-                  {editingBuildingId && (
-                    <div className="form-field form-field-full checkbox-field">
-                      <label htmlFor="bld-is-active">
-                        <input
-                          id="bld-is-active"
-                          type="checkbox"
-                          checked={buildingForm.isActive ?? true}
-                          onChange={(e) => setBuildingForm({ ...buildingForm, isActive: e.target.checked })}
-                        />
-                        <span>Aktif Bina</span>
-                      </label>
+                  <form className="property-form" onSubmit={handleBuildingSubmit}>
+                    <div className="form-field">
+                      <label htmlFor="bld-name">Bina / Blok Adı *</label>
+                      <input
+                        id="bld-name"
+                        value={buildingForm.name}
+                        onChange={(e) => setBuildingForm({ ...buildingForm, name: e.target.value })}
+                        placeholder="Örn: A Blok"
+                        required
+                      />
                     </div>
-                  )}
 
-                  <div className="button-group form-field-full">
-                    <button className="primary-button" type="submit" disabled={isSubmittingBuilding}>
-                      {isSubmittingBuilding
-                        ? 'Kaydediliyor...'
-                        : editingBuildingId
-                        ? 'Güncelle'
-                        : 'Bina Ekle'}
-                    </button>
+                    <div className="form-field">
+                      <label htmlFor="bld-code">Bina Kodu *</label>
+                      <input
+                        id="bld-code"
+                        value={buildingForm.code}
+                        onChange={(e) => setBuildingForm({ ...buildingForm, code: e.target.value })}
+                        placeholder="Örn: A_BLOK"
+                        required
+                      />
+                    </div>
+
+                    <div className="form-field">
+                      <label htmlFor="bld-floor">Kat Sayısı (1-200) *</label>
+                      <input
+                        id="bld-floor"
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={buildingForm.floorCount}
+                        onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Number(e.target.value) })}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-field form-field-full">
+                      <label htmlFor="bld-desc">Açıklama</label>
+                      <textarea
+                        id="bld-desc"
+                        value={buildingForm.description || ''}
+                        onChange={(e) => setBuildingForm({ ...buildingForm, description: e.target.value })}
+                        placeholder="İsteğe bağlı bina açıklaması"
+                        rows={2}
+                      />
+                    </div>
+
                     {editingBuildingId && (
-                      <button className="secondary-button" type="button" onClick={handleCancelBuildingEdit}>
-                        İptal
-                      </button>
+                      <div className="form-field form-field-full checkbox-field">
+                        <label htmlFor="bld-is-active">
+                          <input
+                            id="bld-is-active"
+                            type="checkbox"
+                            checked={buildingForm.isActive ?? true}
+                            onChange={(e) => setBuildingForm({ ...buildingForm, isActive: e.target.checked })}
+                          />
+                          <span>Aktif Bina</span>
+                        </label>
+                      </div>
                     )}
-                  </div>
-                </form>
-              </section>
+
+                    <div className="button-group form-field-full">
+                      <button className="primary-button" type="submit" disabled={isSubmittingBuilding}>
+                        {isSubmittingBuilding
+                          ? 'Kaydediliyor...'
+                          : editingBuildingId
+                          ? 'Güncelle'
+                          : 'Bina Ekle'}
+                      </button>
+                      {editingBuildingId && (
+                        <button className="secondary-button" type="button" onClick={handleCancelBuildingEdit}>
+                          İptal
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </section>
+              )}
 
               {/* Building List */}
               <section className="panel">
@@ -987,7 +1075,7 @@ function App() {
 
                 {!isLoadingBuildings && buildings.length === 0 && (
                   <p className="status-message empty-state-box">
-                    Bu gayrimenkule ait henüz bina/blok bulunmuyor. Sol taraftaki formu kullanarak ilk binayı ekleyebilirsiniz.
+                    Bu gayrimenkule ait henüz bina/blok bulunmuyor.
                   </p>
                 )}
 
@@ -1020,19 +1108,23 @@ function App() {
                             {isSelected ? '✓ Seçili Bina' : 'Bölümleri Yönet →'}
                           </button>
 
-                          <button
-                            className="action-button edit-btn"
-                            onClick={() => handleEditBuildingClick(bld)}
-                          >
-                            Düzenle
-                          </button>
+                          {canEditBuilding && (
+                            <button
+                              className="action-button edit-btn"
+                              onClick={() => handleEditBuildingClick(bld)}
+                            >
+                              Düzenle
+                            </button>
+                          )}
 
-                          <button
-                            className="action-button danger-btn"
-                            onClick={() => handleDeleteBuildingClick(bld.id)}
-                          >
-                            Sil
-                          </button>
+                          {canDeleteBuilding && (
+                            <button
+                              className="action-button danger-btn"
+                              onClick={() => handleDeleteBuildingClick(bld.id)}
+                            >
+                              Sil
+                            </button>
+                          )}
                         </div>
                       </article>
                     )
@@ -1061,133 +1153,135 @@ function App() {
             </button>
           </div>
 
-          <div className="content-grid">
-            {/* Unit Form */}
-            <section className="panel">
-              <div className="section-heading">
-                <h2>{editingUnitId ? 'Bölümü Düzenle' : 'Yeni Bağımsız Bölüm Ekle'}</h2>
-                <p>"{selectedBuilding.name}" altına daire, dükkan veya depo ekleyin.</p>
-              </div>
-
-              {unitError && <p className="status-message error-message">{unitError}</p>}
-
-              <form className="property-form" onSubmit={handleUnitSubmit}>
-                <div className="form-field">
-                  <label htmlFor="unit-number">Kapı / Bölüm No *</label>
-                  <input
-                    id="unit-number"
-                    value={unitForm.unitNumber}
-                    onChange={(e) => setUnitForm({ ...unitForm, unitNumber: e.target.value })}
-                    placeholder="Örn: Daire 1, D:12"
-                    required
-                  />
+          <div className={`content-grid ${!canCreateUnit && !editingUnitId ? 'single-column-grid' : ''}`}>
+            {/* Unit Form - Rendered only for ADMIN and MANAGER */}
+            {(canCreateUnit || (editingUnitId && canEditUnit)) && (
+              <section className="panel">
+                <div className="section-heading">
+                  <h2>{editingUnitId ? 'Bölümü Düzenle' : 'Yeni Bağımsız Bölüm Ekle'}</h2>
+                  <p>"{selectedBuilding.name}" altına daire, dükkan veya depo ekleyin.</p>
                 </div>
 
-                <div className="form-field">
-                  <label htmlFor="unit-type">Bölüm Türü *</label>
-                  <select
-                    id="unit-type"
-                    value={unitForm.unitTypeId || ''}
-                    onChange={(e) => setUnitForm({ ...unitForm, unitTypeId: Number(e.target.value) })}
-                    required
-                  >
-                    <option value="">-- Tür Seçiniz --</option>
-                    {unitTypes.map((ut) => (
-                      <option key={ut.id} value={ut.id}>
-                        {ut.name} ({ut.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {unitError && <p className="status-message error-message">{unitError}</p>}
 
-                <div className="form-field">
-                  <label htmlFor="unit-floor">Kat No (Bodrum için negatif) *</label>
-                  <input
-                    id="unit-floor"
-                    type="number"
-                    value={unitForm.floorNumber}
-                    onChange={(e) => setUnitForm({ ...unitForm, floorNumber: Number(e.target.value) })}
-                    required
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="unit-gross">Brüt Alan (m²)</label>
-                  <input
-                    id="unit-gross"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={unitForm.grossArea ?? ''}
-                    onChange={(e) =>
-                      setUnitForm({
-                        ...unitForm,
-                        grossArea: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                    placeholder="Örn: 100.00"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="unit-net">Net Alan (m²)</label>
-                  <input
-                    id="unit-net"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={unitForm.netArea ?? ''}
-                    onChange={(e) =>
-                      setUnitForm({
-                        ...unitForm,
-                        netArea: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                    placeholder="Örn: 85.50"
-                  />
-                </div>
-
-                <div className="form-field form-field-full">
-                  <label htmlFor="unit-desc">Açıklama</label>
-                  <textarea
-                    id="unit-desc"
-                    value={unitForm.description || ''}
-                    onChange={(e) => setUnitForm({ ...unitForm, description: e.target.value })}
-                    placeholder="İsteğe bağlı açıklama"
-                    rows={2}
-                  />
-                </div>
-
-                {editingUnitId && (
-                  <div className="form-field form-field-full checkbox-field">
-                    <label htmlFor="unit-is-active">
-                      <input
-                        id="unit-is-active"
-                        type="checkbox"
-                        checked={unitForm.isActive ?? true}
-                        onChange={(e) => setUnitForm({ ...unitForm, isActive: e.target.checked })}
-                      />
-                      <span>Aktif Bölüm</span>
-                    </label>
+                <form className="property-form" onSubmit={handleUnitSubmit}>
+                  <div className="form-field">
+                    <label htmlFor="unit-number">Kapı / Bölüm No *</label>
+                    <input
+                      id="unit-number"
+                      value={unitForm.unitNumber}
+                      onChange={(e) => setUnitForm({ ...unitForm, unitNumber: e.target.value })}
+                      placeholder="Örn: Daire 1, D:12"
+                      required
+                    />
                   </div>
-                )}
 
-                <div className="button-group form-field-full">
-                  <button className="primary-button" type="submit" disabled={isSubmittingUnit}>
-                    {isSubmittingUnit
-                      ? 'Kaydediliyor...'
-                      : editingUnitId
-                      ? 'Güncelle'
-                      : 'Bölüm Ekle'}
-                  </button>
+                  <div className="form-field">
+                    <label htmlFor="unit-type">Bölüm Türü *</label>
+                    <select
+                      id="unit-type"
+                      value={unitForm.unitTypeId || ''}
+                      onChange={(e) => setUnitForm({ ...unitForm, unitTypeId: Number(e.target.value) })}
+                      required
+                    >
+                      <option value="">-- Tür Seçiniz --</option>
+                      {unitTypes.map((ut) => (
+                        <option key={ut.id} value={ut.id}>
+                          {ut.name} ({ut.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-field">
+                    <label htmlFor="unit-floor">Kat No (Bodrum için negatif) *</label>
+                    <input
+                      id="unit-floor"
+                      type="number"
+                      value={unitForm.floorNumber}
+                      onChange={(e) => setUnitForm({ ...unitForm, floorNumber: Number(e.target.value) })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label htmlFor="unit-gross">Brüt Alan (m²)</label>
+                    <input
+                      id="unit-gross"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={unitForm.grossArea ?? ''}
+                      onChange={(e) =>
+                        setUnitForm({
+                          ...unitForm,
+                          grossArea: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      placeholder="Örn: 100.00"
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label htmlFor="unit-net">Net Alan (m²)</label>
+                    <input
+                      id="unit-net"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={unitForm.netArea ?? ''}
+                      onChange={(e) =>
+                        setUnitForm({
+                          ...unitForm,
+                          netArea: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      placeholder="Örn: 85.50"
+                    />
+                  </div>
+
+                  <div className="form-field form-field-full">
+                    <label htmlFor="unit-desc">Açıklama</label>
+                    <textarea
+                      id="unit-desc"
+                      value={unitForm.description || ''}
+                      onChange={(e) => setUnitForm({ ...unitForm, description: e.target.value })}
+                      placeholder="İsteğe bağlı açıklama"
+                      rows={2}
+                    />
+                  </div>
+
                   {editingUnitId && (
-                    <button className="secondary-button" type="button" onClick={handleCancelUnitEdit}>
-                      İptal
-                    </button>
+                    <div className="form-field form-field-full checkbox-field">
+                      <label htmlFor="unit-is-active">
+                        <input
+                          id="unit-is-active"
+                          type="checkbox"
+                          checked={unitForm.isActive ?? true}
+                          onChange={(e) => setUnitForm({ ...unitForm, isActive: e.target.checked })}
+                        />
+                        <span>Aktif Bölüm</span>
+                      </label>
+                    </div>
                   )}
-                </div>
-              </form>
-            </section>
+
+                  <div className="button-group form-field-full">
+                    <button className="primary-button" type="submit" disabled={isSubmittingUnit}>
+                      {isSubmittingUnit
+                        ? 'Kaydediliyor...'
+                        : editingUnitId
+                        ? 'Güncelle'
+                        : 'Bölüm Ekle'}
+                    </button>
+                    {editingUnitId && (
+                      <button className="secondary-button" type="button" onClick={handleCancelUnitEdit}>
+                        İptal
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </section>
+            )}
 
             {/* Unit List */}
             <section className="panel">
@@ -1200,7 +1294,7 @@ function App() {
 
               {!isLoadingUnits && units.length === 0 && (
                 <p className="status-message empty-state-box">
-                  Bu bina altında henüz kayıtlı bağımsız bölüm bulunmamaktadır. Sol taraftaki formu kullanarak ilk bölümü ekleyebilirsiniz.
+                  Bu bina altında henüz kayıtlı bağımsız bölüm bulunmamaktadır.
                 </p>
               )}
 
@@ -1228,13 +1322,17 @@ function App() {
                     {u.description && <p className="desc-text">{u.description}</p>}
 
                     <div className="card-actions">
-                      <button className="action-button edit-btn" onClick={() => handleEditUnitClick(u)}>
-                        Düzenle
-                      </button>
+                      {canEditUnit && (
+                        <button className="action-button edit-btn" onClick={() => handleEditUnitClick(u)}>
+                          Düzenle
+                        </button>
+                      )}
 
-                      <button className="action-button danger-btn" onClick={() => handleDeleteUnitClick(u.id)}>
-                        Sil
-                      </button>
+                      {canDeleteUnit && (
+                        <button className="action-button danger-btn" onClick={() => handleDeleteUnitClick(u.id)}>
+                          Sil
+                        </button>
+                      )}
                     </div>
                   </article>
                 ))}

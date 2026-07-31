@@ -7,7 +7,7 @@ The project is being developed incrementally.
 - **Phase 1**: Full-stack prototype validating React, ASP.NET Core Web API, and SQL Server connectivity.
 - **Phase 2**: Service layer, DTO refactoring, standardized string lengths, and centralized exception handling middleware.
 - **Phase 3**: Complete Property Structure Management (`PropertyType` & `UnitType` lookups, `Building` & `Unit` entities, composite unique indexes, database CHECK constraints, Turkey 81 city-district searchable selection, real-world business rules enforcement, and full React hierarchy UI).
-- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, role-based authorization rules, development bootstrap admin initializer, and SQL support scripts).
+- **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, role-based authorization rules, React AuthContext, Login screen, role-based UI rendering, development bootstrap admin initializer, and SQL support scripts).
 
 ---
 
@@ -60,6 +60,18 @@ Phase 4 introduces identity, role-based access control (RBAC), and authenticatio
    - `USER`: Read-only access across all endpoints (`GET` only); write or delete attempts return `403 Forbidden`.
    - `POST /api/auth/login` is explicitly marked `[AllowAnonymous]`; unauthenticated requests to protected endpoints return `401 Unauthorized`.
    - Swagger / OpenAPI document transformer configured to support JWT Bearer token authorization UI.
+
+4. **Frontend Auth State & Role-Based UI**:
+   - `AuthContext` and `useAuth` hook managing authentication state, token persistence (`localStorage`), and session restoration.
+   - Modern Glassmorphism Login screen displaying generic backend error messages for invalid credentials (`401`) and inactive user accounts (`403`).
+   - Automatic `Authorization: Bearer <token>` header attached to all protected API calls.
+   - Header User Bar displaying authenticated user's name, role badges, and Logout button.
+   - Role-Based UI rendering:
+     - `ADMIN`: Sees all create, edit, and delete forms and buttons.
+     - `MANAGER`: Sees operational create and edit forms for Properties, Buildings, and Units; delete buttons and lookup creation forms are hidden.
+     - `USER`: Sees read-only lists and details; all creation/edit/delete forms, buttons, and `SINGLE_APARTMENT` setup prompts are hidden.
+   - `401` responses trigger session cleanup and transition to Login screen with "Oturumunuz sona erdi. Lütfen tekrar giriş yapın." notice; `403` responses display inline permission error messages without clearing the session.
+   - Backend API remains the final authorization authority.
 
 ---
 
@@ -159,6 +171,16 @@ residential-management-system/
 │       ├── auth_user_role_queries.sql
 │       └── verify_auth_schema.sql
 ├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Login.tsx
+│   │   │   └── SearchableSelect.tsx
+│   │   ├── context/
+│   │   │   └── AuthContext.tsx
+│   │   ├── App.tsx
+│   │   ├── api.ts
+│   │   ├── main.tsx
+│   │   └── types.ts
 └── README.md
 ```
 
@@ -197,6 +219,8 @@ dotnet ef database update \
 
 ### Auth API (Anonymous)
 - `POST /api/auth/login`
+- `POST /api/auth/register`
+
 
 ### Property Types API (Auth Required)
 - `GET /api/property-types` (`ADMIN`, `MANAGER`, `USER`)

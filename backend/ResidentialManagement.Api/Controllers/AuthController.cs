@@ -28,4 +28,16 @@ public class AuthController : ControllerBase
         var response = await _authService.LoginAsync(loginDto);
         return Ok(response);
     }
+
+    [HttpPost("register")]
+    public async Task<ActionResult<AuthenticatedUserDto>> Register([FromBody] RegisterRequestDto registerDto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var createdUser = await _authService.RegisterAsync(registerDto);
+        return CreatedAtAction(nameof(Register), new { id = createdUser.Id }, createdUser);
+    }
 }
