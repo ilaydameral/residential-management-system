@@ -221,3 +221,12 @@ export interface ApiErrorResponse {
   details?: string | null
   errors?: Record<string, string[]>
 }
+
+export interface DashboardSummary {
+  propertyCount: number
+  buildingCount: number
+  unitCount: number
+  activeOccupancyCount: number
+  occupiedUnitCount: number
+  vacantUnitCount: number
+}

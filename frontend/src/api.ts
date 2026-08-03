@@ -7,6 +7,7 @@ import type {
   CreatePropertyPayload,
   CreateUnitOccupancyPayload,
   CreateUnitPayload,
+  DashboardSummary,
   EndUnitOccupancyPayload,
   LoginRequest,
   LoginResponse,
@@ -298,4 +299,12 @@ export async function searchUsers(query: string): Promise<UserSearchResult[]> {
     headers: getAuthHeaders(),
   })
   return handleResponse<UserSearchResult[]>(response)
+}
+
+// Dashboard API
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const response = await safeFetch(`${API_BASE_URL}/api/dashboard/summary`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DashboardSummary>(response)
 }
