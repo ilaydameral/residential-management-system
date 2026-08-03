@@ -100,6 +100,17 @@ export interface Unit {
   updatedAt: string | null
 }
 
+export interface ResidentUnit {
+  unitId: number
+  propertyName: string
+  buildingName: string
+  unitNumber: string
+  floorNumber: number
+  occupancyType: OccupancyTypeCode
+  isPrimary: boolean
+  startDate: string
+}
+
 export interface CreateUnitPayload {
   buildingId: number
   unitTypeId: number

@@ -18,6 +18,7 @@ import {
 
 import { Login } from './components/Login'
 import { OccupancyManagement } from './components/OccupancyManagement'
+import { ResidentUnits } from './components/ResidentUnits'
 import { SearchableSelect } from './components/SearchableSelect'
 import { useAuth } from './context/AuthContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
@@ -125,6 +126,8 @@ function App() {
   const canEditUnit = hasAnyRole(['ADMIN', 'MANAGER'])
   const canDeleteUnit = hasRole('ADMIN')
   const canManageOccupancies = hasAnyRole(['ADMIN', 'MANAGER'])
+  const isResidentView = hasRole('RESIDENT') &&
+    !hasAnyRole(['ADMIN', 'MANAGER', 'TECHNICAL_STAFF'])
 
   // Lookups
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([])
@@ -192,7 +195,7 @@ function App() {
 
   // Load Initial Lookups and Properties when authenticated
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || isResidentView) return
 
     const loadData = async () => {
       setIsLoadingProperties(true)
@@ -217,7 +220,7 @@ function App() {
     }
 
     loadData()
-  }, [isAuthenticated])
+  }, [isAuthenticated, isResidentView])
 
   // Load Buildings when Property is Selected
   useEffect(() => {
@@ -315,6 +318,10 @@ function App() {
 
   if (!isAuthenticated) {
     return <Login />
+  }
+
+  if (isResidentView) {
+    return <ResidentUnits />
   }
 
   // ==========================================

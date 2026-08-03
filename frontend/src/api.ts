@@ -12,6 +12,7 @@ import type {
   LoginResponse,
   Property,
   PropertyType,
+  ResidentUnit,
   RegisterRequest,
   Unit,
   UnitOccupancy,
@@ -230,6 +231,14 @@ export async function deleteUnit(id: number): Promise<void> {
     headers: getAuthHeaders(),
   })
   await handleResponse<void>(response)
+}
+
+// Resident Units API
+export async function getMyUnits(): Promise<ResidentUnit[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/my-units`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ResidentUnit[]>(response)
 }
 
 // Unit Occupancies API

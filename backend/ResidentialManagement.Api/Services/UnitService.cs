@@ -114,6 +114,39 @@ public class UnitService : IUnitService
             .ToListAsync();
     }
 
+    public async Task<List<ResidentUnitDto>> GetResidentUnitsAsync(int residentUserId)
+    {
+        var utcNow = DateTime.UtcNow;
+
+        return await _context.UnitOccupancies
+            .AsNoTracking()
+            .Where(uo =>
+                uo.UserId == residentUserId &&
+                uo.IsActive &&
+                uo.StartDate <= utcNow &&
+                (!uo.EndDate.HasValue || uo.EndDate.Value >= utcNow) &&
+                uo.Unit.IsActive &&
+                uo.Unit.Building.IsActive &&
+                uo.Unit.Building.Property.IsActive &&
+                uo.OccupancyType.IsActive)
+            .OrderByDescending(uo => uo.IsPrimary)
+            .ThenBy(uo => uo.Unit.Building.Property.Name)
+            .ThenBy(uo => uo.Unit.Building.Name)
+            .ThenBy(uo => uo.Unit.UnitNumber)
+            .Select(uo => new ResidentUnitDto
+            {
+                UnitId = uo.UnitId,
+                PropertyName = uo.Unit.Building.Property.Name,
+                BuildingName = uo.Unit.Building.Name,
+                UnitNumber = uo.Unit.UnitNumber,
+                FloorNumber = uo.Unit.FloorNumber,
+                OccupancyType = uo.OccupancyType.Code,
+                IsPrimary = uo.IsPrimary,
+                StartDate = uo.StartDate
+            })
+            .ToListAsync();
+    }
+
     public async Task<UnitDto> CreateUnitAsync(CreateUnitDto createDto)
     {
         var building = await _context.Buildings
