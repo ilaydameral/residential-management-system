@@ -18,6 +18,12 @@ public class UnitOccupanciesController : ControllerBase
         _unitOccupancyService = unitOccupancyService;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<List<UnitOccupancyDto>>> GetAll()
+    {
+        return Ok(await _unitOccupancyService.GetAllAsync());
+    }
+
     [HttpGet("~/api/units/{unitId:int}/occupancies")]
     public async Task<ActionResult<List<UnitOccupancyDto>>> GetByUnitId(
         int unitId,

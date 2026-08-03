@@ -27,6 +27,8 @@ export interface Property {
   district: string
   description: string | null
   isActive: boolean
+  buildingCount: number
+  unitCount: number
   createdAt: string
 }
 
@@ -60,6 +62,7 @@ export interface Building {
   floorCount: number
   description: string | null
   isActive: boolean
+  unitCount: number
   createdAt: string
   updatedAt: string | null
 }
@@ -96,6 +99,7 @@ export interface Unit {
   netArea: number | null
   description: string | null
   isActive: boolean
+  activeOccupancyCount: number
   createdAt: string
   updatedAt: string | null
 }
@@ -133,6 +137,12 @@ export interface UpdateUnitPayload {
 }
 
 export type OccupancyTypeCode = 'OWNER' | 'TENANT' | 'HOUSEHOLD_MEMBER'
+
+export interface OccupancyType {
+  id: number
+  code: OccupancyTypeCode
+  name: string
+}
 
 export interface UnitOccupancy {
   id: number

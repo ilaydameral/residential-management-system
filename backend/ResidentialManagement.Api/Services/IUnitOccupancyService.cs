@@ -4,6 +4,7 @@ namespace ResidentialManagement.Api.Services;
 
 public interface IUnitOccupancyService
 {
+    Task<List<UnitOccupancyDto>> GetAllAsync();
     Task<List<UnitOccupancyDto>?> GetByUnitIdAsync(int unitId, bool includeInactive = false);
     Task<UnitOccupancyDto?> GetByIdAsync(int id);
     Task<UnitOccupancyDto> CreateAsync(int unitId, CreateUnitOccupancyDto createDto);

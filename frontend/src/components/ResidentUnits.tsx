@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getMyUnits } from '../api'
 import { useAuth } from '../context/AuthContext'
 import type { OccupancyTypeCode, ResidentUnit } from '../types'
+import { formatUnitNumber } from '../utils/unitDisplay'
 
 const OCCUPANCY_TYPE_LABELS: Record<OccupancyTypeCode, string> = {
   OWNER: 'Malik',
@@ -123,7 +124,7 @@ export function ResidentUnits() {
                 <dl className="resident-unit-details">
                   <div>
                     <dt>Kapı / Bölüm No</dt>
-                    <dd>{unit.unitNumber}</dd>
+                    <dd>{formatUnitNumber(unit.unitNumber)}</dd>
                   </div>
                   <div>
                     <dt>Kat</dt>

@@ -28,7 +28,24 @@ public class PropertyService : IPropertyService
 
         return await query
             .OrderBy(p => p.Id)
-            .Select(p => MapToDto(p))
+            .Select(p => new PropertyDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                PropertyTypeId = p.PropertyTypeId,
+                PropertyType = p.PropertyType,
+                PropertyTypeName = p.PropertyTypeLookup != null
+                    ? p.PropertyTypeLookup.Name
+                    : p.PropertyType,
+                AddressLine = p.AddressLine,
+                City = p.City,
+                District = p.District,
+                Description = p.Description,
+                IsActive = p.IsActive,
+                BuildingCount = p.Buildings.Count,
+                UnitCount = p.Buildings.SelectMany(b => b.Units).Count(),
+                CreatedAt = p.CreatedAt
+            })
             .ToListAsync();
     }
 
@@ -37,6 +54,8 @@ public class PropertyService : IPropertyService
         var property = await _context.Properties
             .AsNoTracking()
             .Include(p => p.PropertyTypeLookup)
+            .Include(p => p.Buildings)
+                .ThenInclude(b => b.Units)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         return property is null ? null : MapToDto(property);
@@ -74,6 +93,8 @@ public class PropertyService : IPropertyService
     {
         var property = await _context.Properties
             .Include(p => p.PropertyTypeLookup)
+            .Include(p => p.Buildings)
+                .ThenInclude(b => b.Units)
             .FirstOrDefaultAsync(p => p.Id == id);
 
         if (property is null)
@@ -199,6 +220,8 @@ public class PropertyService : IPropertyService
             District = property.District,
             Description = property.Description,
             IsActive = property.IsActive,
+            BuildingCount = property.Buildings.Count,
+            UnitCount = property.Buildings.SelectMany(b => b.Units).Count(),
             CreatedAt = property.CreatedAt
         };
     }

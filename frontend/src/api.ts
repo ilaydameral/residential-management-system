@@ -11,6 +11,7 @@ import type {
   EndUnitOccupancyPayload,
   LoginRequest,
   LoginResponse,
+  OccupancyType,
   Property,
   PropertyType,
   ResidentUnit,
@@ -129,6 +130,13 @@ export async function getUnitTypes(includeInactive = false): Promise<UnitType[]>
   return handleResponse<UnitType[]>(response)
 }
 
+export async function getOccupancyTypes(): Promise<OccupancyType[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/occupancy-types`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<OccupancyType[]>(response)
+}
+
 // Properties API
 export async function getProperties(includeInactive = true): Promise<Property[]> {
   const url = `${API_BASE_URL}/api/properties${includeInactive ? '?includeInactive=true' : ''}`
@@ -157,14 +165,22 @@ export async function updateProperty(id: number, payload: UpdatePropertyPayload)
 }
 
 export async function deactivateProperty(id: number): Promise<void> {
-  const response = await safeFetch(`${API_BASE_URL}/api/properties/${id}`, {
-    method: 'DELETE',
+  const response = await safeFetch(`${API_BASE_URL}/api/properties/${id}/deactivate`, {
+    method: 'PATCH',
     headers: getAuthHeaders(),
   })
   await handleResponse<void>(response)
 }
 
 // Buildings API
+export async function getBuildings(includeInactive = true): Promise<Building[]> {
+  const url = `${API_BASE_URL}/api/buildings${includeInactive ? '?includeInactive=true' : ''}`
+  const response = await safeFetch(url, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Building[]>(response)
+}
+
 export async function getBuildingsByProperty(propertyId: number, includeInactive = true): Promise<Building[]> {
   const url = `${API_BASE_URL}/api/buildings/property/${propertyId}${includeInactive ? '?includeInactive=true' : ''}`
   const response = await safeFetch(url, {
@@ -200,6 +216,14 @@ export async function deleteBuilding(id: number): Promise<void> {
 }
 
 // Units API
+export async function getUnits(includeInactive = true): Promise<Unit[]> {
+  const url = `${API_BASE_URL}/api/units${includeInactive ? '?includeInactive=true' : ''}`
+  const response = await safeFetch(url, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Unit[]>(response)
+}
+
 export async function getUnitsByBuilding(buildingId: number, includeInactive = true): Promise<Unit[]> {
   const url = `${API_BASE_URL}/api/units/building/${buildingId}${includeInactive ? '?includeInactive=true' : ''}`
   const response = await safeFetch(url, {
@@ -243,6 +267,13 @@ export async function getMyUnits(): Promise<ResidentUnit[]> {
 }
 
 // Unit Occupancies API
+export async function getAllUnitOccupancies(): Promise<UnitOccupancy[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/unit-occupancies`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<UnitOccupancy[]>(response)
+}
+
 export async function getUnitOccupancies(
   unitId: number,
   includeInactive = true

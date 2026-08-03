@@ -2,18 +2,21 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   closeUnitOccupancy,
   createUnitOccupancy,
+  getOccupancyTypes,
   getUnitOccupancies,
   searchUsers,
   updateUnitOccupancy,
 } from '../api'
 import type {
   CreateUnitOccupancyPayload,
+  OccupancyType,
   Unit,
   UnitOccupancy,
   UpdateUnitOccupancyPayload,
   UserSearchResult,
 } from '../types'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+import { formatUnitDisplay, formatUnitNumber } from '../utils/unitDisplay'
 
 interface OccupancyManagementProps {
   unit: Unit
@@ -29,14 +32,11 @@ interface OccupancyFormState {
   notes: string
 }
 
-const OCCUPANCY_TYPES = [
-  { id: 1, code: 'OWNER', label: 'Malik' },
-  { id: 2, code: 'TENANT', label: 'Kiracı' },
-  { id: 3, code: 'HOUSEHOLD_MEMBER', label: 'Hane Üyesi' },
-] as const
-
 function getOccupancyTypeLabel(code: string): string {
-  return OCCUPANCY_TYPES.find((type) => type.code === code)?.label ?? 'Bilinmeyen'
+  if (code === 'OWNER') return 'Malik'
+  if (code === 'TENANT') return 'Kiracı'
+  if (code === 'HOUSEHOLD_MEMBER') return 'Hane Üyesi'
+  return 'Bilinmeyen'
 }
 
 function todayAsInputDate(): string {
@@ -47,9 +47,9 @@ function todayAsInputDate(): string {
   return `${year}-${month}-${day}`
 }
 
-function createInitialForm(): OccupancyFormState {
+function createInitialForm(occupancyTypeId = 0): OccupancyFormState {
   return {
-    occupancyTypeId: 2,
+    occupancyTypeId,
     startDate: todayAsInputDate(),
     endDate: '',
     isPrimary: false,
@@ -108,6 +108,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyManagementProps) {
   const [occupancies, setOccupancies] = useState<UnitOccupancy[]>([])
+  const [occupancyTypes, setOccupancyTypes] = useState<OccupancyType[]>([])
+  const [occupancyTypesError, setOccupancyTypesError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -176,6 +178,24 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
   }, [loadOccupancies])
 
   useEffect(() => {
+    let isCancelled = false
+    setOccupancyTypesError('')
+    void getOccupancyTypes()
+      .then((types) => {
+        if (!isCancelled) setOccupancyTypes(types)
+      })
+      .catch((typesError) => {
+        if (!isCancelled) {
+          setOccupancyTypes([])
+          setOccupancyTypesError(getErrorMessage(typesError, 'İkamet türleri yüklenemedi.'))
+        }
+      })
+    return () => {
+      isCancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     onDirtyChange(isFormDirty)
   }, [isFormDirty, onDirtyChange])
 
@@ -227,7 +247,8 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
   const openCreateForm = async () => {
     if (!(await requestDiscard())) return
 
-    const initialForm = createInitialForm()
+    const defaultType = occupancyTypes.find((type) => type.code === 'TENANT') ?? occupancyTypes[0]
+    const initialForm = createInitialForm(defaultType?.id ?? 0)
     clearMessages()
     setFormMode('create')
     setEditingOccupancy(null)
@@ -394,7 +415,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         <div className="form-field form-field-full readonly-field">
           <span className="readonly-label">Kullanıcı ve Bağımsız Bölüm</span>
           <strong>{editingOccupancy.userFullName}</strong>
-          <small>{editingOccupancy.userEmail} · {unit.unitNumber}</small>
+          <small>{editingOccupancy.userEmail} · {formatUnitNumber(unit.unitNumber)}</small>
         </div>
       )}
 
@@ -405,13 +426,16 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
           value={form.occupancyTypeId}
           onChange={(event) => setForm({ ...form, occupancyTypeId: Number(event.target.value) })}
           required
+          disabled={occupancyTypes.length === 0}
         >
-          {OCCUPANCY_TYPES.map((type) => (
+          <option value="">İkamet türü seçin</option>
+          {occupancyTypes.map((type) => (
             <option key={type.code} value={type.id}>
-              {type.label}
+              {getOccupancyTypeLabel(type.code)}
             </option>
           ))}
         </select>
+        {occupancyTypesError && <small className="field-error">{occupancyTypesError}</small>}
       </div>
 
       <div className="form-field">
@@ -469,7 +493,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       <div className="occupancy-panel-header">
         <div className="section-heading">
           <p className="eyebrow">Bölüm Detayı</p>
-          <h2>{unit.unitTypeName} {unit.unitNumber} — Sakin Yönetimi</h2>
+          <h2>{formatUnitDisplay(unit.unitNumber, unit.unitTypeName)} — Sakin Yönetimi</h2>
           <p>{unit.propertyName} · {unit.buildingName}</p>
         </div>
         <div className="occupancy-header-actions">

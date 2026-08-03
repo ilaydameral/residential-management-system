@@ -18,6 +18,7 @@ public class UnitService : IUnitService
         bool includeInactive = false,
         int? residentUserId = null)
     {
+        var utcNow = DateTime.UtcNow;
         var query = _context.Units
             .AsNoTracking()
             .Include(u => u.Building)
@@ -31,12 +32,36 @@ public class UnitService : IUnitService
             .OrderBy(u => u.Building.PropertyId)
             .ThenBy(u => u.BuildingId)
             .ThenBy(u => u.UnitNumber)
-            .Select(u => MapToDto(u))
+            .Select(u => new UnitDto
+            {
+                Id = u.Id,
+                BuildingId = u.BuildingId,
+                BuildingName = u.Building.Name,
+                PropertyId = u.Building.PropertyId,
+                PropertyName = u.Building.Property.Name,
+                UnitTypeId = u.UnitTypeId,
+                UnitTypeName = u.UnitType.Name,
+                UnitTypeCode = u.UnitType.Code,
+                UnitNumber = u.UnitNumber,
+                FloorNumber = u.FloorNumber,
+                GrossArea = u.GrossArea,
+                NetArea = u.NetArea,
+                Description = u.Description,
+                IsActive = u.IsActive,
+                ActiveOccupancyCount = u.UnitOccupancies.Count(occupancy =>
+                    occupancy.IsActive &&
+                    occupancy.StartDate <= utcNow &&
+                    (!occupancy.EndDate.HasValue || occupancy.EndDate.Value >= utcNow) &&
+                    occupancy.OccupancyType.IsActive),
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt
+            })
             .ToListAsync();
     }
 
     public async Task<UnitDto?> GetUnitByIdAsync(int id, int? residentUserId = null)
     {
+        var utcNow = DateTime.UtcNow;
         var query = _context.Units
             .AsNoTracking()
             .Include(u => u.Building)
@@ -50,9 +75,33 @@ public class UnitService : IUnitService
             residentUserId: residentUserId
         );
 
-        var unit = await query.FirstOrDefaultAsync(u => u.Id == id);
-
-        return unit is null ? null : MapToDto(unit);
+        return await query
+            .Where(u => u.Id == id)
+            .Select(u => new UnitDto
+            {
+                Id = u.Id,
+                BuildingId = u.BuildingId,
+                BuildingName = u.Building.Name,
+                PropertyId = u.Building.PropertyId,
+                PropertyName = u.Building.Property.Name,
+                UnitTypeId = u.UnitTypeId,
+                UnitTypeName = u.UnitType.Name,
+                UnitTypeCode = u.UnitType.Code,
+                UnitNumber = u.UnitNumber,
+                FloorNumber = u.FloorNumber,
+                GrossArea = u.GrossArea,
+                NetArea = u.NetArea,
+                Description = u.Description,
+                IsActive = u.IsActive,
+                ActiveOccupancyCount = u.UnitOccupancies.Count(occupancy =>
+                    occupancy.IsActive &&
+                    occupancy.StartDate <= utcNow &&
+                    (!occupancy.EndDate.HasValue || occupancy.EndDate.Value >= utcNow) &&
+                    occupancy.OccupancyType.IsActive),
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt
+            })
+            .FirstOrDefaultAsync();
     }
 
     public async Task<List<UnitDto>?> GetUnitsByBuildingIdAsync(
@@ -60,6 +109,7 @@ public class UnitService : IUnitService
         bool includeInactive = false,
         int? residentUserId = null)
     {
+        var utcNow = DateTime.UtcNow;
         var buildingExists = await _context.Buildings
             .AsNoTracking()
             .AnyAsync(b => b.Id == buildingId);
@@ -80,7 +130,30 @@ public class UnitService : IUnitService
 
         return await query
             .OrderBy(u => u.UnitNumber)
-            .Select(u => MapToDto(u))
+            .Select(u => new UnitDto
+            {
+                Id = u.Id,
+                BuildingId = u.BuildingId,
+                BuildingName = u.Building.Name,
+                PropertyId = u.Building.PropertyId,
+                PropertyName = u.Building.Property.Name,
+                UnitTypeId = u.UnitTypeId,
+                UnitTypeName = u.UnitType.Name,
+                UnitTypeCode = u.UnitType.Code,
+                UnitNumber = u.UnitNumber,
+                FloorNumber = u.FloorNumber,
+                GrossArea = u.GrossArea,
+                NetArea = u.NetArea,
+                Description = u.Description,
+                IsActive = u.IsActive,
+                ActiveOccupancyCount = u.UnitOccupancies.Count(occupancy =>
+                    occupancy.IsActive &&
+                    occupancy.StartDate <= utcNow &&
+                    (!occupancy.EndDate.HasValue || occupancy.EndDate.Value >= utcNow) &&
+                    occupancy.OccupancyType.IsActive),
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt
+            })
             .ToListAsync();
     }
 
@@ -89,6 +162,7 @@ public class UnitService : IUnitService
         bool includeInactive = false,
         int? residentUserId = null)
     {
+        var utcNow = DateTime.UtcNow;
         var propertyExists = await _context.Properties
             .AsNoTracking()
             .AnyAsync(p => p.Id == propertyId);
@@ -110,7 +184,30 @@ public class UnitService : IUnitService
         return await query
             .OrderBy(u => u.Building.Code)
             .ThenBy(u => u.UnitNumber)
-            .Select(u => MapToDto(u))
+            .Select(u => new UnitDto
+            {
+                Id = u.Id,
+                BuildingId = u.BuildingId,
+                BuildingName = u.Building.Name,
+                PropertyId = u.Building.PropertyId,
+                PropertyName = u.Building.Property.Name,
+                UnitTypeId = u.UnitTypeId,
+                UnitTypeName = u.UnitType.Name,
+                UnitTypeCode = u.UnitType.Code,
+                UnitNumber = u.UnitNumber,
+                FloorNumber = u.FloorNumber,
+                GrossArea = u.GrossArea,
+                NetArea = u.NetArea,
+                Description = u.Description,
+                IsActive = u.IsActive,
+                ActiveOccupancyCount = u.UnitOccupancies.Count(occupancy =>
+                    occupancy.IsActive &&
+                    occupancy.StartDate <= utcNow &&
+                    (!occupancy.EndDate.HasValue || occupancy.EndDate.Value >= utcNow) &&
+                    occupancy.OccupancyType.IsActive),
+                CreatedAt = u.CreatedAt,
+                UpdatedAt = u.UpdatedAt
+            })
             .ToListAsync();
     }
 
@@ -356,6 +453,7 @@ public class UnitService : IUnitService
             NetArea = unit.NetArea,
             Description = unit.Description,
             IsActive = unit.IsActive,
+            ActiveOccupancyCount = 0,
             CreatedAt = unit.CreatedAt,
             UpdatedAt = unit.UpdatedAt
         };

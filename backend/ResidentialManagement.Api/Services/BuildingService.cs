@@ -30,7 +30,20 @@ public class BuildingService : IBuildingService
         return await query
             .OrderBy(b => b.PropertyId)
             .ThenBy(b => b.Code)
-            .Select(b => MapToDto(b, b.Property.Name))
+            .Select(b => new BuildingDto
+            {
+                Id = b.Id,
+                PropertyId = b.PropertyId,
+                PropertyName = b.Property.Name,
+                Name = b.Name,
+                Code = b.Code,
+                FloorCount = b.FloorCount,
+                Description = b.Description,
+                IsActive = b.IsActive,
+                UnitCount = b.Units.Count,
+                CreatedAt = b.CreatedAt,
+                UpdatedAt = b.UpdatedAt
+            })
             .ToListAsync();
     }
 
@@ -39,6 +52,7 @@ public class BuildingService : IBuildingService
         var building = await _context.Buildings
             .AsNoTracking()
             .Include(b => b.Property)
+            .Include(b => b.Units)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         return building is null ? null : MapToDto(building, building.Property.Name);
@@ -67,7 +81,20 @@ public class BuildingService : IBuildingService
 
         return await query
             .OrderBy(b => b.Code)
-            .Select(b => MapToDto(b, b.Property.Name))
+            .Select(b => new BuildingDto
+            {
+                Id = b.Id,
+                PropertyId = b.PropertyId,
+                PropertyName = b.Property.Name,
+                Name = b.Name,
+                Code = b.Code,
+                FloorCount = b.FloorCount,
+                Description = b.Description,
+                IsActive = b.IsActive,
+                UnitCount = b.Units.Count,
+                CreatedAt = b.CreatedAt,
+                UpdatedAt = b.UpdatedAt
+            })
             .ToListAsync();
     }
 
@@ -133,6 +160,7 @@ public class BuildingService : IBuildingService
     {
         var building = await _context.Buildings
             .Include(b => b.Property)
+            .Include(b => b.Units)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (building is null)
@@ -240,6 +268,7 @@ public class BuildingService : IBuildingService
             FloorCount = building.FloorCount,
             Description = building.Description,
             IsActive = building.IsActive,
+            UnitCount = building.Units.Count,
             CreatedAt = building.CreatedAt,
             UpdatedAt = building.UpdatedAt
         };
