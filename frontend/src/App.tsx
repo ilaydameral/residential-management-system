@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import {
   createBuilding,
   createProperty,
@@ -22,6 +31,7 @@ import { ResidentUnits } from './components/ResidentUnits'
 import { SearchableSelect } from './components/SearchableSelect'
 import { useAuth } from './context/AuthContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
+import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
 import type {
   Building,
   CreateBuildingPayload,
@@ -80,6 +90,13 @@ const PROPERTY_TYPE_LABEL_MAP: Record<string, string> = {
   MIXED_USE: 'Karma Kullanım',
 }
 
+const ROLE_LABEL_MAP: Record<string, string> = {
+  ADMIN: 'Yönetici',
+  MANAGER: 'Site Yöneticisi',
+  RESIDENT: 'Sakin',
+  TECHNICAL_STAFF: 'Teknik Personel',
+}
+
 const initialPropertyForm: CreatePropertyPayload & { id?: number; isActive?: boolean } = {
   name: '',
   propertyTypeId: null,
@@ -108,6 +125,43 @@ const initialUnitForm: CreateUnitPayload & { id?: number; isActive?: boolean } =
   netArea: null,
   description: '',
   isActive: true,
+}
+
+interface OccupancyErrorBoundaryProps {
+  children: ReactNode
+  onClose: () => void
+}
+
+class OccupancyErrorBoundary extends Component<
+  OccupancyErrorBoundaryProps,
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Sakin yönetimi ekranı oluşturulamadı.', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="panel occupancy-panel">
+          <p className="status-message error-message" role="alert">
+            Sakin yönetimi ekranı açılırken bir sorun oluştu. Lütfen ekranı kapatıp tekrar deneyin.
+          </p>
+          <button className="secondary-button" type="button" onClick={this.props.onClose}>
+            Ekranı Kapat
+          </button>
+        </section>
+      )
+    }
+
+    return this.props.children
+  }
 }
 
 function App() {
@@ -153,6 +207,10 @@ function App() {
   const [propertyForm, setPropertyForm] = useState(initialPropertyForm)
   const [buildingForm, setBuildingForm] = useState(initialBuildingForm)
   const [unitForm, setUnitForm] = useState(initialUnitForm)
+  const [propertyFormDirty, setPropertyFormDirty] = useState(false)
+  const [buildingFormDirty, setBuildingFormDirty] = useState(false)
+  const [unitFormDirty, setUnitFormDirty] = useState(false)
+  const [occupancyFormDirty, setOccupancyFormDirty] = useState(false)
 
   // Edit Modes
   const [editingPropertyId, setEditingPropertyId] = useState<number | null>(null)
@@ -176,6 +234,51 @@ function App() {
   const buildingSectionRef = useRef<HTMLElement | null>(null)
   const unitSectionRef = useRef<HTMLElement | null>(null)
   const occupancySectionRef = useRef<HTMLDivElement | null>(null)
+
+  const hasUnsavedChanges =
+    propertyFormDirty || buildingFormDirty || unitFormDirty || occupancyFormDirty
+  const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(hasUnsavedChanges)
+
+  const resetUiState = useCallback(() => {
+    setProperties([])
+    setBuildings([])
+    setUnits([])
+    setPropertyTypes([])
+    setUnitTypes([])
+    setSelectedProperty(null)
+    setSelectedBuilding(null)
+    setSelectedOccupancyUnit(null)
+    setPropertyForm(initialPropertyForm)
+    setBuildingForm(initialBuildingForm)
+    setUnitForm(initialUnitForm)
+    setEditingPropertyId(null)
+    setEditingBuildingId(null)
+    setEditingUnitId(null)
+    setPropertyError('')
+    setBuildingError('')
+    setUnitError('')
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
+    setIsBlockCodeUserEdited(false)
+    setSingleApartmentFloorCount(1)
+  }, [])
+
+  const handleOccupancyDirtyChange = useCallback((isDirty: boolean) => {
+    setOccupancyFormDirty(isDirty)
+  }, [])
+
+  const handleCloseOccupancyManagement = useCallback(() => {
+    setSelectedOccupancyUnit(null)
+    setOccupancyFormDirty(false)
+  }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      resetUiState()
+    }
+  }, [isAuthenticated, resetUiState])
 
   // Computed Values
   const selectedPropertyTypeObj = propertyTypes.find(
@@ -211,6 +314,7 @@ function App() {
 
         if (propTypesData.length > 0) {
           setPropertyForm((prev) => ({ ...prev, propertyTypeId: propTypesData[0].id }))
+          setPropertyFormDirty(false)
         }
       } catch (err) {
         setPropertyError(err instanceof Error ? err.message : 'Veriler yüklenirken hata oluştu.')
@@ -239,6 +343,7 @@ function App() {
         const data = await getBuildingsByProperty(selectedProperty.id, true)
         setBuildings(data)
         setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
+        setBuildingFormDirty(false)
         setIsBlockCodeUserEdited(false)
 
         if (selectedBuilding) {
@@ -283,6 +388,7 @@ function App() {
           buildingId: selectedBuilding.id,
           unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
         })
+        setUnitFormDirty(false)
       } catch (err) {
         setUnitError(err instanceof Error ? err.message : 'Bağımsız bölümler yüklenemedi.')
       } finally {
@@ -304,6 +410,7 @@ function App() {
           buildingId: autoBuilding.id,
           unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
         })
+        setUnitFormDirty(false)
       }
     }
   }, [isSingleApartment, buildings, selectedBuilding, unitTypes])
@@ -327,36 +434,63 @@ function App() {
   // ==========================================
   // PROPERTY HANDLERS
   // ==========================================
-  const handleSelectProperty = (property: Property) => {
+  const handleSelectProperty = async (property: Property) => {
+    if (!(await requestDiscard())) return
+
     setSelectedProperty(property)
     setSelectedBuilding(null)
     setUnits([])
     setSelectedOccupancyUnit(null)
+    setEditingPropertyId(null)
     setEditingBuildingId(null)
     setEditingUnitId(null)
     setPropertyError('')
     setBuildingError('')
     setUnitError('')
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm({ ...initialBuildingForm, propertyId: property.id })
+    setUnitForm(initialUnitForm)
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
 
     setTimeout(() => {
       buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
-  const handleClearPropertySelection = () => {
+  const handleClearPropertySelection = async () => {
+    if (!(await requestDiscard())) return
+
     setSelectedProperty(null)
     setSelectedBuilding(null)
     setBuildings([])
     setUnits([])
     setSelectedOccupancyUnit(null)
+    setEditingPropertyId(null)
     setEditingBuildingId(null)
     setEditingUnitId(null)
     setPropertyError('')
     setBuildingError('')
     setUnitError('')
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm(initialBuildingForm)
+    setUnitForm(initialUnitForm)
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
   }
 
   const handleCityChange = (newCity: string) => {
+    setPropertyFormDirty(true)
     setPropertyForm((prev) => ({
       ...prev,
       city: newCity,
@@ -365,13 +499,16 @@ function App() {
   }
 
   const handleDistrictChange = (newDistrict: string) => {
+    setPropertyFormDirty(true)
     setPropertyForm((prev) => ({
       ...prev,
       district: newDistrict,
     }))
   }
 
-  const handleEditPropertyClick = (property: Property) => {
+  const handleEditPropertyClick = async (property: Property) => {
+    if (!(await requestDiscard(propertyFormDirty))) return
+
     setEditingPropertyId(property.id)
     setPropertyForm({
       name: property.name,
@@ -383,15 +520,19 @@ function App() {
       isActive: property.isActive,
     })
     setPropertyError('')
+    setPropertyFormDirty(false)
   }
 
-  const handleCancelPropertyEdit = () => {
+  const handleCancelPropertyEdit = async () => {
+    if (!(await requestDiscard(propertyFormDirty))) return
+
     setEditingPropertyId(null)
     setPropertyForm({
       ...initialPropertyForm,
       propertyTypeId: propertyTypes[0]?.id || null,
     })
     setPropertyError('')
+    setPropertyFormDirty(false)
   }
 
   const handlePropertySubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -447,6 +588,7 @@ function App() {
         ...initialPropertyForm,
         propertyTypeId: propertyTypes[0]?.id || null,
       })
+      setPropertyFormDirty(false)
     } catch (err) {
       setPropertyError(err instanceof Error ? err.message : 'Gayrimenkul kaydedilemedi.')
     } finally {
@@ -474,32 +616,53 @@ function App() {
   // ==========================================
   // BUILDING HANDLERS
   // ==========================================
-  const handleSelectBuilding = (building: Building) => {
+  const handleSelectBuilding = async (building: Building) => {
+    if (!(await requestDiscard())) return
+
     setSelectedBuilding(building)
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
     setUnitForm({
       ...initialUnitForm,
       buildingId: building.id,
       unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
     })
     setEditingUnitId(null)
+    setEditingBuildingId(null)
     setSelectedOccupancyUnit(null)
     setBuildingError('')
     setUnitError('')
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
 
     setTimeout(() => {
       unitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
-  const handleClearBuildingSelection = () => {
+  const handleClearBuildingSelection = async () => {
+    if (!(await requestDiscard())) return
+
     setSelectedBuilding(null)
     setUnits([])
     setSelectedOccupancyUnit(null)
+    setEditingBuildingId(null)
     setEditingUnitId(null)
     setUnitError('')
+    setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
+    setUnitForm(initialUnitForm)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
   }
 
   const handleBuildingNameChange = (name: string) => {
+    setBuildingFormDirty(true)
     let autoCode = buildingForm.code
     if (!isBlockCodeUserEdited && !editingBuildingId) {
       autoCode = slugifyBlockName(name)
@@ -512,6 +675,7 @@ function App() {
   }
 
   const handleBuildingCodeChange = (code: string) => {
+    setBuildingFormDirty(true)
     setIsBlockCodeUserEdited(true)
     setBuildingForm((prev) => ({
       ...prev,
@@ -519,7 +683,9 @@ function App() {
     }))
   }
 
-  const handleEditBuildingClick = (building: Building) => {
+  const handleEditBuildingClick = async (building: Building) => {
+    if (!(await requestDiscard(buildingFormDirty))) return
+
     setEditingBuildingId(building.id)
     setIsBlockCodeUserEdited(true)
     setBuildingForm({
@@ -531,13 +697,17 @@ function App() {
       isActive: building.isActive,
     })
     setBuildingError('')
+    setBuildingFormDirty(false)
   }
 
-  const handleCancelBuildingEdit = () => {
+  const handleCancelBuildingEdit = async () => {
+    if (!(await requestDiscard(buildingFormDirty))) return
+
     setEditingBuildingId(null)
     setIsBlockCodeUserEdited(false)
     setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
     setBuildingError('')
+    setBuildingFormDirty(false)
   }
 
   const handleBuildingSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -576,6 +746,7 @@ function App() {
       }
       setIsBlockCodeUserEdited(false)
       setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
+      setBuildingFormDirty(false)
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Bina kaydedilemedi.')
     } finally {
@@ -602,6 +773,7 @@ function App() {
       const created = await createBuilding(payload)
       setBuildings([created])
       setSelectedBuilding(created)
+      setBuildingFormDirty(false)
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Apartman yapısı oluşturulamadı.')
     } finally {
@@ -629,7 +801,9 @@ function App() {
   // ==========================================
   // UNIT HANDLERS
   // ==========================================
-  const handleEditUnitClick = (unit: Unit) => {
+  const handleEditUnitClick = async (unit: Unit) => {
+    if (!(await requestDiscard(unitFormDirty))) return
+
     setEditingUnitId(unit.id)
     setUnitForm({
       buildingId: unit.buildingId,
@@ -642,9 +816,12 @@ function App() {
       isActive: unit.isActive,
     })
     setUnitError('')
+    setUnitFormDirty(false)
   }
 
-  const handleCancelUnitEdit = () => {
+  const handleCancelUnitEdit = async () => {
+    if (!(await requestDiscard(unitFormDirty))) return
+
     setEditingUnitId(null)
     setUnitForm({
       ...initialUnitForm,
@@ -652,6 +829,7 @@ function App() {
       unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
     })
     setUnitError('')
+    setUnitFormDirty(false)
   }
 
   const handleUnitSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -707,13 +885,25 @@ function App() {
           description: unitForm.description ? unitForm.description.trim() : null,
         }
         const created = await createUnit(payload)
-        setUnits((prev) => [...prev, created])
+        const createdUnitType = unitTypes.find((unitType) => unitType.id === created.unitTypeId)
+        const createdForState: Unit = {
+          ...created,
+          buildingId: created.buildingId || selectedBuilding.id,
+          buildingName: created.buildingName?.trim() || selectedBuilding.name,
+          propertyId: created.propertyId || selectedProperty?.id || 0,
+          propertyName: created.propertyName?.trim() || selectedProperty?.name || '',
+          unitTypeId: created.unitTypeId || Number(unitForm.unitTypeId),
+          unitTypeName: created.unitTypeName?.trim() || createdUnitType?.name || '',
+          unitTypeCode: created.unitTypeCode?.trim() || createdUnitType?.code || '',
+        }
+        setUnits((prev) => [...prev, createdForState])
       }
       setUnitForm({
         ...initialUnitForm,
         buildingId: selectedBuilding.id,
         unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
       })
+      setUnitFormDirty(false)
     } catch (err) {
       setUnitError(err instanceof Error ? err.message : 'Bağımsız bölüm kaydedilemedi.')
     } finally {
@@ -734,12 +924,51 @@ function App() {
     }
   }
 
-  const handleOpenOccupancyManagement = (unit: Unit) => {
-    setSelectedOccupancyUnit(unit)
+  const handleOpenOccupancyManagement = async (unit: Unit) => {
+    if (!(await requestDiscard())) return
+
+    if (!unit || !Number.isInteger(unit.id) || unit.id <= 0) {
+      setSelectedOccupancyUnit(null)
+      setUnitError('Sakin yönetimi açılamadı. Daire bilgileri eksik veya geçersiz.')
+      return
+    }
+
+    const safeUnit: Unit = {
+      ...unit,
+      buildingName: unit.buildingName?.trim() || selectedBuilding?.name || 'Bina bilgisi yok',
+      propertyName: unit.propertyName?.trim() || selectedProperty?.name || 'Site/apartman bilgisi yok',
+      unitNumber: unit.unitNumber?.trim() || 'Numara belirtilmemiş',
+      unitTypeName: unit.unitTypeName?.trim() || 'Bağımsız Bölüm',
+    }
+
+    setSelectedOccupancyUnit(safeUnit)
     setUnitError('')
+    setEditingPropertyId(null)
+    setEditingBuildingId(null)
+    setEditingUnitId(null)
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
+    setUnitForm({
+      ...initialUnitForm,
+      buildingId: selectedBuilding?.id || 0,
+      unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+    })
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
     window.setTimeout(() => {
       occupancySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
+  }
+
+  const handleLogout = async () => {
+    if (!(await requestDiscard())) return
+    resetUiState()
+    logout()
   }
 
   return (
@@ -752,17 +981,17 @@ function App() {
           </span>
           {user?.roles?.map((role) => (
             <span key={role} className={`role-badge ${role.toLowerCase()}`}>
-              {role}
+              {ROLE_LABEL_MAP[role] || role}
             </span>
           ))}
         </div>
-        <button className="secondary-button" onClick={() => logout()}>
+        <button className="secondary-button" onClick={handleLogout}>
           Çıkış Yap
         </button>
       </div>
 
       <header className="page-header">
-        <p className="eyebrow">Phase 5 — Residential Management System</p>
+        <p className="eyebrow">Yönetim Paneli</p>
         <h1>Site & Gayrimenkul Yönetimi</h1>
         <p className="page-description">
           Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.
@@ -829,7 +1058,10 @@ function App() {
                   <input
                     id="prop-name"
                     value={propertyForm.name}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
+                      setPropertyForm({ ...propertyForm, name: e.target.value })
+                    }}
                     placeholder="Örn: Akdeniz Sitesi"
                     required
                   />
@@ -840,12 +1072,13 @@ function App() {
                   <select
                     id="prop-type"
                     value={propertyForm.propertyTypeId || ''}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
                       setPropertyForm({
                         ...propertyForm,
                         propertyTypeId: e.target.value ? Number(e.target.value) : null,
                       })
-                    }
+                    }}
                     required
                   >
                     <option value="">-- Tür Seçiniz --</option>
@@ -862,7 +1095,10 @@ function App() {
                   <input
                     id="prop-address"
                     value={propertyForm.addressLine}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, addressLine: e.target.value })}
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
+                      setPropertyForm({ ...propertyForm, addressLine: e.target.value })
+                    }}
                     placeholder="Cadde, sokak, no"
                     required
                   />
@@ -898,7 +1134,10 @@ function App() {
                   <textarea
                     id="prop-desc"
                     value={propertyForm.description || ''}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, description: e.target.value })}
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
+                      setPropertyForm({ ...propertyForm, description: e.target.value })
+                    }}
                     placeholder="İsteğe bağlı açıklama"
                     rows={3}
                   />
@@ -911,7 +1150,10 @@ function App() {
                         id="prop-is-active"
                         type="checkbox"
                         checked={propertyForm.isActive ?? true}
-                        onChange={(e) => setPropertyForm({ ...propertyForm, isActive: e.target.checked })}
+                        onChange={(e) => {
+                          setPropertyFormDirty(true)
+                          setPropertyForm({ ...propertyForm, isActive: e.target.checked })
+                        }}
                       />
                       <span>Aktif Kayıt</span>
                     </label>
@@ -1066,7 +1308,10 @@ function App() {
                           min={1}
                           max={200}
                           value={singleApartmentFloorCount}
-                          onChange={(e) => setSingleApartmentFloorCount(Number(e.target.value))}
+                          onChange={(e) => {
+                            setBuildingFormDirty(true)
+                            setSingleApartmentFloorCount(Number(e.target.value))
+                          }}
                           required
                         />
                       </div>
@@ -1146,7 +1391,10 @@ function App() {
                         min={1}
                         max={200}
                         value={buildingForm.floorCount}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Math.floor(Number(e.target.value)) })}
+                        onChange={(e) => {
+                          setBuildingFormDirty(true)
+                          setBuildingForm({ ...buildingForm, floorCount: Math.floor(Number(e.target.value)) })
+                        }}
                         required
                       />
                     </div>
@@ -1156,7 +1404,10 @@ function App() {
                       <textarea
                         id="bld-desc"
                         value={buildingForm.description || ''}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, description: e.target.value })}
+                        onChange={(e) => {
+                          setBuildingFormDirty(true)
+                          setBuildingForm({ ...buildingForm, description: e.target.value })
+                        }}
                         placeholder="İsteğe bağlı bina açıklaması"
                         rows={2}
                       />
@@ -1169,7 +1420,10 @@ function App() {
                             id="bld-is-active"
                             type="checkbox"
                             checked={buildingForm.isActive ?? true}
-                            onChange={(e) => setBuildingForm({ ...buildingForm, isActive: e.target.checked })}
+                            onChange={(e) => {
+                              setBuildingFormDirty(true)
+                              setBuildingForm({ ...buildingForm, isActive: e.target.checked })
+                            }}
                           />
                           <span>Aktif Bina</span>
                         </label>
@@ -1300,7 +1554,10 @@ function App() {
                     <input
                       id="unit-number"
                       value={unitForm.unitNumber}
-                      onChange={(e) => setUnitForm({ ...unitForm, unitNumber: e.target.value })}
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, unitNumber: e.target.value })
+                      }}
                       placeholder="Örn: 1, 12, A1, B-03"
                       required
                     />
@@ -1311,7 +1568,10 @@ function App() {
                     <select
                       id="unit-type"
                       value={unitForm.unitTypeId || ''}
-                      onChange={(e) => setUnitForm({ ...unitForm, unitTypeId: Number(e.target.value) })}
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, unitTypeId: Number(e.target.value) })
+                      }}
                       required
                     >
                       <option value="">-- Tür Seçiniz --</option>
@@ -1329,7 +1589,10 @@ function App() {
                       id="unit-floor"
                       type="number"
                       value={unitForm.floorNumber}
-                      onChange={(e) => setUnitForm({ ...unitForm, floorNumber: Math.floor(Number(e.target.value)) })}
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, floorNumber: Math.floor(Number(e.target.value)) })
+                      }}
                       required
                     />
                     <small className="field-help" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
@@ -1345,12 +1608,13 @@ function App() {
                       step="0.01"
                       min="0.01"
                       value={unitForm.grossArea ?? ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
                         setUnitForm({
                           ...unitForm,
                           grossArea: e.target.value ? Number(e.target.value) : null,
                         })
-                      }
+                      }}
                       placeholder="Örn: 100.00"
                     />
                   </div>
@@ -1363,12 +1627,13 @@ function App() {
                       step="0.01"
                       min="0.01"
                       value={unitForm.netArea ?? ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
                         setUnitForm({
                           ...unitForm,
                           netArea: e.target.value ? Number(e.target.value) : null,
                         })
-                      }
+                      }}
                       placeholder="Örn: 85.50"
                     />
                   </div>
@@ -1378,7 +1643,10 @@ function App() {
                     <textarea
                       id="unit-desc"
                       value={unitForm.description || ''}
-                      onChange={(e) => setUnitForm({ ...unitForm, description: e.target.value })}
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, description: e.target.value })
+                      }}
                       placeholder="İsteğe bağlı açıklama"
                       rows={2}
                     />
@@ -1391,7 +1659,10 @@ function App() {
                           id="unit-is-active"
                           type="checkbox"
                           checked={unitForm.isActive ?? true}
-                          onChange={(e) => setUnitForm({ ...unitForm, isActive: e.target.checked })}
+                          onChange={(e) => {
+                            setUnitFormDirty(true)
+                            setUnitForm({ ...unitForm, isActive: e.target.checked })
+                          }}
                         />
                         <span>Aktif Bölüm</span>
                       </label>
@@ -1486,14 +1757,21 @@ function App() {
 
           {canManageOccupancies && selectedOccupancyUnit && (
             <div ref={occupancySectionRef} className="occupancy-section-wrapper">
-              <OccupancyManagement
-                unit={selectedOccupancyUnit}
-                onClose={() => setSelectedOccupancyUnit(null)}
-              />
+              <OccupancyErrorBoundary
+                key={selectedOccupancyUnit.id}
+                onClose={handleCloseOccupancyManagement}
+              >
+                <OccupancyManagement
+                  unit={selectedOccupancyUnit}
+                  onClose={handleCloseOccupancyManagement}
+                  onDirtyChange={handleOccupancyDirtyChange}
+                />
+              </OccupancyErrorBoundary>
             </div>
           )}
         </section>
       )}
+      {unsavedChangesDialog}
     </main>
   )
 }

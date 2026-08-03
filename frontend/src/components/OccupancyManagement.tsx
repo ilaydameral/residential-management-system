@@ -13,10 +13,12 @@ import type {
   UpdateUnitOccupancyPayload,
   UserSearchResult,
 } from '../types'
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 
 interface OccupancyManagementProps {
   unit: Unit
   onClose: () => void
+  onDirtyChange: (isDirty: boolean) => void
 }
 
 interface OccupancyFormState {
@@ -38,7 +40,11 @@ function getOccupancyTypeLabel(code: string): string {
 }
 
 function todayAsInputDate(): string {
-  return new Date().toISOString().slice(0, 10)
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function createInitialForm(): OccupancyFormState {
@@ -51,50 +57,70 @@ function createInitialForm(): OccupancyFormState {
   }
 }
 
-function toUtcIso(date: string): string {
-  return `${date}T00:00:00.000Z`
+function toStartOfDayUtcIso(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString()
+}
+
+function toEndOfDayUtcIso(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString()
 }
 
 function toInputDate(value: string | null): string {
-  return value ? value.slice(0, 10) : ''
+  if (!value) return ''
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function formatDate(value: string | null): string {
   if (!value) return '—'
 
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-
-  return new Intl.DateTimeFormat('tr-TR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(parsed)
+  const inputDate = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : toInputDate(value)
+  const match = inputDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : '—'
 }
 
-function isCurrentOccupancy(occupancy: UnitOccupancy): boolean {
-  if (!occupancy.isActive) return false
-  if (!occupancy.endDate) return true
-  return new Date(occupancy.endDate).getTime() >= Date.now()
+type OccupancyStatus = 'Aktif' | 'Sonlandırılmış' | 'Pasif'
+
+function getOccupancyStatus(occupancy: UnitOccupancy): OccupancyStatus {
+  const today = todayAsInputDate()
+  const startDate = toInputDate(occupancy.startDate)
+  const endDate = toInputDate(occupancy.endDate)
+
+  if (!occupancy.isActive) {
+    return endDate ? 'Sonlandırılmış' : 'Pasif'
+  }
+  if (startDate > today) return 'Pasif'
+  if (endDate && endDate < today) return 'Sonlandırılmış'
+  return 'Aktif'
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
-export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps) {
+export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyManagementProps) {
   const [occupancies, setOccupancies] = useState<UnitOccupancy[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [success, setSuccess] = useState('')
 
   const [formMode, setFormMode] = useState<'none' | 'create' | 'edit' | 'close'>('none')
   const [form, setForm] = useState<OccupancyFormState>(createInitialForm)
+  const [formBaseline, setFormBaseline] = useState<OccupancyFormState>(createInitialForm)
   const [editingOccupancy, setEditingOccupancy] = useState<UnitOccupancy | null>(null)
   const [closingOccupancy, setClosingOccupancy] = useState<UnitOccupancy | null>(null)
   const [closeDate, setCloseDate] = useState(todayAsInputDate())
+  const [closeDateBaseline, setCloseDateBaseline] = useState(todayAsInputDate())
 
   const [userQuery, setUserQuery] = useState('')
   const [userResults, setUserResults] = useState<UserSearchResult[]>([])
@@ -103,16 +129,34 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
   const [userSearchError, setUserSearchError] = useState('')
 
   const editingRecordIsPast = Boolean(
-    editingOccupancy && !isCurrentOccupancy(editingOccupancy)
+    editingOccupancy && getOccupancyStatus(editingOccupancy) !== 'Aktif'
   )
+
+  const isFormDirty =
+    formMode === 'create'
+      ? JSON.stringify(form) !== JSON.stringify(formBaseline) ||
+        userQuery.trim() !== '' ||
+        selectedUser !== null
+      : formMode === 'edit'
+        ? JSON.stringify(form) !== JSON.stringify(formBaseline)
+        : formMode === 'close'
+          ? closeDate !== closeDateBaseline
+          : false
+
+  const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isFormDirty)
 
   const loadOccupancies = useCallback(async () => {
     setIsLoading(true)
+    setLoadError('')
     try {
       const data = await getUnitOccupancies(unit.id, true)
+      if (!Array.isArray(data)) {
+        throw new Error('Sakin kayıtları beklenen biçimde alınamadı. Lütfen tekrar deneyin.')
+      }
       setOccupancies(data)
     } catch (loadError) {
-      setError(getErrorMessage(loadError, 'Sakin kayıtları yüklenemedi.'))
+      setOccupancies([])
+      setLoadError(getErrorMessage(loadError, 'Sakin kayıtları yüklenemedi.'))
     } finally {
       setIsLoading(false)
     }
@@ -126,9 +170,18 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
     setUserQuery('')
     setUserResults([])
     setError('')
+    setLoadError('')
     setSuccess('')
     void loadOccupancies()
   }, [loadOccupancies])
+
+  useEffect(() => {
+    onDirtyChange(isFormDirty)
+  }, [isFormDirty, onDirtyChange])
+
+  useEffect(() => {
+    return () => onDirtyChange(false)
+  }, [onDirtyChange])
 
   useEffect(() => {
     const trimmedQuery = userQuery.trim()
@@ -171,41 +224,55 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
     setSuccess('')
   }
 
-  const openCreateForm = () => {
+  const openCreateForm = async () => {
+    if (!(await requestDiscard())) return
+
+    const initialForm = createInitialForm()
     clearMessages()
     setFormMode('create')
     setEditingOccupancy(null)
     setClosingOccupancy(null)
-    setForm(createInitialForm())
+    setForm(initialForm)
+    setFormBaseline(initialForm)
     setSelectedUser(null)
     setUserQuery('')
     setUserResults([])
     setUserSearchError('')
   }
 
-  const openEditForm = (occupancy: UnitOccupancy) => {
-    clearMessages()
-    setFormMode('edit')
-    setEditingOccupancy(occupancy)
-    setClosingOccupancy(null)
-    setForm({
+  const openEditForm = async (occupancy: UnitOccupancy) => {
+    if (!(await requestDiscard())) return
+
+    const editForm = {
       occupancyTypeId: occupancy.occupancyTypeId,
       startDate: toInputDate(occupancy.startDate),
       endDate: toInputDate(occupancy.endDate),
       isPrimary: occupancy.isPrimary,
       notes: occupancy.notes || '',
-    })
+    }
+    clearMessages()
+    setFormMode('edit')
+    setEditingOccupancy(occupancy)
+    setClosingOccupancy(null)
+    setForm(editForm)
+    setFormBaseline(editForm)
   }
 
-  const openCloseForm = (occupancy: UnitOccupancy) => {
+  const openCloseForm = async (occupancy: UnitOccupancy) => {
+    if (!(await requestDiscard())) return
+
+    const initialCloseDate = todayAsInputDate()
     clearMessages()
     setFormMode('close')
     setClosingOccupancy(occupancy)
     setEditingOccupancy(null)
-    setCloseDate(todayAsInputDate())
+    setCloseDate(initialCloseDate)
+    setCloseDateBaseline(initialCloseDate)
   }
 
-  const cancelForm = () => {
+  const cancelForm = async () => {
+    if (!(await requestDiscard())) return
+
     clearMessages()
     setFormMode('none')
     setEditingOccupancy(null)
@@ -214,6 +281,11 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
     setUserQuery('')
     setUserResults([])
     setUserSearchError('')
+  }
+
+  const closeManagement = async () => {
+    if (!(await requestDiscard())) return
+    onClose()
   }
 
   const validateDateRange = (): boolean => {
@@ -237,8 +309,8 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
     const payload: CreateUnitOccupancyPayload = {
       userId: selectedUser.id,
       occupancyTypeId: form.occupancyTypeId,
-      startDate: toUtcIso(form.startDate),
-      endDate: form.endDate ? toUtcIso(form.endDate) : null,
+      startDate: toStartOfDayUtcIso(form.startDate),
+      endDate: form.endDate ? toEndOfDayUtcIso(form.endDate) : null,
       isPrimary: form.isPrimary,
       notes: form.notes.trim() || null,
     }
@@ -265,8 +337,8 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
 
     const payload: UpdateUnitOccupancyPayload = {
       occupancyTypeId: form.occupancyTypeId,
-      startDate: toUtcIso(form.startDate),
-      endDate: form.endDate ? toUtcIso(form.endDate) : null,
+      startDate: toStartOfDayUtcIso(form.startDate),
+      endDate: form.endDate ? toEndOfDayUtcIso(form.endDate) : null,
       isPrimary: form.isPrimary,
       notes: form.notes.trim() || null,
     }
@@ -297,14 +369,14 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
 
     const confirmed = window.confirm(
       `${closingOccupancy.userFullName} için bu ikamet ilişkisini ${formatDate(
-        toUtcIso(closeDate)
+        closeDate
       )} tarihinde sonlandırmak istediğinizden emin misiniz?`
     )
     if (!confirmed) return
 
     setIsSubmitting(true)
     try {
-      await closeUnitOccupancy(closingOccupancy.id, { endDate: toUtcIso(closeDate) })
+      await closeUnitOccupancy(closingOccupancy.id, { endDate: toEndOfDayUtcIso(closeDate) })
       await loadOccupancies()
       setFormMode('none')
       setClosingOccupancy(null)
@@ -404,7 +476,7 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
           <button className="primary-button compact-button" type="button" onClick={openCreateForm}>
             Yeni Sakin Ata
           </button>
-          <button className="secondary-button" type="button" onClick={onClose}>
+          <button className="secondary-button" type="button" onClick={closeManagement}>
             Kapat
           </button>
         </div>
@@ -542,17 +614,26 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
 
       <div className="occupancy-list-heading">
         <h3>Sakin Kayıtları</h3>
-        <span>{occupancies.length} kayıt</span>
+        {!loadError && <span>{occupancies.length} kayıt</span>}
       </div>
 
       {isLoading && <p className="status-message">Sakin kayıtları yükleniyor...</p>}
-      {!isLoading && occupancies.length === 0 && (
+      {!isLoading && loadError && (
+        <div className="status-message error-message" role="alert">
+          <p>{loadError}</p>
+          <button className="secondary-button compact-button" type="button" onClick={() => void loadOccupancies()}>
+            Tekrar Dene
+          </button>
+        </div>
+      )}
+      {!isLoading && !loadError && occupancies.length === 0 && (
         <p className="status-message empty-state-box">Bu bağımsız bölüm için henüz sakin kaydı bulunmuyor.</p>
       )}
 
-      <div className="occupancy-card-list">
+      {!loadError && <div className="occupancy-card-list">
         {occupancies.map((occupancy) => {
-          const isCurrent = isCurrentOccupancy(occupancy)
+          const status = getOccupancyStatus(occupancy)
+          const isCurrent = status === 'Aktif'
           return (
             <article
               key={occupancy.id}
@@ -564,9 +645,13 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
                   <p className="subtitle">@{occupancy.userName} · {occupancy.userEmail}</p>
                 </div>
                 <div className="occupancy-badges">
-                  {occupancy.isPrimary && <span className="status-badge primary-badge">Birincil Sakin</span>}
+                  {occupancy.isPrimary && (
+                    <span className="status-badge primary-badge">
+                      {isCurrent ? 'Birincil Sakin' : 'Döneminde Birincil'}
+                    </span>
+                  )}
                   <span className={`status-badge ${isCurrent ? 'active' : 'inactive'}`}>
-                    {isCurrent ? 'Aktif' : 'Geçmiş / Pasif'}
+                    {status}
                   </span>
                 </div>
               </div>
@@ -583,10 +668,6 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
                 <div>
                   <dt>Bitiş</dt>
                   <dd>{formatDate(occupancy.endDate)}</dd>
-                </div>
-                <div>
-                  <dt>Kayıt Durumu</dt>
-                  <dd>{occupancy.isActive ? 'Aktif işaretli' : 'Pasif'}</dd>
                 </div>
               </dl>
 
@@ -608,7 +689,8 @@ export function OccupancyManagement({ unit, onClose }: OccupancyManagementProps)
             </article>
           )
         })}
-      </div>
+      </div>}
+      {unsavedChangesDialog}
     </section>
   )
 }
