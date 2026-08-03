@@ -5,17 +5,22 @@ import type {
   Building,
   CreateBuildingPayload,
   CreatePropertyPayload,
+  CreateUnitOccupancyPayload,
   CreateUnitPayload,
+  EndUnitOccupancyPayload,
   LoginRequest,
   LoginResponse,
   Property,
   PropertyType,
   RegisterRequest,
   Unit,
+  UnitOccupancy,
   UnitType,
   UpdateBuildingPayload,
   UpdatePropertyPayload,
+  UpdateUnitOccupancyPayload,
   UpdateUnitPayload,
+  UserSearchResult,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -225,4 +230,63 @@ export async function deleteUnit(id: number): Promise<void> {
     headers: getAuthHeaders(),
   })
   await handleResponse<void>(response)
+}
+
+// Unit Occupancies API
+export async function getUnitOccupancies(
+  unitId: number,
+  includeInactive = true
+): Promise<UnitOccupancy[]> {
+  const url = `${API_BASE_URL}/api/units/${unitId}/occupancies${
+    includeInactive ? '?includeInactive=true' : ''
+  }`
+  const response = await safeFetch(url, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<UnitOccupancy[]>(response)
+}
+
+export async function createUnitOccupancy(
+  unitId: number,
+  payload: CreateUnitOccupancyPayload
+): Promise<UnitOccupancy> {
+  const response = await safeFetch(`${API_BASE_URL}/api/units/${unitId}/occupancies`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<UnitOccupancy>(response)
+}
+
+export async function updateUnitOccupancy(
+  id: number,
+  payload: UpdateUnitOccupancyPayload
+): Promise<UnitOccupancy> {
+  const response = await safeFetch(`${API_BASE_URL}/api/unit-occupancies/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<UnitOccupancy>(response)
+}
+
+export async function closeUnitOccupancy(
+  id: number,
+  payload: EndUnitOccupancyPayload
+): Promise<UnitOccupancy> {
+  const response = await safeFetch(`${API_BASE_URL}/api/unit-occupancies/${id}/close`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<UnitOccupancy>(response)
+}
+
+// Safe User Search API
+export async function searchUsers(query: string): Promise<UserSearchResult[]> {
+  const params = new URLSearchParams({ query: query.trim() })
+  const response = await safeFetch(`${API_BASE_URL}/api/users/search?${params.toString()}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<UserSearchResult[]>(response)
 }

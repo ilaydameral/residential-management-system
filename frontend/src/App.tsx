@@ -17,6 +17,7 @@ import {
 } from './api'
 
 import { Login } from './components/Login'
+import { OccupancyManagement } from './components/OccupancyManagement'
 import { SearchableSelect } from './components/SearchableSelect'
 import { useAuth } from './context/AuthContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
@@ -123,6 +124,7 @@ function App() {
   const canCreateUnit = hasAnyRole(['ADMIN', 'MANAGER'])
   const canEditUnit = hasAnyRole(['ADMIN', 'MANAGER'])
   const canDeleteUnit = hasRole('ADMIN')
+  const canManageOccupancies = hasAnyRole(['ADMIN', 'MANAGER'])
 
   // Lookups
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([])
@@ -136,6 +138,7 @@ function App() {
   // Selections
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null)
+  const [selectedOccupancyUnit, setSelectedOccupancyUnit] = useState<Unit | null>(null)
 
   // Single Apartment Setup State
   const [singleApartmentFloorCount, setSingleApartmentFloorCount] = useState(1)
@@ -169,6 +172,7 @@ function App() {
   // Section Refs
   const buildingSectionRef = useRef<HTMLElement | null>(null)
   const unitSectionRef = useRef<HTMLElement | null>(null)
+  const occupancySectionRef = useRef<HTMLDivElement | null>(null)
 
   // Computed Values
   const selectedPropertyTypeObj = propertyTypes.find(
@@ -221,6 +225,7 @@ function App() {
       setBuildings([])
       setSelectedBuilding(null)
       setUnits([])
+      setSelectedOccupancyUnit(null)
       return
     }
 
@@ -240,6 +245,7 @@ function App() {
           } else {
             setSelectedBuilding(null)
             setUnits([])
+            setSelectedOccupancyUnit(null)
           }
         }
       } catch (err) {
@@ -256,6 +262,7 @@ function App() {
   useEffect(() => {
     if (!selectedBuilding) {
       setUnits([])
+      setSelectedOccupancyUnit(null)
       return
     }
 
@@ -265,6 +272,9 @@ function App() {
       try {
         const data = await getUnitsByBuilding(selectedBuilding.id, true)
         setUnits(data)
+        setSelectedOccupancyUnit((current) =>
+          current ? data.find((unit) => unit.id === current.id) || null : null
+        )
         setUnitForm({
           ...initialUnitForm,
           buildingId: selectedBuilding.id,
@@ -314,6 +324,7 @@ function App() {
     setSelectedProperty(property)
     setSelectedBuilding(null)
     setUnits([])
+    setSelectedOccupancyUnit(null)
     setEditingBuildingId(null)
     setEditingUnitId(null)
     setPropertyError('')
@@ -330,6 +341,7 @@ function App() {
     setSelectedBuilding(null)
     setBuildings([])
     setUnits([])
+    setSelectedOccupancyUnit(null)
     setEditingBuildingId(null)
     setEditingUnitId(null)
     setPropertyError('')
@@ -463,6 +475,7 @@ function App() {
       unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
     })
     setEditingUnitId(null)
+    setSelectedOccupancyUnit(null)
     setBuildingError('')
     setUnitError('')
 
@@ -474,6 +487,7 @@ function App() {
   const handleClearBuildingSelection = () => {
     setSelectedBuilding(null)
     setUnits([])
+    setSelectedOccupancyUnit(null)
     setEditingUnitId(null)
     setUnitError('')
   }
@@ -598,6 +612,7 @@ function App() {
       if (selectedBuilding?.id === id) {
         setSelectedBuilding(null)
         setUnits([])
+        setSelectedOccupancyUnit(null)
       }
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Bina silinemedi.')
@@ -670,6 +685,9 @@ function App() {
         }
         const updated = await updateUnit(editingUnitId, payload)
         setUnits((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+        setSelectedOccupancyUnit((current) =>
+          current?.id === updated.id ? updated : current
+        )
         setEditingUnitId(null)
       } else {
         const payload: CreateUnitPayload = {
@@ -703,9 +721,18 @@ function App() {
     try {
       await deleteUnit(id)
       setUnits((prev) => prev.filter((u) => u.id !== id))
+      setSelectedOccupancyUnit((current) => (current?.id === id ? null : current))
     } catch (err) {
       setUnitError(err instanceof Error ? err.message : 'Bağımsız bölüm silinemedi.')
     }
+  }
+
+  const handleOpenOccupancyManagement = (unit: Unit) => {
+    setSelectedOccupancyUnit(unit)
+    setUnitError('')
+    window.setTimeout(() => {
+      occupancySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
 
   return (
@@ -1427,6 +1454,17 @@ function App() {
                         </button>
                       )}
 
+                      {canManageOccupancies && (
+                        <button
+                          className={`action-button ${
+                            selectedOccupancyUnit?.id === u.id ? 'active-select' : 'select-btn'
+                          }`}
+                          onClick={() => handleOpenOccupancyManagement(u)}
+                        >
+                          {selectedOccupancyUnit?.id === u.id ? 'Sakinler Açık' : 'Sakinleri Yönet'}
+                        </button>
+                      )}
+
                       {canDeleteUnit && (
                         <button className="action-button danger-btn" onClick={() => handleDeleteUnitClick(u.id)}>
                           Sil
@@ -1438,6 +1476,15 @@ function App() {
               </div>
             </section>
           </div>
+
+          {canManageOccupancies && selectedOccupancyUnit && (
+            <div ref={occupancySectionRef} className="occupancy-section-wrapper">
+              <OccupancyManagement
+                unit={selectedOccupancyUnit}
+                onClose={() => setSelectedOccupancyUnit(null)}
+              />
+            </div>
+          )}
         </section>
       )}
     </main>
