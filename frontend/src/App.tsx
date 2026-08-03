@@ -97,6 +97,17 @@ const ROLE_LABEL_MAP: Record<string, string> = {
   TECHNICAL_STAFF: 'Teknik Personel',
 }
 
+type ManagementView = 'overview' | 'properties' | 'buildings' | 'units' | 'users' | 'residents'
+
+const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
+  { id: 'overview', label: 'Genel Bakış' },
+  { id: 'properties', label: 'Yapılar' },
+  { id: 'buildings', label: 'Bloklar' },
+  { id: 'units', label: 'Daireler' },
+  { id: 'users', label: 'Kullanıcılar' },
+  { id: 'residents', label: 'Site Sakinleri' },
+]
+
 const initialPropertyForm: CreatePropertyPayload & { id?: number; isActive?: boolean } = {
   name: '',
   propertyTypeId: null,
@@ -180,6 +191,7 @@ function App() {
   const canEditUnit = hasAnyRole(['ADMIN', 'MANAGER'])
   const canDeleteUnit = hasRole('ADMIN')
   const canManageOccupancies = hasAnyRole(['ADMIN', 'MANAGER'])
+  const isManagementPanel = hasAnyRole(['ADMIN', 'MANAGER'])
   const isResidentView = hasRole('RESIDENT') &&
     !hasAnyRole(['ADMIN', 'MANAGER', 'TECHNICAL_STAFF'])
 
@@ -196,6 +208,8 @@ function App() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null)
   const [selectedOccupancyUnit, setSelectedOccupancyUnit] = useState<Unit | null>(null)
+  const [activeManagementView, setActiveManagementView] = useState<ManagementView>('overview')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // Single Apartment Setup State
   const [singleApartmentFloorCount, setSingleApartmentFloorCount] = useState(1)
@@ -263,6 +277,8 @@ function App() {
     setOccupancyFormDirty(false)
     setIsBlockCodeUserEdited(false)
     setSingleApartmentFloorCount(1)
+    setActiveManagementView('overview')
+    setIsSidebarOpen(false)
   }, [])
 
   const handleOccupancyDirtyChange = useCallback((isDirty: boolean) => {
@@ -295,6 +311,12 @@ function App() {
     (c) => c.name.toLowerCase() === (propertyForm.city || '').toLowerCase()
   )
   const availableDistricts = matchedCity ? matchedCity.districts : []
+  const showPropertySection = !isManagementPanel || activeManagementView === 'properties'
+  const showBuildingSection = !isManagementPanel || activeManagementView === 'buildings'
+  const showUnitSection =
+    !isManagementPanel || activeManagementView === 'units' || activeManagementView === 'residents'
+  const showUnitManagementActions = !isManagementPanel || activeManagementView === 'units'
+  const showOccupancyActions = !isManagementPanel || activeManagementView === 'residents'
 
   // Load Initial Lookups and Properties when authenticated
   useEffect(() => {
@@ -457,6 +479,10 @@ function App() {
     setBuildingFormDirty(false)
     setUnitFormDirty(false)
     setOccupancyFormDirty(false)
+
+    if (isManagementPanel && activeManagementView === 'properties') {
+      setActiveManagementView('buildings')
+    }
 
     setTimeout(() => {
       buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -639,6 +665,10 @@ function App() {
     setBuildingFormDirty(false)
     setUnitFormDirty(false)
     setOccupancyFormDirty(false)
+
+    if (isManagementPanel && activeManagementView === 'buildings') {
+      setActiveManagementView('units')
+    }
 
     setTimeout(() => {
       unitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -960,9 +990,46 @@ function App() {
     setBuildingFormDirty(false)
     setUnitFormDirty(false)
     setOccupancyFormDirty(false)
+    if (isManagementPanel && activeManagementView === 'units') {
+      setActiveManagementView('residents')
+    }
     window.setTimeout(() => {
       occupancySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
+  }
+
+  const handleManagementNavigation = async (view: ManagementView) => {
+    if (view === activeManagementView) {
+      setIsSidebarOpen(false)
+      return
+    }
+    if (!(await requestDiscard())) return
+
+    setActiveManagementView(view)
+    setIsSidebarOpen(false)
+    setSelectedProperty(null)
+    setSelectedBuilding(null)
+    setSelectedOccupancyUnit(null)
+    setBuildings([])
+    setUnits([])
+    setEditingPropertyId(null)
+    setEditingBuildingId(null)
+    setEditingUnitId(null)
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm(initialBuildingForm)
+    setUnitForm(initialUnitForm)
+    setPropertyError('')
+    setBuildingError('')
+    setUnitError('')
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
+    setIsBlockCodeUserEdited(false)
+    setSingleApartmentFloorCount(1)
   }
 
   const handleLogout = async () => {
@@ -971,13 +1038,60 @@ function App() {
     logout()
   }
 
+  const activeViewLabel =
+    MANAGEMENT_MENU.find((item) => item.id === activeManagementView)?.label || 'Yönetim Paneli'
+
   return (
-    <main className="page-shell">
-      {/* Header Auth Bar */}
-      <div className="auth-bar">
+    <div className={isManagementPanel ? 'management-layout' : ''}>
+      {isManagementPanel && (
+        <>
+          <aside className={`management-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+            <div className="sidebar-brand">
+              <span className="sidebar-brand-mark">SY</span>
+              <div>
+                <strong>Site Yönetimi</strong>
+                <small>Yönetim Paneli</small>
+              </div>
+            </div>
+            <nav className="sidebar-nav" aria-label="Yönetim menüsü">
+              {MANAGEMENT_MENU.map((item) => (
+                <button
+                  key={item.id}
+                  className={activeManagementView === item.id ? 'active' : ''}
+                  type="button"
+                  onClick={() => void handleManagementNavigation(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
+          {isSidebarOpen && (
+            <button
+              className="sidebar-overlay"
+              type="button"
+              aria-label="Menüyü kapat"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+          )}
+        </>
+      )}
+
+      <div className={isManagementPanel ? 'management-workspace' : ''}>
+      <div className={isManagementPanel ? 'management-topbar' : 'auth-bar'}>
+        {isManagementPanel && (
+          <button
+            className="mobile-menu-button"
+            type="button"
+            aria-label="Menüyü aç"
+            onClick={() => setIsSidebarOpen(true)}
+          >
+            ☰
+          </button>
+        )}
         <div className="user-info">
           <span className="user-name">
-            {user?.firstName} {user?.lastName} ({user?.userName})
+            {user?.firstName} {user?.lastName}
           </span>
           {user?.roles?.map((role) => (
             <span key={role} className={`role-badge ${role.toLowerCase()}`}>
@@ -990,15 +1104,18 @@ function App() {
         </button>
       </div>
 
+      <main className={isManagementPanel ? 'management-content' : 'page-shell'}>
       <header className="page-header">
         <p className="eyebrow">Yönetim Paneli</p>
-        <h1>Site & Gayrimenkul Yönetimi</h1>
+        <h1>{isManagementPanel ? activeViewLabel : 'Site & Gayrimenkul Yönetimi'}</h1>
         <p className="page-description">
-          Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.
+          {isManagementPanel
+            ? 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
+            : 'Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.'}
         </p>
 
         {/* Selection Breadcrumbs */}
-        <div className="selection-breadcrumbs">
+        {!isManagementPanel && <div className="selection-breadcrumbs">
           <div
             className={`breadcrumb-item ${selectedProperty ? 'active' : ''}`}
             onClick={() => selectedProperty && buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
@@ -1036,11 +1153,84 @@ function App() {
               </button>
             )}
           </div>
-        </div>
+        </div>}
       </header>
 
+      {isManagementPanel && activeManagementView === 'overview' && (
+        <section className="section-container">
+          <section className="panel overview-welcome-panel">
+            <p className="eyebrow">Hoş Geldiniz</p>
+            <h2>Yönetim işlemlerine sol menüden ulaşabilirsiniz.</h2>
+            <p>
+              Yapı, blok, daire, kullanıcı ve sakin işlemleri ayrı ekranlarda düzenlenmiştir.
+              Genel özet bilgileri sonraki geliştirmede bu alana eklenecektir.
+            </p>
+          </section>
+        </section>
+      )}
+
+      {isManagementPanel && activeManagementView === 'users' && (
+        <section className="section-container">
+          <section className="panel empty-state-box management-placeholder">
+            <h2>Kullanıcılar</h2>
+            <p>Kullanıcı yönetimi içeriği sonraki geliştirmelerde bu ekrana eklenecektir.</p>
+          </section>
+        </section>
+      )}
+
+      {isManagementPanel && ['buildings', 'units', 'residents'].includes(activeManagementView) && (
+        <section className="section-container management-context-section">
+          <section className="panel management-context-panel">
+            <div className="section-heading">
+              <h2>Çalışma Alanı Seçimi</h2>
+              <p>İşlem yapmak istediğiniz yapı ve gerekiyorsa bloğu seçin.</p>
+            </div>
+            <div className="management-context-fields">
+              <div className="form-field">
+                <label htmlFor="management-property-select">Yapı</label>
+                <select
+                  id="management-property-select"
+                  value={selectedProperty?.id || ''}
+                  onChange={(event) => {
+                    const property = properties.find((item) => item.id === Number(event.target.value))
+                    if (property) void handleSelectProperty(property)
+                    else void handleClearPropertySelection()
+                  }}
+                >
+                  <option value="">Yapı seçin</option>
+                  {properties.map((property) => (
+                    <option key={property.id} value={property.id}>{property.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {['units', 'residents'].includes(activeManagementView) && (
+                <div className="form-field">
+                  <label htmlFor="management-building-select">Blok / Bina</label>
+                  <select
+                    id="management-building-select"
+                    value={selectedBuilding?.id || ''}
+                    disabled={!selectedProperty || isLoadingBuildings}
+                    onChange={(event) => {
+                      const building = buildings.find((item) => item.id === Number(event.target.value))
+                      if (building) void handleSelectBuilding(building)
+                      else void handleClearBuildingSelection()
+                    }}
+                  >
+                    <option value="">{isLoadingBuildings ? 'Bloklar yükleniyor...' : 'Blok seçin'}</option>
+                    {buildings.map((building) => (
+                      <option key={building.id} value={building.id}>{building.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </section>
+        </section>
+      )}
+
       {/* SECTION 1: PROPERTIES */}
-      <section className="section-container">
+      {showPropertySection && <section className="section-container">
         <div className={`content-grid ${!canCreateProperty && !editingPropertyId ? 'single-column-grid' : ''}`}>
           {/* Property Form - Rendered only for ADMIN and MANAGER */}
           {(canCreateProperty || (editingPropertyId && canEditProperty)) && (
@@ -1250,10 +1440,10 @@ function App() {
             </div>
           </section>
         </div>
-      </section>
+      </section>}
 
       {/* SECTION 2: BUILDINGS (Requires Selected Property) */}
-      {selectedProperty && (
+      {showBuildingSection && selectedProperty && (
         <section
           ref={buildingSectionRef}
           className="section-container highlight-section"
@@ -1521,7 +1711,7 @@ function App() {
       )}
 
       {/* SECTION 3: UNITS (Requires Selected Building) */}
-      {selectedBuilding && (
+      {showUnitSection && selectedBuilding && (
         <section
           ref={unitSectionRef}
           className="section-container highlight-section-units"
@@ -1539,7 +1729,7 @@ function App() {
 
           <div className={`content-grid ${!canCreateUnit && !editingUnitId ? 'single-column-grid' : ''}`}>
             {/* Unit Form - Rendered only for ADMIN and MANAGER */}
-            {(canCreateUnit || (editingUnitId && canEditUnit)) && (
+            {showUnitManagementActions && (canCreateUnit || (editingUnitId && canEditUnit)) && (
               <section className="panel">
                 <div className="section-heading">
                   <h2>{editingUnitId ? 'Bölümü Düzenle' : 'Yeni Bağımsız Bölüm Ekle'}</h2>
@@ -1726,13 +1916,13 @@ function App() {
                     {u.description && <p className="desc-text">{u.description}</p>}
 
                     <div className="card-actions">
-                      {canEditUnit && (
+                      {showUnitManagementActions && canEditUnit && (
                         <button className="action-button edit-btn" onClick={() => handleEditUnitClick(u)}>
                           Düzenle
                         </button>
                       )}
 
-                      {canManageOccupancies && (
+                      {showOccupancyActions && canManageOccupancies && (
                         <button
                           className={`action-button ${
                             selectedOccupancyUnit?.id === u.id ? 'active-select' : 'select-btn'
@@ -1743,7 +1933,7 @@ function App() {
                         </button>
                       )}
 
-                      {canDeleteUnit && (
+                      {showUnitManagementActions && canDeleteUnit && (
                         <button className="action-button danger-btn" onClick={() => handleDeleteUnitClick(u.id)}>
                           Sil
                         </button>
@@ -1755,7 +1945,7 @@ function App() {
             </section>
           </div>
 
-          {canManageOccupancies && selectedOccupancyUnit && (
+          {showOccupancyActions && canManageOccupancies && selectedOccupancyUnit && (
             <div ref={occupancySectionRef} className="occupancy-section-wrapper">
               <OccupancyErrorBoundary
                 key={selectedOccupancyUnit.id}
@@ -1772,7 +1962,9 @@ function App() {
         </section>
       )}
       {unsavedChangesDialog}
-    </main>
+      </main>
+      </div>
+    </div>
   )
 }
 
