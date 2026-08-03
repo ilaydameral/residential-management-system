@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAccessToken(storedToken)
             setUser(JSON.parse(storedUser))
           } else {
-            logout('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.')
+            logout()
           }
         }
       } catch {

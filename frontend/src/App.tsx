@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import {
   createBuilding,
   createProperty,
@@ -17,9 +26,12 @@ import {
 } from './api'
 
 import { Login } from './components/Login'
+import { OccupancyManagement } from './components/OccupancyManagement'
+import { ResidentUnits } from './components/ResidentUnits'
 import { SearchableSelect } from './components/SearchableSelect'
 import { useAuth } from './context/AuthContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
+import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
 import type {
   Building,
   CreateBuildingPayload,
@@ -33,6 +45,57 @@ import type {
   UpdatePropertyPayload,
   UpdateUnitPayload,
 } from './types'
+
+function slugifyBlockName(name: string): string {
+  let str = name.trim()
+  str = str.replace(/\s+(Blok|Bloğu|Block)$/i, '')
+  const charMap: Record<string, string> = {
+    'ç': 'C', 'Ç': 'C',
+    'ğ': 'G', 'Ğ': 'G',
+    'ı': 'I', 'I': 'I', 'İ': 'I',
+    'ö': 'O', 'Ö': 'O',
+    'ş': 'S', 'Ş': 'S',
+    'ü': 'U', 'Ü': 'U',
+  }
+  str = str.replace(/[çÇğĞıIİöÖşŞüÜ]/g, (m) => charMap[m] || m)
+  str = str.toUpperCase()
+  str = str.replace(/[^A-Z0-9]/g, '-')
+  str = str.replace(/-+/g, '-')
+  str = str.replace(/^-|-$/g, '')
+  return str
+}
+
+function formatFloorDisplay(floorNumber: number): string {
+  const floor = Math.floor(Number(floorNumber))
+  if (floor === 0) return 'Zemin Kat'
+  if (floor < 0) return `Bodrum ${floor}`
+  return `${floor}. Kat`
+}
+
+function formatUnitDisplay(unitNumber: string, unitTypeName?: string): string {
+  const trimmed = unitNumber.trim()
+  if (/^(Daire|Dükkan|Depo|Ofis|D:)/i.test(trimmed)) {
+    return trimmed
+  }
+  if (unitTypeName) {
+    return `${unitTypeName} ${trimmed}`
+  }
+  return trimmed
+}
+
+const PROPERTY_TYPE_LABEL_MAP: Record<string, string> = {
+  SINGLE_APARTMENT: 'Tek Apartman',
+  RESIDENTIAL_COMPLEX: 'Rezidans / Konut Sitesi',
+  COMMERCIAL: 'Ticari Yapı',
+  MIXED_USE: 'Karma Kullanım',
+}
+
+const ROLE_LABEL_MAP: Record<string, string> = {
+  ADMIN: 'Yönetici',
+  MANAGER: 'Site Yöneticisi',
+  RESIDENT: 'Sakin',
+  TECHNICAL_STAFF: 'Teknik Personel',
+}
 
 const initialPropertyForm: CreatePropertyPayload & { id?: number; isActive?: boolean } = {
   name: '',
@@ -64,6 +127,43 @@ const initialUnitForm: CreateUnitPayload & { id?: number; isActive?: boolean } =
   isActive: true,
 }
 
+interface OccupancyErrorBoundaryProps {
+  children: ReactNode
+  onClose: () => void
+}
+
+class OccupancyErrorBoundary extends Component<
+  OccupancyErrorBoundaryProps,
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Sakin yönetimi ekranı oluşturulamadı.', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="panel occupancy-panel">
+          <p className="status-message error-message" role="alert">
+            Sakin yönetimi ekranı açılırken bir sorun oluştu. Lütfen ekranı kapatıp tekrar deneyin.
+          </p>
+          <button className="secondary-button" type="button" onClick={this.props.onClose}>
+            Ekranı Kapat
+          </button>
+        </section>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
 function App() {
   const { user, isAuthenticated, loading, logout, hasRole, hasAnyRole } = useAuth()
 
@@ -79,6 +179,9 @@ function App() {
   const canCreateUnit = hasAnyRole(['ADMIN', 'MANAGER'])
   const canEditUnit = hasAnyRole(['ADMIN', 'MANAGER'])
   const canDeleteUnit = hasRole('ADMIN')
+  const canManageOccupancies = hasAnyRole(['ADMIN', 'MANAGER'])
+  const isResidentView = hasRole('RESIDENT') &&
+    !hasAnyRole(['ADMIN', 'MANAGER', 'TECHNICAL_STAFF'])
 
   // Lookups
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([])
@@ -92,14 +195,22 @@ function App() {
   // Selections
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null)
+  const [selectedOccupancyUnit, setSelectedOccupancyUnit] = useState<Unit | null>(null)
 
   // Single Apartment Setup State
   const [singleApartmentFloorCount, setSingleApartmentFloorCount] = useState(1)
+
+  // Block Code User Input Override Flag
+  const [isBlockCodeUserEdited, setIsBlockCodeUserEdited] = useState(false)
 
   // Forms
   const [propertyForm, setPropertyForm] = useState(initialPropertyForm)
   const [buildingForm, setBuildingForm] = useState(initialBuildingForm)
   const [unitForm, setUnitForm] = useState(initialUnitForm)
+  const [propertyFormDirty, setPropertyFormDirty] = useState(false)
+  const [buildingFormDirty, setBuildingFormDirty] = useState(false)
+  const [unitFormDirty, setUnitFormDirty] = useState(false)
+  const [occupancyFormDirty, setOccupancyFormDirty] = useState(false)
 
   // Edit Modes
   const [editingPropertyId, setEditingPropertyId] = useState<number | null>(null)
@@ -122,6 +233,52 @@ function App() {
   // Section Refs
   const buildingSectionRef = useRef<HTMLElement | null>(null)
   const unitSectionRef = useRef<HTMLElement | null>(null)
+  const occupancySectionRef = useRef<HTMLDivElement | null>(null)
+
+  const hasUnsavedChanges =
+    propertyFormDirty || buildingFormDirty || unitFormDirty || occupancyFormDirty
+  const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(hasUnsavedChanges)
+
+  const resetUiState = useCallback(() => {
+    setProperties([])
+    setBuildings([])
+    setUnits([])
+    setPropertyTypes([])
+    setUnitTypes([])
+    setSelectedProperty(null)
+    setSelectedBuilding(null)
+    setSelectedOccupancyUnit(null)
+    setPropertyForm(initialPropertyForm)
+    setBuildingForm(initialBuildingForm)
+    setUnitForm(initialUnitForm)
+    setEditingPropertyId(null)
+    setEditingBuildingId(null)
+    setEditingUnitId(null)
+    setPropertyError('')
+    setBuildingError('')
+    setUnitError('')
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
+    setIsBlockCodeUserEdited(false)
+    setSingleApartmentFloorCount(1)
+  }, [])
+
+  const handleOccupancyDirtyChange = useCallback((isDirty: boolean) => {
+    setOccupancyFormDirty(isDirty)
+  }, [])
+
+  const handleCloseOccupancyManagement = useCallback(() => {
+    setSelectedOccupancyUnit(null)
+    setOccupancyFormDirty(false)
+  }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      resetUiState()
+    }
+  }, [isAuthenticated, resetUiState])
 
   // Computed Values
   const selectedPropertyTypeObj = propertyTypes.find(
@@ -131,6 +288,8 @@ function App() {
     selectedPropertyTypeObj?.code === 'SINGLE_APARTMENT' ||
     selectedProperty?.propertyType === 'SINGLE_APARTMENT'
 
+  const selectableUnitTypes = unitTypes.filter((ut) => ut.code !== 'PARKING_SPACE')
+
   const cityNames = TURKEY_CITIES.map((c) => c.name)
   const matchedCity = TURKEY_CITIES.find(
     (c) => c.name.toLowerCase() === (propertyForm.city || '').toLowerCase()
@@ -139,7 +298,7 @@ function App() {
 
   // Load Initial Lookups and Properties when authenticated
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || isResidentView) return
 
     const loadData = async () => {
       setIsLoadingProperties(true)
@@ -155,6 +314,7 @@ function App() {
 
         if (propTypesData.length > 0) {
           setPropertyForm((prev) => ({ ...prev, propertyTypeId: propTypesData[0].id }))
+          setPropertyFormDirty(false)
         }
       } catch (err) {
         setPropertyError(err instanceof Error ? err.message : 'Veriler yüklenirken hata oluştu.')
@@ -164,7 +324,7 @@ function App() {
     }
 
     loadData()
-  }, [isAuthenticated])
+  }, [isAuthenticated, isResidentView])
 
   // Load Buildings when Property is Selected
   useEffect(() => {
@@ -172,6 +332,7 @@ function App() {
       setBuildings([])
       setSelectedBuilding(null)
       setUnits([])
+      setSelectedOccupancyUnit(null)
       return
     }
 
@@ -182,6 +343,8 @@ function App() {
         const data = await getBuildingsByProperty(selectedProperty.id, true)
         setBuildings(data)
         setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
+        setBuildingFormDirty(false)
+        setIsBlockCodeUserEdited(false)
 
         if (selectedBuilding) {
           const updatedSelectedBuilding = data.find((b) => b.id === selectedBuilding.id)
@@ -190,6 +353,7 @@ function App() {
           } else {
             setSelectedBuilding(null)
             setUnits([])
+            setSelectedOccupancyUnit(null)
           }
         }
       } catch (err) {
@@ -206,6 +370,7 @@ function App() {
   useEffect(() => {
     if (!selectedBuilding) {
       setUnits([])
+      setSelectedOccupancyUnit(null)
       return
     }
 
@@ -215,11 +380,15 @@ function App() {
       try {
         const data = await getUnitsByBuilding(selectedBuilding.id, true)
         setUnits(data)
+        setSelectedOccupancyUnit((current) =>
+          current ? data.find((unit) => unit.id === current.id) || null : null
+        )
         setUnitForm({
           ...initialUnitForm,
           buildingId: selectedBuilding.id,
-          unitTypeId: unitTypes[0]?.id || 0,
+          unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
         })
+        setUnitFormDirty(false)
       } catch (err) {
         setUnitError(err instanceof Error ? err.message : 'Bağımsız bölümler yüklenemedi.')
       } finally {
@@ -239,8 +408,9 @@ function App() {
         setUnitForm({
           ...initialUnitForm,
           buildingId: autoBuilding.id,
-          unitTypeId: unitTypes[0]?.id || 0,
+          unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
         })
+        setUnitFormDirty(false)
       }
     }
   }, [isSingleApartment, buildings, selectedBuilding, unitTypes])
@@ -257,33 +427,70 @@ function App() {
     return <Login />
   }
 
+  if (isResidentView) {
+    return <ResidentUnits />
+  }
+
   // ==========================================
   // PROPERTY HANDLERS
   // ==========================================
-  const handleSelectProperty = (property: Property) => {
+  const handleSelectProperty = async (property: Property) => {
+    if (!(await requestDiscard())) return
+
     setSelectedProperty(property)
     setSelectedBuilding(null)
     setUnits([])
+    setSelectedOccupancyUnit(null)
+    setEditingPropertyId(null)
     setEditingBuildingId(null)
     setEditingUnitId(null)
+    setPropertyError('')
     setBuildingError('')
     setUnitError('')
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm({ ...initialBuildingForm, propertyId: property.id })
+    setUnitForm(initialUnitForm)
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
 
     setTimeout(() => {
       buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
-  const handleClearPropertySelection = () => {
+  const handleClearPropertySelection = async () => {
+    if (!(await requestDiscard())) return
+
     setSelectedProperty(null)
     setSelectedBuilding(null)
     setBuildings([])
     setUnits([])
+    setSelectedOccupancyUnit(null)
+    setEditingPropertyId(null)
     setEditingBuildingId(null)
     setEditingUnitId(null)
+    setPropertyError('')
+    setBuildingError('')
+    setUnitError('')
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm(initialBuildingForm)
+    setUnitForm(initialUnitForm)
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
   }
 
   const handleCityChange = (newCity: string) => {
+    setPropertyFormDirty(true)
     setPropertyForm((prev) => ({
       ...prev,
       city: newCity,
@@ -292,13 +499,16 @@ function App() {
   }
 
   const handleDistrictChange = (newDistrict: string) => {
+    setPropertyFormDirty(true)
     setPropertyForm((prev) => ({
       ...prev,
       district: newDistrict,
     }))
   }
 
-  const handleEditPropertyClick = (property: Property) => {
+  const handleEditPropertyClick = async (property: Property) => {
+    if (!(await requestDiscard(propertyFormDirty))) return
+
     setEditingPropertyId(property.id)
     setPropertyForm({
       name: property.name,
@@ -310,15 +520,19 @@ function App() {
       isActive: property.isActive,
     })
     setPropertyError('')
+    setPropertyFormDirty(false)
   }
 
-  const handleCancelPropertyEdit = () => {
+  const handleCancelPropertyEdit = async () => {
+    if (!(await requestDiscard(propertyFormDirty))) return
+
     setEditingPropertyId(null)
     setPropertyForm({
       ...initialPropertyForm,
       propertyTypeId: propertyTypes[0]?.id || null,
     })
     setPropertyError('')
+    setPropertyFormDirty(false)
   }
 
   const handlePropertySubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -344,12 +558,12 @@ function App() {
     try {
       if (editingPropertyId) {
         const payload: UpdatePropertyPayload = {
-          name: propertyForm.name,
+          name: propertyForm.name.trim(),
           propertyTypeId: propertyForm.propertyTypeId ? Number(propertyForm.propertyTypeId) : null,
-          addressLine: propertyForm.addressLine,
+          addressLine: propertyForm.addressLine.trim(),
           city: matchedCity.name,
           district: matchedDistrict,
-          description: propertyForm.description || null,
+          description: propertyForm.description ? propertyForm.description.trim() : null,
           isActive: propertyForm.isActive ?? true,
         }
         const updated = await updateProperty(editingPropertyId, payload)
@@ -360,12 +574,12 @@ function App() {
         setEditingPropertyId(null)
       } else {
         const payload: CreatePropertyPayload = {
-          name: propertyForm.name,
+          name: propertyForm.name.trim(),
           propertyTypeId: propertyForm.propertyTypeId ? Number(propertyForm.propertyTypeId) : null,
-          addressLine: propertyForm.addressLine,
+          addressLine: propertyForm.addressLine.trim(),
           city: matchedCity.name,
           district: matchedDistrict,
-          description: propertyForm.description || null,
+          description: propertyForm.description ? propertyForm.description.trim() : null,
         }
         const created = await createProperty(payload)
         setProperties((prev) => [...prev, created])
@@ -374,6 +588,7 @@ function App() {
         ...initialPropertyForm,
         propertyTypeId: propertyTypes[0]?.id || null,
       })
+      setPropertyFormDirty(false)
     } catch (err) {
       setPropertyError(err instanceof Error ? err.message : 'Gayrimenkul kaydedilemedi.')
     } finally {
@@ -401,25 +616,78 @@ function App() {
   // ==========================================
   // BUILDING HANDLERS
   // ==========================================
-  const handleSelectBuilding = (building: Building) => {
+  const handleSelectBuilding = async (building: Building) => {
+    if (!(await requestDiscard())) return
+
     setSelectedBuilding(building)
-    setUnitForm({ ...initialUnitForm, buildingId: building.id, unitTypeId: unitTypes[0]?.id || 0 })
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
+    setUnitForm({
+      ...initialUnitForm,
+      buildingId: building.id,
+      unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+    })
     setEditingUnitId(null)
+    setEditingBuildingId(null)
+    setSelectedOccupancyUnit(null)
+    setBuildingError('')
     setUnitError('')
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
 
     setTimeout(() => {
       unitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
-  const handleClearBuildingSelection = () => {
+  const handleClearBuildingSelection = async () => {
+    if (!(await requestDiscard())) return
+
     setSelectedBuilding(null)
     setUnits([])
+    setSelectedOccupancyUnit(null)
+    setEditingBuildingId(null)
     setEditingUnitId(null)
+    setUnitError('')
+    setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
+    setUnitForm(initialUnitForm)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
   }
 
-  const handleEditBuildingClick = (building: Building) => {
+  const handleBuildingNameChange = (name: string) => {
+    setBuildingFormDirty(true)
+    let autoCode = buildingForm.code
+    if (!isBlockCodeUserEdited && !editingBuildingId) {
+      autoCode = slugifyBlockName(name)
+    }
+    setBuildingForm((prev) => ({
+      ...prev,
+      name,
+      code: autoCode,
+    }))
+  }
+
+  const handleBuildingCodeChange = (code: string) => {
+    setBuildingFormDirty(true)
+    setIsBlockCodeUserEdited(true)
+    setBuildingForm((prev) => ({
+      ...prev,
+      code,
+    }))
+  }
+
+  const handleEditBuildingClick = async (building: Building) => {
+    if (!(await requestDiscard(buildingFormDirty))) return
+
     setEditingBuildingId(building.id)
+    setIsBlockCodeUserEdited(true)
     setBuildingForm({
       propertyId: building.propertyId,
       name: building.name,
@@ -429,12 +697,17 @@ function App() {
       isActive: building.isActive,
     })
     setBuildingError('')
+    setBuildingFormDirty(false)
   }
 
-  const handleCancelBuildingEdit = () => {
+  const handleCancelBuildingEdit = async () => {
+    if (!(await requestDiscard(buildingFormDirty))) return
+
     setEditingBuildingId(null)
+    setIsBlockCodeUserEdited(false)
     setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
     setBuildingError('')
+    setBuildingFormDirty(false)
   }
 
   const handleBuildingSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -448,10 +721,10 @@ function App() {
       if (editingBuildingId) {
         const payload: UpdateBuildingPayload = {
           propertyId: selectedProperty.id,
-          name: buildingForm.name,
-          code: buildingForm.code,
-          floorCount: Number(buildingForm.floorCount),
-          description: buildingForm.description || null,
+          name: buildingForm.name.trim(),
+          code: buildingForm.code.trim(),
+          floorCount: Math.floor(Number(buildingForm.floorCount)),
+          description: buildingForm.description ? buildingForm.description.trim() : null,
           isActive: buildingForm.isActive ?? true,
         }
         const updated = await updateBuilding(editingBuildingId, payload)
@@ -463,15 +736,17 @@ function App() {
       } else {
         const payload: CreateBuildingPayload = {
           propertyId: selectedProperty.id,
-          name: buildingForm.name,
-          code: buildingForm.code,
-          floorCount: Number(buildingForm.floorCount),
-          description: buildingForm.description || null,
+          name: buildingForm.name.trim(),
+          code: buildingForm.code.trim(),
+          floorCount: Math.floor(Number(buildingForm.floorCount)),
+          description: buildingForm.description ? buildingForm.description.trim() : null,
         }
         const created = await createBuilding(payload)
         setBuildings((prev) => [...prev, created])
       }
+      setIsBlockCodeUserEdited(false)
       setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty.id })
+      setBuildingFormDirty(false)
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Bina kaydedilemedi.')
     } finally {
@@ -491,13 +766,14 @@ function App() {
         propertyId: selectedProperty.id,
         name: selectedProperty.name,
         code: 'MAIN',
-        floorCount: Number(singleApartmentFloorCount),
+        floorCount: Math.floor(Number(singleApartmentFloorCount)),
         description: 'Tek Apartman Binası',
       }
 
       const created = await createBuilding(payload)
       setBuildings([created])
       setSelectedBuilding(created)
+      setBuildingFormDirty(false)
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Apartman yapısı oluşturulamadı.')
     } finally {
@@ -515,6 +791,7 @@ function App() {
       if (selectedBuilding?.id === id) {
         setSelectedBuilding(null)
         setUnits([])
+        setSelectedOccupancyUnit(null)
       }
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Bina silinemedi.')
@@ -524,7 +801,9 @@ function App() {
   // ==========================================
   // UNIT HANDLERS
   // ==========================================
-  const handleEditUnitClick = (unit: Unit) => {
+  const handleEditUnitClick = async (unit: Unit) => {
+    if (!(await requestDiscard(unitFormDirty))) return
+
     setEditingUnitId(unit.id)
     setUnitForm({
       buildingId: unit.buildingId,
@@ -537,21 +816,33 @@ function App() {
       isActive: unit.isActive,
     })
     setUnitError('')
+    setUnitFormDirty(false)
   }
 
-  const handleCancelUnitEdit = () => {
+  const handleCancelUnitEdit = async () => {
+    if (!(await requestDiscard(unitFormDirty))) return
+
     setEditingUnitId(null)
     setUnitForm({
       ...initialUnitForm,
       buildingId: selectedBuilding?.id || 0,
-      unitTypeId: unitTypes[0]?.id || 0,
+      unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
     })
     setUnitError('')
+    setUnitFormDirty(false)
   }
 
   const handleUnitSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!selectedBuilding) return
+
+    const trimmedUnitNumber = unitForm.unitNumber.trim()
+    if (!trimmedUnitNumber) {
+      setUnitError('Kapı / Bölüm No zorunludur.')
+      return
+    }
+
+    const normalizedFloorNumber = Math.floor(Number(unitForm.floorNumber))
 
     if (unitForm.grossArea != null && unitForm.netArea != null) {
       const gross = Number(unitForm.grossArea)
@@ -570,34 +861,49 @@ function App() {
         const payload: UpdateUnitPayload = {
           buildingId: selectedBuilding.id,
           unitTypeId: Number(unitForm.unitTypeId),
-          unitNumber: unitForm.unitNumber,
-          floorNumber: Number(unitForm.floorNumber),
+          unitNumber: trimmedUnitNumber,
+          floorNumber: normalizedFloorNumber,
           grossArea: unitForm.grossArea ? Number(unitForm.grossArea) : null,
           netArea: unitForm.netArea ? Number(unitForm.netArea) : null,
-          description: unitForm.description || null,
+          description: unitForm.description ? unitForm.description.trim() : null,
           isActive: unitForm.isActive ?? true,
         }
         const updated = await updateUnit(editingUnitId, payload)
         setUnits((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+        setSelectedOccupancyUnit((current) =>
+          current?.id === updated.id ? updated : current
+        )
         setEditingUnitId(null)
       } else {
         const payload: CreateUnitPayload = {
           buildingId: selectedBuilding.id,
           unitTypeId: Number(unitForm.unitTypeId),
-          unitNumber: unitForm.unitNumber,
-          floorNumber: Number(unitForm.floorNumber),
+          unitNumber: trimmedUnitNumber,
+          floorNumber: normalizedFloorNumber,
           grossArea: unitForm.grossArea ? Number(unitForm.grossArea) : null,
           netArea: unitForm.netArea ? Number(unitForm.netArea) : null,
-          description: unitForm.description || null,
+          description: unitForm.description ? unitForm.description.trim() : null,
         }
         const created = await createUnit(payload)
-        setUnits((prev) => [...prev, created])
+        const createdUnitType = unitTypes.find((unitType) => unitType.id === created.unitTypeId)
+        const createdForState: Unit = {
+          ...created,
+          buildingId: created.buildingId || selectedBuilding.id,
+          buildingName: created.buildingName?.trim() || selectedBuilding.name,
+          propertyId: created.propertyId || selectedProperty?.id || 0,
+          propertyName: created.propertyName?.trim() || selectedProperty?.name || '',
+          unitTypeId: created.unitTypeId || Number(unitForm.unitTypeId),
+          unitTypeName: created.unitTypeName?.trim() || createdUnitType?.name || '',
+          unitTypeCode: created.unitTypeCode?.trim() || createdUnitType?.code || '',
+        }
+        setUnits((prev) => [...prev, createdForState])
       }
       setUnitForm({
         ...initialUnitForm,
         buildingId: selectedBuilding.id,
-        unitTypeId: unitTypes[0]?.id || 0,
+        unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
       })
+      setUnitFormDirty(false)
     } catch (err) {
       setUnitError(err instanceof Error ? err.message : 'Bağımsız bölüm kaydedilemedi.')
     } finally {
@@ -612,9 +918,57 @@ function App() {
     try {
       await deleteUnit(id)
       setUnits((prev) => prev.filter((u) => u.id !== id))
+      setSelectedOccupancyUnit((current) => (current?.id === id ? null : current))
     } catch (err) {
       setUnitError(err instanceof Error ? err.message : 'Bağımsız bölüm silinemedi.')
     }
+  }
+
+  const handleOpenOccupancyManagement = async (unit: Unit) => {
+    if (!(await requestDiscard())) return
+
+    if (!unit || !Number.isInteger(unit.id) || unit.id <= 0) {
+      setSelectedOccupancyUnit(null)
+      setUnitError('Sakin yönetimi açılamadı. Daire bilgileri eksik veya geçersiz.')
+      return
+    }
+
+    const safeUnit: Unit = {
+      ...unit,
+      buildingName: unit.buildingName?.trim() || selectedBuilding?.name || 'Bina bilgisi yok',
+      propertyName: unit.propertyName?.trim() || selectedProperty?.name || 'Site/apartman bilgisi yok',
+      unitNumber: unit.unitNumber?.trim() || 'Numara belirtilmemiş',
+      unitTypeName: unit.unitTypeName?.trim() || 'Bağımsız Bölüm',
+    }
+
+    setSelectedOccupancyUnit(safeUnit)
+    setUnitError('')
+    setEditingPropertyId(null)
+    setEditingBuildingId(null)
+    setEditingUnitId(null)
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
+    setUnitForm({
+      ...initialUnitForm,
+      buildingId: selectedBuilding?.id || 0,
+      unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+    })
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
+    window.setTimeout(() => {
+      occupancySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
+
+  const handleLogout = async () => {
+    if (!(await requestDiscard())) return
+    resetUiState()
+    logout()
   }
 
   return (
@@ -627,18 +981,18 @@ function App() {
           </span>
           {user?.roles?.map((role) => (
             <span key={role} className={`role-badge ${role.toLowerCase()}`}>
-              {role}
+              {ROLE_LABEL_MAP[role] || role}
             </span>
           ))}
         </div>
-        <button className="secondary-button" onClick={() => logout()}>
+        <button className="secondary-button" onClick={handleLogout}>
           Çıkış Yap
         </button>
       </div>
 
       <header className="page-header">
-        <p className="eyebrow">Phase 4 — Authentication & Role-Based UI</p>
-        <h1>Residential Management System</h1>
+        <p className="eyebrow">Yönetim Paneli</p>
+        <h1>Site & Gayrimenkul Yönetimi</h1>
         <p className="page-description">
           Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.
         </p>
@@ -669,7 +1023,7 @@ function App() {
             onClick={() => selectedBuilding && unitSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
           >
             <span>2. Bina / Blok:</span>
-            <strong>{selectedBuilding ? `${selectedBuilding.name} (${selectedBuilding.code})` : 'Seçilmedi'}</strong>
+            <strong>{selectedBuilding ? selectedBuilding.name : 'Seçilmedi'}</strong>
             {selectedBuilding && (
               <button
                 className="text-button"
@@ -704,7 +1058,10 @@ function App() {
                   <input
                     id="prop-name"
                     value={propertyForm.name}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
+                      setPropertyForm({ ...propertyForm, name: e.target.value })
+                    }}
                     placeholder="Örn: Akdeniz Sitesi"
                     required
                   />
@@ -715,18 +1072,19 @@ function App() {
                   <select
                     id="prop-type"
                     value={propertyForm.propertyTypeId || ''}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
                       setPropertyForm({
                         ...propertyForm,
                         propertyTypeId: e.target.value ? Number(e.target.value) : null,
                       })
-                    }
+                    }}
                     required
                   >
                     <option value="">-- Tür Seçiniz --</option>
                     {propertyTypes.map((pt) => (
                       <option key={pt.id} value={pt.id}>
-                        {pt.name} ({pt.code})
+                        {pt.name}
                       </option>
                     ))}
                   </select>
@@ -737,7 +1095,10 @@ function App() {
                   <input
                     id="prop-address"
                     value={propertyForm.addressLine}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, addressLine: e.target.value })}
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
+                      setPropertyForm({ ...propertyForm, addressLine: e.target.value })
+                    }}
                     placeholder="Cadde, sokak, no"
                     required
                   />
@@ -773,7 +1134,10 @@ function App() {
                   <textarea
                     id="prop-desc"
                     value={propertyForm.description || ''}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, description: e.target.value })}
+                    onChange={(e) => {
+                      setPropertyFormDirty(true)
+                      setPropertyForm({ ...propertyForm, description: e.target.value })
+                    }}
                     placeholder="İsteğe bağlı açıklama"
                     rows={3}
                   />
@@ -786,7 +1150,10 @@ function App() {
                         id="prop-is-active"
                         type="checkbox"
                         checked={propertyForm.isActive ?? true}
-                        onChange={(e) => setPropertyForm({ ...propertyForm, isActive: e.target.checked })}
+                        onChange={(e) => {
+                          setPropertyFormDirty(true)
+                          setPropertyForm({ ...propertyForm, isActive: e.target.checked })
+                        }}
                       />
                       <span>Aktif Kayıt</span>
                     </label>
@@ -835,7 +1202,9 @@ function App() {
                     <div className="card-header">
                       <div>
                         <h3>{prop.name}</h3>
-                        <p className="subtitle">{prop.propertyTypeName || prop.propertyType}</p>
+                        <p className="subtitle">
+                          {prop.propertyTypeName || PROPERTY_TYPE_LABEL_MAP[prop.propertyType] || prop.propertyType}
+                        </p>
                       </div>
 
                       <span className={`status-badge ${prop.isActive ? 'active' : 'inactive'}`}>
@@ -939,7 +1308,10 @@ function App() {
                           min={1}
                           max={200}
                           value={singleApartmentFloorCount}
-                          onChange={(e) => setSingleApartmentFloorCount(Number(e.target.value))}
+                          onChange={(e) => {
+                            setBuildingFormDirty(true)
+                            setSingleApartmentFloorCount(Number(e.target.value))
+                          }}
                           required
                         />
                       </div>
@@ -966,7 +1338,7 @@ function App() {
                   <div className="section-heading">
                     <h2>Tek Apartman Kaydı Hazır</h2>
                     <p>
-                      <strong>{buildings[0].name}</strong> ({buildings[0].floorCount} Kat) için bağımsız bölüm yönetimi aktifleştirildi. Aşağıdaki bölümden daire veya dükkan ekleyebilirsiniz.
+                      <strong>{buildings[0].name}</strong> ({formatFloorDisplay(buildings[0].floorCount)}) için bağımsız bölüm yönetimi aktifleştirildi. Aşağıdaki bölümden daire veya dükkan ekleyebilirsiniz.
                     </p>
                   </div>
                 </div>
@@ -991,21 +1363,24 @@ function App() {
                       <input
                         id="bld-name"
                         value={buildingForm.name}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, name: e.target.value })}
-                        placeholder="Örn: A Blok"
+                        onChange={(e) => handleBuildingNameChange(e.target.value)}
+                        placeholder="Örn: A Blok, Güney Rezidans"
                         required
                       />
                     </div>
 
                     <div className="form-field">
-                      <label htmlFor="bld-code">Bina Kodu *</label>
+                      <label htmlFor="bld-code">Blok Kodu *</label>
                       <input
                         id="bld-code"
                         value={buildingForm.code}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, code: e.target.value })}
-                        placeholder="Örn: A_BLOK"
+                        onChange={(e) => handleBuildingCodeChange(e.target.value)}
+                        placeholder="Örn: A, B, GUN-01"
                         required
                       />
+                      <small className="field-help" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                        Site içinde bloğu kısa ve benzersiz biçimde tanımlar. Örn: A, B, GUN-01
+                      </small>
                     </div>
 
                     <div className="form-field">
@@ -1016,7 +1391,10 @@ function App() {
                         min={1}
                         max={200}
                         value={buildingForm.floorCount}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, floorCount: Number(e.target.value) })}
+                        onChange={(e) => {
+                          setBuildingFormDirty(true)
+                          setBuildingForm({ ...buildingForm, floorCount: Math.floor(Number(e.target.value)) })
+                        }}
                         required
                       />
                     </div>
@@ -1026,7 +1404,10 @@ function App() {
                       <textarea
                         id="bld-desc"
                         value={buildingForm.description || ''}
-                        onChange={(e) => setBuildingForm({ ...buildingForm, description: e.target.value })}
+                        onChange={(e) => {
+                          setBuildingFormDirty(true)
+                          setBuildingForm({ ...buildingForm, description: e.target.value })
+                        }}
                         placeholder="İsteğe bağlı bina açıklaması"
                         rows={2}
                       />
@@ -1039,7 +1420,10 @@ function App() {
                             id="bld-is-active"
                             type="checkbox"
                             checked={buildingForm.isActive ?? true}
-                            onChange={(e) => setBuildingForm({ ...buildingForm, isActive: e.target.checked })}
+                            onChange={(e) => {
+                              setBuildingFormDirty(true)
+                              setBuildingForm({ ...buildingForm, isActive: e.target.checked })
+                            }}
                           />
                           <span>Aktif Bina</span>
                         </label>
@@ -1090,7 +1474,7 @@ function App() {
                         <div className="card-header">
                           <div>
                             <h3>{bld.name}</h3>
-                            <p className="subtitle">Kod: <code>{bld.code}</code> | {bld.floorCount} Kat</p>
+                            <p className="subtitle">Blok Kodu: {bld.code} | {formatFloorDisplay(bld.floorCount)} (Toplam Kat)</p>
                           </div>
 
                           <span className={`status-badge ${bld.isActive ? 'active' : 'inactive'}`}>
@@ -1170,8 +1554,11 @@ function App() {
                     <input
                       id="unit-number"
                       value={unitForm.unitNumber}
-                      onChange={(e) => setUnitForm({ ...unitForm, unitNumber: e.target.value })}
-                      placeholder="Örn: Daire 1, D:12"
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, unitNumber: e.target.value })
+                      }}
+                      placeholder="Örn: 1, 12, A1, B-03"
                       required
                     />
                   </div>
@@ -1181,27 +1568,36 @@ function App() {
                     <select
                       id="unit-type"
                       value={unitForm.unitTypeId || ''}
-                      onChange={(e) => setUnitForm({ ...unitForm, unitTypeId: Number(e.target.value) })}
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, unitTypeId: Number(e.target.value) })
+                      }}
                       required
                     >
                       <option value="">-- Tür Seçiniz --</option>
-                      {unitTypes.map((ut) => (
+                      {selectableUnitTypes.map((ut) => (
                         <option key={ut.id} value={ut.id}>
-                          {ut.name} ({ut.code})
+                          {ut.name}
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div className="form-field">
-                    <label htmlFor="unit-floor">Kat No (Bodrum için negatif) *</label>
+                    <label htmlFor="unit-floor">Kat No *</label>
                     <input
                       id="unit-floor"
                       type="number"
                       value={unitForm.floorNumber}
-                      onChange={(e) => setUnitForm({ ...unitForm, floorNumber: Number(e.target.value) })}
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, floorNumber: Math.floor(Number(e.target.value)) })
+                      }}
                       required
                     />
+                    <small className="field-help" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      0: Zemin Kat, Negatif: Bodrum Kat (örn: -1), Pozitif: Normal Kat (örn: 2)
+                    </small>
                   </div>
 
                   <div className="form-field">
@@ -1212,12 +1608,13 @@ function App() {
                       step="0.01"
                       min="0.01"
                       value={unitForm.grossArea ?? ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
                         setUnitForm({
                           ...unitForm,
                           grossArea: e.target.value ? Number(e.target.value) : null,
                         })
-                      }
+                      }}
                       placeholder="Örn: 100.00"
                     />
                   </div>
@@ -1230,12 +1627,13 @@ function App() {
                       step="0.01"
                       min="0.01"
                       value={unitForm.netArea ?? ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
                         setUnitForm({
                           ...unitForm,
                           netArea: e.target.value ? Number(e.target.value) : null,
                         })
-                      }
+                      }}
                       placeholder="Örn: 85.50"
                     />
                   </div>
@@ -1245,7 +1643,10 @@ function App() {
                     <textarea
                       id="unit-desc"
                       value={unitForm.description || ''}
-                      onChange={(e) => setUnitForm({ ...unitForm, description: e.target.value })}
+                      onChange={(e) => {
+                        setUnitFormDirty(true)
+                        setUnitForm({ ...unitForm, description: e.target.value })
+                      }}
                       placeholder="İsteğe bağlı açıklama"
                       rows={2}
                     />
@@ -1258,7 +1659,10 @@ function App() {
                           id="unit-is-active"
                           type="checkbox"
                           checked={unitForm.isActive ?? true}
-                          onChange={(e) => setUnitForm({ ...unitForm, isActive: e.target.checked })}
+                          onChange={(e) => {
+                            setUnitFormDirty(true)
+                            setUnitForm({ ...unitForm, isActive: e.target.checked })
+                          }}
                         />
                         <span>Aktif Bölüm</span>
                       </label>
@@ -1303,9 +1707,9 @@ function App() {
                   <article className="item-card" key={u.id}>
                     <div className="card-header">
                       <div>
-                        <h3>{u.unitNumber}</h3>
+                        <h3>{formatUnitDisplay(u.unitNumber, u.unitTypeName)}</h3>
                         <p className="subtitle">
-                          Tür: <strong>{u.unitTypeName}</strong> | Kat: {u.floorNumber}
+                          Tür: <strong>{u.unitTypeName}</strong> | {formatFloorDisplay(u.floorNumber)}
                         </p>
                       </div>
 
@@ -1328,6 +1732,17 @@ function App() {
                         </button>
                       )}
 
+                      {canManageOccupancies && (
+                        <button
+                          className={`action-button ${
+                            selectedOccupancyUnit?.id === u.id ? 'active-select' : 'select-btn'
+                          }`}
+                          onClick={() => handleOpenOccupancyManagement(u)}
+                        >
+                          {selectedOccupancyUnit?.id === u.id ? 'Sakinler Açık' : 'Sakinleri Yönet'}
+                        </button>
+                      )}
+
                       {canDeleteUnit && (
                         <button className="action-button danger-btn" onClick={() => handleDeleteUnitClick(u.id)}>
                           Sil
@@ -1339,8 +1754,24 @@ function App() {
               </div>
             </section>
           </div>
+
+          {canManageOccupancies && selectedOccupancyUnit && (
+            <div ref={occupancySectionRef} className="occupancy-section-wrapper">
+              <OccupancyErrorBoundary
+                key={selectedOccupancyUnit.id}
+                onClose={handleCloseOccupancyManagement}
+              >
+                <OccupancyManagement
+                  unit={selectedOccupancyUnit}
+                  onClose={handleCloseOccupancyManagement}
+                  onDirtyChange={handleOccupancyDirtyChange}
+                />
+              </OccupancyErrorBoundary>
+            </div>
+          )}
         </section>
       )}
+      {unsavedChangesDialog}
     </main>
   )
 }

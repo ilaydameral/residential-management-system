@@ -8,6 +8,7 @@ The project is being developed incrementally.
 - **Phase 2**: Service layer, DTO refactoring, standardized string lengths, and centralized exception handling middleware.
 - **Phase 3**: Complete Property Structure Management (`PropertyType` & `UnitType` lookups, `Building` & `Unit` entities, composite unique indexes, database CHECK constraints, Turkey 81 city-district searchable selection, real-world business rules enforcement, and full React hierarchy UI).
 - **Phase 4**: Authentication & Authorization infrastructure (`User`, `Role`, `UserRole` data model, PBKDF2 password hashing, JWT access tokens, login API endpoint, role-based authorization rules, React AuthContext, Login screen, role-based UI rendering, development bootstrap admin initializer, and SQL support scripts).
+- **Phase 5**: Occupancy & Resident Management (`OccupancyType` & `UnitOccupancy` entities, historical residency tracking, `OWNER`, `TENANT`, `HOUSEHOLD_MEMBER` lookup seeding, EF Core `DeleteBehavior.Restrict`, composite indexes, check constraints, and reporting queries).
 
 ---
 
@@ -32,7 +33,34 @@ The project is being developed incrementally.
 
 ---
 
-## Current Status: Phase 4 In Progress
+## Current Status: Phase 5 In Progress
+
+### Phase 5 — Occupancy & Resident Management
+
+Phase 5 introduces historical resident tracking between `User` and `Unit`:
+
+1. **Occupancy Data Model & Relationships**:
+   - `OccupancyType` lookup table (`OWNER`, `TENANT`, `HOUSEHOLD_MEMBER`).
+   - `UnitOccupancy` entity tracking historical and current resident relationships (`UserId`, `UnitId`, `OccupancyTypeId`, `StartDate`, `EndDate`, `IsActive`, `IsPrimary`).
+   - Foreign key delete behavior set to `DeleteBehavior.Restrict` on User, Unit, and OccupancyType.
+   - Composite indexes on `(UnitId, IsActive)` and `(UserId, IsActive)` for efficient active residency queries.
+   - Check constraint `CK_UnitOccupancies_EndDate_After_StartDate` enforcing `[EndDate] IS NULL OR [EndDate] >= [StartDate]`.
+   - Comprehensive verification and analytical SQL scripts (`verify_occupancy_schema.sql`, `occupancy_reporting_queries.sql`).
+   - ADMIN/MANAGER occupancy API for listing, detail viewing, assignment, update, and relationship closure.
+   - Service-layer validation for active user/unit/building/property/type records, date overlaps, and one active primary record per unit.
+   - Historical relationships are closed with `EndDate` and `IsActive = false`; physical delete is not exposed.
+   - Resident data isolation will follow in a subsequent commit.
+
+2. **Frontend UX & User-Facing Text Cleanup**:
+   - Technical codes (`SINGLE_APARTMENT`, `PARKING_SPACE`, `APARTMENT`, `SHOP`) hidden from user-facing selection dropdowns and cards.
+   - Parking spaces remain reserved for a future parking/common-area module and are hidden from the current Unit form.
+   - Unit number entry simplified with clear placeholders (`1, 12, A1, B-03`) and automatic whitespace trimming.
+   - Floor numbers formatted with user-friendly Turkish labels (`0: Zemin Kat`, `-1: Bodrum -1`, `2: 2. Kat`).
+   - Building Block Code helper text added with automatic Turkish-normalized slug suggestions (`A Blok` -> `A`, `Güney Rezidans` -> `GUNEY-REZIDANS`).
+   - Network failure messages standardized to friendly Turkish message (`Sunucuya ulaşılamadı. Backend servisinin çalıştığını kontrol edin.`).
+   - Generic 401 credential errors and global session expiration handling separated to avoid double error messages.
+
+---
 
 ### Phase 4 — Authentication & Authorization Infrastructure
 
@@ -212,6 +240,8 @@ dotnet ef database update \
 6. 20260730200204_AddBuildings
 7. 20260730205710_AddUnits
 8. 20260731064656_AddAuthenticationEntities
+9. 20260731080741_AlignSystemRoles
+10. 20260731090050_AddOccupancyManagement
 ```
 
 ---
@@ -260,6 +290,13 @@ dotnet ef database update \
 - `POST /api/units` (`ADMIN`, `MANAGER`)
 - `PUT /api/units/{id}` (`ADMIN`, `MANAGER`)
 - `DELETE /api/units/{id}` (`ADMIN`)
+
+### Unit Occupancies API (Auth Required)
+- `GET /api/units/{unitId}/occupancies` (`ADMIN`, `MANAGER`)
+- `GET /api/unit-occupancies/{id}` (`ADMIN`, `MANAGER`)
+- `POST /api/units/{unitId}/occupancies` (`ADMIN`, `MANAGER`)
+- `PUT /api/unit-occupancies/{id}` (`ADMIN`, `MANAGER`)
+- `POST /api/unit-occupancies/{id}/close` (`ADMIN`, `MANAGER`)
 
 ---
 

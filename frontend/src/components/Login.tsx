@@ -149,7 +149,7 @@ export const Login: React.FC = () => {
           </button>
         </div>
 
-        {sessionExpiredMessage && (
+        {!errorMessage && sessionExpiredMessage && (
           <div className="auth-error warning-box">
             <span>{sessionExpiredMessage}</span>
           </div>

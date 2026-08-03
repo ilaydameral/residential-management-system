@@ -100,6 +100,17 @@ export interface Unit {
   updatedAt: string | null
 }
 
+export interface ResidentUnit {
+  unitId: number
+  propertyName: string
+  buildingName: string
+  unitNumber: string
+  floorNumber: number
+  occupancyType: OccupancyTypeCode
+  isPrimary: boolean
+  startDate: string
+}
+
 export interface CreateUnitPayload {
   buildingId: number
   unitTypeId: number
@@ -119,6 +130,60 @@ export interface UpdateUnitPayload {
   netArea?: number | null
   description?: string | null
   isActive: boolean
+}
+
+export type OccupancyTypeCode = 'OWNER' | 'TENANT' | 'HOUSEHOLD_MEMBER'
+
+export interface UnitOccupancy {
+  id: number
+  userId: number
+  userName: string
+  userFullName: string
+  userEmail: string
+  unitId: number
+  unitNumber: string
+  buildingId: number
+  buildingName: string
+  propertyId: number
+  propertyName: string
+  occupancyTypeId: number
+  occupancyTypeCode: OccupancyTypeCode
+  occupancyTypeName: string
+  startDate: string
+  endDate: string | null
+  isActive: boolean
+  isPrimary: boolean
+  notes: string | null
+  createdAt: string
+  updatedAt: string | null
+}
+
+export interface UserSearchResult {
+  id: number
+  fullName: string
+  email: string
+  isActive: boolean
+}
+
+export interface CreateUnitOccupancyPayload {
+  userId: number
+  occupancyTypeId: number
+  startDate: string
+  endDate: string | null
+  isPrimary: boolean
+  notes: string | null
+}
+
+export interface UpdateUnitOccupancyPayload {
+  occupancyTypeId: number
+  startDate: string
+  endDate: string | null
+  isPrimary: boolean
+  notes: string | null
+}
+
+export interface EndUnitOccupancyPayload {
+  endDate: string
 }
 
 export interface LoginRequest {

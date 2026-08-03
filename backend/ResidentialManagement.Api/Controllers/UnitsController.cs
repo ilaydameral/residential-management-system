@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.DTOs;
+using ResidentialManagement.Api.Exceptions;
 using ResidentialManagement.Api.Services;
 
 namespace ResidentialManagement.Api.Controllers;
@@ -22,7 +24,7 @@ public class UnitsController : ControllerBase
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnits([FromQuery] bool includeInactive = false)
     {
-        var units = await _unitService.GetAllUnitsAsync(includeInactive);
+        var units = await _unitService.GetAllUnitsAsync(includeInactive, GetResidentUserId());
         return Ok(units);
     }
 
@@ -30,7 +32,7 @@ public class UnitsController : ControllerBase
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<UnitDto>> GetUnitById(int id)
     {
-        var unit = await _unitService.GetUnitByIdAsync(id);
+        var unit = await _unitService.GetUnitByIdAsync(id, GetResidentUserId());
         if (unit is null)
         {
             return NotFound(new ErrorResponse
@@ -48,7 +50,7 @@ public class UnitsController : ControllerBase
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByBuildingId(int buildingId, [FromQuery] bool includeInactive = false)
     {
-        var units = await _unitService.GetUnitsByBuildingIdAsync(buildingId, includeInactive);
+        var units = await _unitService.GetUnitsByBuildingIdAsync(buildingId, includeInactive, GetResidentUserId());
         if (units is null)
         {
             return NotFound(new ErrorResponse
@@ -66,7 +68,7 @@ public class UnitsController : ControllerBase
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByPropertyId(int propertyId, [FromQuery] bool includeInactive = false)
     {
-        var units = await _unitService.GetUnitsByPropertyIdAsync(propertyId, includeInactive);
+        var units = await _unitService.GetUnitsByPropertyIdAsync(propertyId, includeInactive, GetResidentUserId());
         if (units is null)
         {
             return NotFound(new ErrorResponse
@@ -137,5 +139,23 @@ public class UnitsController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    private int? GetResidentUserId()
+    {
+        if (!User.IsInRole(AppRoles.Resident) ||
+            User.IsInRole(AppRoles.Admin) ||
+            User.IsInRole(AppRoles.Manager))
+        {
+            return null;
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedException("Kimliği doğrulanmış kullanıcı bilgisi geçersizdir.");
+        }
+
+        return userId;
     }
 }
