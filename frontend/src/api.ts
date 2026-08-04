@@ -1,26 +1,37 @@
 import { API_BASE_URL } from './config'
 import type {
   ApiErrorResponse,
+  AccountProfile,
   AuthenticatedUser,
   Building,
   CreateBuildingPayload,
+  CreateManagedUserPayload,
   CreatePropertyPayload,
   CreateUnitOccupancyPayload,
   CreateUnitPayload,
+  DashboardSummary,
   EndUnitOccupancyPayload,
   LoginRequest,
   LoginResponse,
+  ManagedUser,
+  ManagedUserDetail,
+  OccupancyType,
   Property,
   PropertyType,
   ResidentUnit,
   RegisterRequest,
+  Role,
   Unit,
   UnitOccupancy,
   UnitType,
   UpdateBuildingPayload,
+  UpdateAccountProfilePayload,
+  ChangeAccountPasswordPayload,
+  UpdateManagedUserPayload,
   UpdatePropertyPayload,
   UpdateUnitOccupancyPayload,
   UpdateUnitPayload,
+  UpdateUserRolesPayload,
   UserSearchResult,
 } from './types'
 
@@ -128,6 +139,13 @@ export async function getUnitTypes(includeInactive = false): Promise<UnitType[]>
   return handleResponse<UnitType[]>(response)
 }
 
+export async function getOccupancyTypes(): Promise<OccupancyType[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/occupancy-types`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<OccupancyType[]>(response)
+}
+
 // Properties API
 export async function getProperties(includeInactive = true): Promise<Property[]> {
   const url = `${API_BASE_URL}/api/properties${includeInactive ? '?includeInactive=true' : ''}`
@@ -156,14 +174,22 @@ export async function updateProperty(id: number, payload: UpdatePropertyPayload)
 }
 
 export async function deactivateProperty(id: number): Promise<void> {
-  const response = await safeFetch(`${API_BASE_URL}/api/properties/${id}`, {
-    method: 'DELETE',
+  const response = await safeFetch(`${API_BASE_URL}/api/properties/${id}/deactivate`, {
+    method: 'PATCH',
     headers: getAuthHeaders(),
   })
   await handleResponse<void>(response)
 }
 
 // Buildings API
+export async function getBuildings(includeInactive = true): Promise<Building[]> {
+  const url = `${API_BASE_URL}/api/buildings${includeInactive ? '?includeInactive=true' : ''}`
+  const response = await safeFetch(url, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Building[]>(response)
+}
+
 export async function getBuildingsByProperty(propertyId: number, includeInactive = true): Promise<Building[]> {
   const url = `${API_BASE_URL}/api/buildings/property/${propertyId}${includeInactive ? '?includeInactive=true' : ''}`
   const response = await safeFetch(url, {
@@ -199,6 +225,14 @@ export async function deleteBuilding(id: number): Promise<void> {
 }
 
 // Units API
+export async function getUnits(includeInactive = true): Promise<Unit[]> {
+  const url = `${API_BASE_URL}/api/units${includeInactive ? '?includeInactive=true' : ''}`
+  const response = await safeFetch(url, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Unit[]>(response)
+}
+
 export async function getUnitsByBuilding(buildingId: number, includeInactive = true): Promise<Unit[]> {
   const url = `${API_BASE_URL}/api/units/building/${buildingId}${includeInactive ? '?includeInactive=true' : ''}`
   const response = await safeFetch(url, {
@@ -241,7 +275,39 @@ export async function getMyUnits(): Promise<ResidentUnit[]> {
   return handleResponse<ResidentUnit[]>(response)
 }
 
+export async function getMyAccountProfile(): Promise<AccountProfile> {
+  const response = await safeFetch(`${API_BASE_URL}/api/account/me`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AccountProfile>(response)
+}
+
+export async function updateMyAccountProfile(payload: UpdateAccountProfilePayload): Promise<AccountProfile> {
+  const response = await safeFetch(`${API_BASE_URL}/api/account/profile`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<AccountProfile>(response)
+}
+
+export async function changeMyAccountPassword(payload: ChangeAccountPasswordPayload): Promise<void> {
+  const response = await safeFetch(`${API_BASE_URL}/api/account/password`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  await handleResponse<void>(response)
+}
+
 // Unit Occupancies API
+export async function getAllUnitOccupancies(): Promise<UnitOccupancy[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/unit-occupancies`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<UnitOccupancy[]>(response)
+}
+
 export async function getUnitOccupancies(
   unitId: number,
   includeInactive = true
@@ -292,10 +358,75 @@ export async function closeUnitOccupancy(
 }
 
 // Safe User Search API
+export async function getUsers(): Promise<ManagedUser[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagedUser[]>(response)
+}
+
+export async function getManagedUserDetail(id: number): Promise<ManagedUserDetail> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagedUserDetail>(response)
+}
+
+export async function createManagedUser(payload: CreateManagedUserPayload): Promise<ManagedUser> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function updateManagedUser(id: number, payload: UpdateManagedUserPayload): Promise<ManagedUser> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function setManagedUserActive(id: number, isActive: boolean): Promise<ManagedUser> {
+  const action = isActive ? 'activate' : 'deactivate'
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}/${action}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function updateManagedUserRoles(id: number, payload: UpdateUserRolesPayload): Promise<ManagedUser> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}/roles`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function getRoles(): Promise<Role[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/roles`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Role[]>(response)
+}
+
 export async function searchUsers(query: string): Promise<UserSearchResult[]> {
   const params = new URLSearchParams({ query: query.trim() })
   const response = await safeFetch(`${API_BASE_URL}/api/users/search?${params.toString()}`, {
     headers: getAuthHeaders(),
   })
   return handleResponse<UserSearchResult[]>(response)
+}
+
+// Dashboard API
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const response = await safeFetch(`${API_BASE_URL}/api/dashboard/summary`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DashboardSummary>(response)
 }

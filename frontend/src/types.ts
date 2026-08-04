@@ -27,6 +27,8 @@ export interface Property {
   district: string
   description: string | null
   isActive: boolean
+  buildingCount: number
+  unitCount: number
   createdAt: string
 }
 
@@ -60,6 +62,7 @@ export interface Building {
   floorCount: number
   description: string | null
   isActive: boolean
+  unitCount: number
   createdAt: string
   updatedAt: string | null
 }
@@ -96,6 +99,7 @@ export interface Unit {
   netArea: number | null
   description: string | null
   isActive: boolean
+  activeOccupancyCount: number
   createdAt: string
   updatedAt: string | null
 }
@@ -106,9 +110,32 @@ export interface ResidentUnit {
   buildingName: string
   unitNumber: string
   floorNumber: number
+  unitTypeName: string
+  grossArea: number | null
+  netArea: number | null
   occupancyType: OccupancyTypeCode
   isPrimary: boolean
   startDate: string
+}
+
+export interface AccountProfile {
+  id: number
+  fullName: string
+  userName?: string | null
+  email: string
+  roles: string[]
+  isActive: boolean
+  createdAt: string
+}
+
+export interface UpdateAccountProfilePayload {
+  fullName: string
+}
+
+export interface ChangeAccountPasswordPayload {
+  currentPassword: string
+  newPassword: string
+  confirmNewPassword: string
 }
 
 export interface CreateUnitPayload {
@@ -133,6 +160,12 @@ export interface UpdateUnitPayload {
 }
 
 export type OccupancyTypeCode = 'OWNER' | 'TENANT' | 'HOUSEHOLD_MEMBER'
+
+export interface OccupancyType {
+  id: number
+  code: OccupancyTypeCode
+  name: string
+}
 
 export interface UnitOccupancy {
   id: number
@@ -163,6 +196,51 @@ export interface UserSearchResult {
   fullName: string
   email: string
   isActive: boolean
+}
+
+export interface ManagedUser {
+  id: number
+  fullName: string
+  email: string
+  roles: string[]
+  isActive: boolean
+  activeUnitCount: number
+  createdAt: string
+}
+
+export interface ManagedUserDetail {
+  id: number
+  firstName: string
+  lastName: string
+  email: string
+  roles: string[]
+  isActive: boolean
+}
+
+export interface Role {
+  id: number
+  code: string
+  name: string
+  isActive: boolean
+}
+
+export interface CreateManagedUserPayload {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  roleCodes: string[]
+  isActive: boolean
+}
+
+export interface UpdateManagedUserPayload {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+export interface UpdateUserRolesPayload {
+  roleCodes: string[]
 }
 
 export interface CreateUnitOccupancyPayload {
@@ -220,4 +298,13 @@ export interface ApiErrorResponse {
   message?: string
   details?: string | null
   errors?: Record<string, string[]>
+}
+
+export interface DashboardSummary {
+  propertyCount: number
+  buildingCount: number
+  unitCount: number
+  activeOccupancyCount: number
+  occupiedUnitCount: number
+  vacantUnitCount: number
 }

@@ -22,5 +22,9 @@ public class PropertyDto
 
     public bool IsActive { get; set; }
 
+    public int BuildingCount { get; set; }
+
+    public int UnitCount { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

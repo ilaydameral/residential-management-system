@@ -1,19 +1,26 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   closeUnitOccupancy,
   createUnitOccupancy,
+  getOccupancyTypes,
   getUnitOccupancies,
   searchUsers,
   updateUnitOccupancy,
 } from '../api'
 import type {
   CreateUnitOccupancyPayload,
+  OccupancyType,
   Unit,
   UnitOccupancy,
   UpdateUnitOccupancyPayload,
   UserSearchResult,
 } from '../types'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+import { useToast } from '../context/ToastContext'
+import { formatUnitDisplay, formatUnitNumber } from '../utils/unitDisplay'
+import { LoadingSkeleton } from './LoadingSkeleton'
+import { ConfirmationDialog } from './ConfirmationDialog'
+import { SaveShortcutHint } from './SaveShortcutHint'
 
 interface OccupancyManagementProps {
   unit: Unit
@@ -29,14 +36,11 @@ interface OccupancyFormState {
   notes: string
 }
 
-const OCCUPANCY_TYPES = [
-  { id: 1, code: 'OWNER', label: 'Malik' },
-  { id: 2, code: 'TENANT', label: 'Kiracı' },
-  { id: 3, code: 'HOUSEHOLD_MEMBER', label: 'Hane Üyesi' },
-] as const
-
 function getOccupancyTypeLabel(code: string): string {
-  return OCCUPANCY_TYPES.find((type) => type.code === code)?.label ?? 'Bilinmeyen'
+  if (code === 'OWNER') return 'Malik'
+  if (code === 'TENANT') return 'Kiracı'
+  if (code === 'HOUSEHOLD_MEMBER') return 'Hane Üyesi'
+  return 'Bilinmeyen'
 }
 
 function todayAsInputDate(): string {
@@ -47,9 +51,9 @@ function todayAsInputDate(): string {
   return `${year}-${month}-${day}`
 }
 
-function createInitialForm(): OccupancyFormState {
+function createInitialForm(occupancyTypeId = 0): OccupancyFormState {
   return {
-    occupancyTypeId: 2,
+    occupancyTypeId,
     startDate: todayAsInputDate(),
     endDate: '',
     isPrimary: false,
@@ -107,12 +111,16 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyManagementProps) {
+  const { showToast } = useToast()
   const [occupancies, setOccupancies] = useState<UnitOccupancy[]>([])
+  const [occupancyTypes, setOccupancyTypes] = useState<OccupancyType[]>([])
+  const [occupancyTypesError, setOccupancyTypesError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
-  const [success, setSuccess] = useState('')
+  const panelRef = useRef<HTMLElement>(null)
 
   const [formMode, setFormMode] = useState<'none' | 'create' | 'edit' | 'close'>('none')
   const [form, setForm] = useState<OccupancyFormState>(createInitialForm)
@@ -145,6 +153,20 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
 
   const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isFormDirty)
 
+  useEffect(() => {
+    if (formMode !== 'create' && formMode !== 'edit') return
+    const handleSaveShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return
+      if (isSubmitting || document.querySelector('.confirmation-overlay')) return
+      const formElement = panelRef.current?.querySelector<HTMLFormElement>('form.occupancy-form')
+      if (!formElement) return
+      event.preventDefault()
+      formElement.requestSubmit()
+    }
+    document.addEventListener('keydown', handleSaveShortcut)
+    return () => document.removeEventListener('keydown', handleSaveShortcut)
+  }, [formMode, isSubmitting])
+
   const loadOccupancies = useCallback(async () => {
     setIsLoading(true)
     setLoadError('')
@@ -171,9 +193,26 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
     setUserResults([])
     setError('')
     setLoadError('')
-    setSuccess('')
     void loadOccupancies()
   }, [loadOccupancies])
+
+  useEffect(() => {
+    let isCancelled = false
+    setOccupancyTypesError('')
+    void getOccupancyTypes()
+      .then((types) => {
+        if (!isCancelled) setOccupancyTypes(types)
+      })
+      .catch((typesError) => {
+        if (!isCancelled) {
+          setOccupancyTypes([])
+          setOccupancyTypesError(getErrorMessage(typesError, 'İkamet türleri yüklenemedi.'))
+        }
+      })
+    return () => {
+      isCancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     onDirtyChange(isFormDirty)
@@ -221,13 +260,13 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
 
   const clearMessages = () => {
     setError('')
-    setSuccess('')
   }
 
   const openCreateForm = async () => {
     if (!(await requestDiscard())) return
 
-    const initialForm = createInitialForm()
+    const defaultType = occupancyTypes.find((type) => type.code === 'TENANT') ?? occupancyTypes[0]
+    const initialForm = createInitialForm(defaultType?.id ?? 0)
     clearMessages()
     setFormMode('create')
     setEditingOccupancy(null)
@@ -322,7 +361,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       setFormMode('none')
       setSelectedUser(null)
       setUserQuery('')
-      setSuccess('Sakin ataması başarıyla oluşturuldu.')
+      showToast('Sakin ataması oluşturuldu.')
     } catch (createError) {
       setError(getErrorMessage(createError, 'Sakin ataması oluşturulamadı.'))
     } finally {
@@ -349,7 +388,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       await loadOccupancies()
       setFormMode('none')
       setEditingOccupancy(null)
-      setSuccess('Sakin kaydı başarıyla güncellendi.')
+      showToast('Sakin kaydı güncellendi.')
     } catch (updateError) {
       setError(getErrorMessage(updateError, 'Sakin kaydı güncellenemedi.'))
     } finally {
@@ -367,24 +406,24 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       return
     }
 
-    const confirmed = window.confirm(
-      `${closingOccupancy.userFullName} için bu ikamet ilişkisini ${formatDate(
-        closeDate
-      )} tarihinde sonlandırmak istediğinizden emin misiniz?`
-    )
-    if (!confirmed) return
+    if (closeConfirmationOpen) return
+    setCloseConfirmationOpen(true)
+  }
 
+  const confirmClose = async () => {
+    if (!closingOccupancy || isSubmitting) return
     setIsSubmitting(true)
     try {
       await closeUnitOccupancy(closingOccupancy.id, { endDate: toEndOfDayUtcIso(closeDate) })
       await loadOccupancies()
       setFormMode('none')
       setClosingOccupancy(null)
-      setSuccess('Sakin kaydı başarıyla sonlandırıldı.')
+      showToast('Sakin kaydı sonlandırıldı.')
     } catch (closeError) {
       setError(getErrorMessage(closeError, 'Sakin kaydı sonlandırılamadı.'))
     } finally {
       setIsSubmitting(false)
+      setCloseConfirmationOpen(false)
     }
   }
 
@@ -394,7 +433,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         <div className="form-field form-field-full readonly-field">
           <span className="readonly-label">Kullanıcı ve Bağımsız Bölüm</span>
           <strong>{editingOccupancy.userFullName}</strong>
-          <small>{editingOccupancy.userEmail} · {unit.unitNumber}</small>
+          <small>{editingOccupancy.userEmail} · {formatUnitNumber(unit.unitNumber)}</small>
         </div>
       )}
 
@@ -405,13 +444,16 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
           value={form.occupancyTypeId}
           onChange={(event) => setForm({ ...form, occupancyTypeId: Number(event.target.value) })}
           required
+          disabled={occupancyTypes.length === 0}
         >
-          {OCCUPANCY_TYPES.map((type) => (
+          <option value="">İkamet türü seçin</option>
+          {occupancyTypes.map((type) => (
             <option key={type.code} value={type.id}>
-              {type.label}
+              {getOccupancyTypeLabel(type.code)}
             </option>
           ))}
         </select>
+        {occupancyTypesError && <small className="field-error">{occupancyTypesError}</small>}
       </div>
 
       <div className="form-field">
@@ -465,11 +507,11 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
   )
 
   return (
-    <section className="panel occupancy-panel">
+    <section ref={panelRef} className="panel occupancy-panel">
       <div className="occupancy-panel-header">
         <div className="section-heading">
           <p className="eyebrow">Bölüm Detayı</p>
-          <h2>{unit.unitTypeName} {unit.unitNumber} — Sakin Yönetimi</h2>
+          <h2>{formatUnitDisplay(unit.unitNumber, unit.unitTypeName)} — Sakin Yönetimi</h2>
           <p>{unit.propertyName} · {unit.buildingName}</p>
         </div>
         <div className="occupancy-header-actions">
@@ -483,7 +525,6 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       </div>
 
       {error && <p className="status-message error-message" role="alert">{error}</p>}
-      {success && <p className="status-message success-message" role="status">{success}</p>}
 
       {formMode === 'create' && (
         <form className="property-form occupancy-form" onSubmit={handleCreate}>
@@ -555,6 +596,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
           {renderOccupancyFields(false)}
 
           <div className="button-group form-field-full">
+            <SaveShortcutHint />
             <button className="primary-button" type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Kaydediliyor...' : 'Atamayı Kaydet'}
             </button>
@@ -574,6 +616,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
           )}
           {renderOccupancyFields(true)}
           <div className="button-group form-field-full">
+            <SaveShortcutHint />
             <button className="primary-button" type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Güncelleniyor...' : 'Kaydı Güncelle'}
             </button>
@@ -617,7 +660,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         {!loadError && <span>{occupancies.length} kayıt</span>}
       </div>
 
-      {isLoading && <p className="status-message">Sakin kayıtları yükleniyor...</p>}
+      {isLoading && <LoadingSkeleton variant="table" rows={3} />}
       {!isLoading && loadError && (
         <div className="status-message error-message" role="alert">
           <p>{loadError}</p>
@@ -627,7 +670,12 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         </div>
       )}
       {!isLoading && !loadError && occupancies.length === 0 && (
-        <p className="status-message empty-state-box">Bu bağımsız bölüm için henüz sakin kaydı bulunmuyor.</p>
+        <section className="status-message empty-state-box actionable-empty-state">
+          <p>Bu daireye henüz sakin atanmamış.</p>
+          <button className="primary-button compact-button" type="button" onClick={openCreateForm} disabled={occupancyTypes.length === 0}>
+            Yeni Sakin Ata
+          </button>
+        </section>
       )}
 
       {!loadError && <div className="occupancy-card-list">
@@ -646,7 +694,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
                 </div>
                 <div className="occupancy-badges">
                   {occupancy.isPrimary && (
-                    <span className="status-badge primary-badge">
+                    <span className={`status-badge ${isCurrent ? 'primary-badge' : 'historical-primary-badge'}`}>
                       {isCurrent ? 'Birincil Sakin' : 'Döneminde Birincil'}
                     </span>
                   )}
@@ -691,6 +739,17 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         })}
       </div>}
       {unsavedChangesDialog}
+      {closeConfirmationOpen && closingOccupancy && !unsavedChangesDialog && (
+        <ConfirmationDialog
+          title="Sakin Kaydını Sonlandır"
+          message={`${closingOccupancy.userFullName} için sakin kaydını ${formatDate(closeDate)} tarihinde sonlandırmak istediğinizden emin misiniz?`}
+          confirmLabel="Sonlandır"
+          danger
+          isLoading={isSubmitting}
+          onCancel={() => setCloseConfirmationOpen(false)}
+          onConfirm={() => { void confirmClose() }}
+        />
+      )}
     </section>
   )
 }

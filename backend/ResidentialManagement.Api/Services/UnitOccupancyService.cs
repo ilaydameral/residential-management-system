@@ -16,6 +16,39 @@ public class UnitOccupancyService : IUnitOccupancyService
         _context = context;
     }
 
+    public async Task<List<UnitOccupancyDto>> GetAllAsync()
+    {
+        return await _context.UnitOccupancies
+            .AsNoTracking()
+            .OrderByDescending(uo => uo.IsActive)
+            .ThenByDescending(uo => uo.StartDate)
+            .Select(uo => new UnitOccupancyDto
+            {
+                Id = uo.Id,
+                UserId = uo.UserId,
+                UserName = uo.User.UserName,
+                UserFullName = (uo.User.FirstName + " " + uo.User.LastName).Trim(),
+                UserEmail = uo.User.Email,
+                UnitId = uo.UnitId,
+                UnitNumber = uo.Unit.UnitNumber,
+                BuildingId = uo.Unit.BuildingId,
+                BuildingName = uo.Unit.Building.Name,
+                PropertyId = uo.Unit.Building.PropertyId,
+                PropertyName = uo.Unit.Building.Property.Name,
+                OccupancyTypeId = uo.OccupancyTypeId,
+                OccupancyTypeCode = uo.OccupancyType.Code,
+                OccupancyTypeName = uo.OccupancyType.Name,
+                StartDate = uo.StartDate,
+                EndDate = uo.EndDate,
+                IsActive = uo.IsActive,
+                IsPrimary = uo.IsPrimary,
+                Notes = uo.Notes,
+                CreatedAt = uo.CreatedAt,
+                UpdatedAt = uo.UpdatedAt
+            })
+            .ToListAsync();
+    }
+
     public async Task<List<UnitOccupancyDto>?> GetByUnitIdAsync(int unitId, bool includeInactive = false)
     {
         var unitExists = await _context.Units

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ConfirmationDialog } from '../components/ConfirmationDialog'
 
 const UNSAVED_CHANGES_MESSAGE =
   'Kaydedilmemiş değişiklikleriniz var. Devam ederseniz değişiklikler kaybolacak.'
@@ -45,26 +46,14 @@ export function useUnsavedChangesGuard(isDirty: boolean) {
   }
 
   const unsavedChangesDialog = isDialogOpen ? (
-    <div className="confirmation-overlay" role="presentation">
-      <div
-        className="confirmation-dialog"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="unsaved-dialog-title"
-        aria-describedby="unsaved-dialog-description"
-      >
-        <h2 id="unsaved-dialog-title">Kaydedilmemiş Değişiklikler</h2>
-        <p id="unsaved-dialog-description">{UNSAVED_CHANGES_MESSAGE}</p>
-        <div className="confirmation-actions">
-          <button className="secondary-button" type="button" onClick={() => resolveDialog(false)}>
-            Vazgeç
-          </button>
-          <button className="action-button danger-btn" type="button" onClick={() => resolveDialog(true)}>
-            Değişiklikleri Sil ve Devam Et
-          </button>
-        </div>
-      </div>
-    </div>
+    <ConfirmationDialog
+      title="Kaydedilmemiş Değişiklikler"
+      message={UNSAVED_CHANGES_MESSAGE}
+      confirmLabel="Değişiklikleri Sil ve Devam Et"
+      danger
+      onCancel={() => resolveDialog(false)}
+      onConfirm={() => resolveDialog(true)}
+    />
   ) : null
 
   return { requestDiscard, unsavedChangesDialog }
