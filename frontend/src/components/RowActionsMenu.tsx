@@ -88,6 +88,7 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
 
   const runAction = (action: RowAction) => {
     closeMenu()
+    triggerRef.current?.focus()
     action.onSelect()
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, type MouseEvent } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent, type MouseEvent } from 'react'
 
 interface ConfirmationDialogProps {
   title: string
@@ -6,6 +6,7 @@ interface ConfirmationDialogProps {
   confirmLabel: string
   cancelLabel?: string
   danger?: boolean
+  isLoading?: boolean
   onCancel: () => void
   onConfirm: () => void
 }
@@ -16,43 +17,88 @@ export function ConfirmationDialog({
   confirmLabel,
   cancelLabel = 'Vazgeç',
   danger = false,
+  isLoading = false,
   onCancel,
   onConfirm,
 }: ConfirmationDialogProps) {
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel()
-    }
+  const titleId = useId()
+  const descriptionId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
 
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [onCancel])
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    cancelButtonRef.current?.focus()
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      previousFocusRef.current?.focus()
+    }
+  }, [])
 
   const handleBackdrop = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) onCancel()
+    if (!isLoading && event.target === event.currentTarget) onCancel()
+  }
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      if (!isLoading) onCancel()
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      return
+    }
+
+    if (event.key !== 'Tab') return
+    const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+    )
+    if (!focusableElements?.length) return
+
+    const first = focusableElements[0]
+    const last = focusableElements[focusableElements.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
   }
 
   return (
     <div className="confirmation-overlay" role="presentation" onMouseDown={handleBackdrop}>
       <div
+        ref={dialogRef}
         className="confirmation-dialog"
-        role="alertdialog"
+        role="dialog"
         aria-modal="true"
-        aria-labelledby="confirmation-dialog-title"
-        aria-describedby="confirmation-dialog-description"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        aria-busy={isLoading}
+        onKeyDown={handleDialogKeyDown}
       >
-        <h2 id="confirmation-dialog-title">{title}</h2>
-        <p id="confirmation-dialog-description">{message}</p>
+        <h2 id={titleId}>{title}</h2>
+        <p id={descriptionId}>{message}</p>
         <div className="confirmation-actions">
-          <button className="secondary-button" type="button" onClick={onCancel} autoFocus>
+          <button ref={cancelButtonRef} className="secondary-button" type="button" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
           </button>
           <button
             className={danger ? 'action-button danger-btn' : 'primary-button'}
             type="button"
             onClick={onConfirm}
+            disabled={isLoading}
           >
-            {confirmLabel}
+            {isLoading ? 'İşlem yapılıyor...' : confirmLabel}
           </button>
         </div>
       </div>

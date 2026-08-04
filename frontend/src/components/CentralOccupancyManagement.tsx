@@ -12,6 +12,7 @@ import { useToast } from '../context/ToastContext'
 import { formatUnitNumber } from '../utils/unitDisplay'
 import { RowActionsMenu } from './RowActionsMenu'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { ConfirmationDialog } from './ConfirmationDialog'
 import type {
   Building,
   CreateUnitOccupancyPayload,
@@ -134,6 +135,7 @@ export function CentralOccupancyManagement({
   const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false)
 
   const [search, setSearch] = useState('')
   const [propertyFilter, setPropertyFilter] = useState('all')
@@ -366,7 +368,12 @@ export function CentralOccupancyManagement({
       setError('Bitiş tarihi başlangıç tarihinden önce olamaz.')
       return
     }
-    if (!window.confirm(`${activeOccupancy.userFullName} için sakin kaydını sonlandırmak istediğinizden emin misiniz?`)) return
+    if (closeConfirmationOpen) return
+    setCloseConfirmationOpen(true)
+  }
+
+  const confirmCloseOccupancy = async () => {
+    if (!activeOccupancy || isSubmitting) return
     setIsSubmitting(true)
     try {
       await closeUnitOccupancy(activeOccupancy.id, { endDate: toEndOfDayUtcIso(closeDate) })
@@ -377,6 +384,7 @@ export function CentralOccupancyManagement({
       setError(getErrorMessage(closeError, 'Sakin kaydı sonlandırılamadı.'))
     } finally {
       setIsSubmitting(false)
+      setCloseConfirmationOpen(false)
     }
   }
 
@@ -505,6 +513,17 @@ export function CentralOccupancyManagement({
         </>
       )}
       {unsavedChangesDialog}
+      {closeConfirmationOpen && activeOccupancy && !unsavedChangesDialog && (
+        <ConfirmationDialog
+          title="Sakin Kaydını Sonlandır"
+          message={`${activeOccupancy.userFullName} için sakin kaydını sonlandırmak istediğinizden emin misiniz?`}
+          confirmLabel="Sonlandır"
+          danger
+          isLoading={isSubmitting}
+          onCancel={() => setCloseConfirmationOpen(false)}
+          onConfirm={() => { void confirmCloseOccupancy() }}
+        />
+      )}
     </section>
   )
 }

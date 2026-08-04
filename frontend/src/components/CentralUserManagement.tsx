@@ -14,6 +14,7 @@ import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { ManagedUser, Role } from '../types'
 import { RowActionsMenu } from './RowActionsMenu'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { ConfirmationDialog } from './ConfirmationDialog'
 
 interface CentralUserManagementProps {
   onDirtyChange: (isDirty: boolean) => void
@@ -21,6 +22,14 @@ interface CentralUserManagementProps {
 }
 
 type DrawerMode = 'none' | 'create' | 'edit' | 'roles'
+
+interface UserConfirmation {
+  title: string
+  message: string
+  confirmLabel: string
+  danger: boolean
+  action: () => Promise<void>
+}
 
 interface UserFormState {
   firstName: string
@@ -80,6 +89,8 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
   const [actionError, setActionError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [confirmation, setConfirmation] = useState<UserConfirmation | null>(null)
+  const [isConfirmationRunning, setIsConfirmationRunning] = useState(false)
 
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
@@ -221,6 +232,27 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
       setActionError('En az bir rol seçmelisiniz.')
       return
     }
+    if (drawerMode === 'roles' && selectedUser) {
+      if (confirmation) return
+      setConfirmation({
+        title: 'Kullanıcı Rollerini Değiştir',
+        message: `${selectedUser.fullName} kullanıcısının rollerini değiştirmek istediğinizden emin misiniz?`,
+        confirmLabel: 'Rolleri Güncelle',
+        danger: selectedUser.roles.includes('ADMIN') && !form.roleCodes.includes('ADMIN'),
+        action: async () => {
+          try {
+            await updateManagedUserRoles(selectedUser.id, { roleCodes: form.roleCodes })
+            closeDrawerState()
+            await loadData()
+            showToast('Kullanıcı rolleri güncellendi.')
+          } catch (error) {
+            setActionError(getErrorMessage(error, 'Kullanıcı rolleri güncellenemedi.'))
+          }
+        },
+      })
+      return
+    }
+
     setIsSubmitting(true)
     const completedMode = drawerMode
     try {
@@ -239,17 +271,13 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
           lastName: form.lastName.trim(),
           email: form.email.trim(),
         })
-      } else if (drawerMode === 'roles' && selectedUser) {
-        await updateManagedUserRoles(selectedUser.id, { roleCodes: form.roleCodes })
       }
       closeDrawerState()
       await loadData()
       showToast(
         completedMode === 'create'
           ? 'Kullanıcı oluşturuldu.'
-          : completedMode === 'roles'
-            ? 'Kullanıcı rolleri güncellendi.'
-            : 'Kullanıcı bilgileri güncellendi.'
+          : 'Kullanıcı bilgileri güncellendi.'
       )
     } catch (error) {
       setActionError(getErrorMessage(error, 'Kullanıcı işlemi tamamlanamadı.'))
@@ -262,13 +290,32 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
     setActionError('')
     const nextActive = !managedUser.isActive
     const action = nextActive ? 'aktif' : 'pasif'
-    if (!window.confirm(`${managedUser.fullName} adlı kullanıcıyı ${action} yapmak istediğinizden emin misiniz?`)) return
+    if (confirmation) return
+    setConfirmation({
+      title: nextActive ? 'Kullanıcıyı Aktifleştir' : 'Kullanıcıyı Pasifleştir',
+      message: `${managedUser.fullName} hesabını ${nextActive ? 'aktifleştirmek' : 'pasifleştirmek'} istediğinizden emin misiniz?`,
+      confirmLabel: nextActive ? 'Aktifleştir' : 'Pasifleştir',
+      danger: !nextActive,
+      action: async () => {
+        try {
+          await setManagedUserActive(managedUser.id, nextActive)
+          await loadData()
+          showToast(nextActive ? 'Kullanıcı aktif hâle getirildi.' : 'Kullanıcı pasif hâle getirildi.')
+        } catch (error) {
+          setActionError(getErrorMessage(error, `Kullanıcı ${action} duruma getirilemedi.`))
+        }
+      },
+    })
+  }
+
+  const confirmUserAction = async () => {
+    if (!confirmation || isConfirmationRunning) return
+    setIsConfirmationRunning(true)
     try {
-      await setManagedUserActive(managedUser.id, nextActive)
-      await loadData()
-      showToast(nextActive ? 'Kullanıcı aktif hâle getirildi.' : 'Kullanıcı pasif hâle getirildi.')
-    } catch (error) {
-      setActionError(getErrorMessage(error, `Kullanıcı ${action} duruma getirilemedi.`))
+      await confirmation.action()
+    } finally {
+      setIsConfirmationRunning(false)
+      setConfirmation(null)
     }
   }
 
@@ -349,6 +396,17 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
         </>
       )}
       {unsavedChangesDialog}
+      {confirmation && !unsavedChangesDialog && (
+        <ConfirmationDialog
+          title={confirmation.title}
+          message={confirmation.message}
+          confirmLabel={confirmation.confirmLabel}
+          danger={confirmation.danger}
+          isLoading={isConfirmationRunning}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => { void confirmUserAction() }}
+        />
+      )}
     </section>
   )
 }

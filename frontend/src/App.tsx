@@ -112,6 +112,13 @@ const ROLE_LABEL_MAP: Record<string, string> = {
 type ManagementView = 'overview' | 'properties' | 'buildings' | 'units' | 'users' | 'residents'
 type NavigationGroup = 'structures' | 'people'
 
+interface DestructiveConfirmation {
+  title: string
+  message: string
+  confirmLabel: string
+  action: () => Promise<void>
+}
+
 const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'overview', label: 'Genel Bakış' },
   { id: 'properties', label: 'Yapılar' },
@@ -256,6 +263,8 @@ function App() {
   const [isBuildingDrawerOpen, setIsBuildingDrawerOpen] = useState(false)
   const [isUnitDrawerOpen, setIsUnitDrawerOpen] = useState(false)
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
+  const [destructiveConfirmation, setDestructiveConfirmation] = useState<DestructiveConfirmation | null>(null)
+  const [isDestructiveActionRunning, setIsDestructiveActionRunning] = useState(false)
   const [selectedUnitDetail, setSelectedUnitDetail] = useState<Unit | null>(null)
   const [unitDetailTab, setUnitDetailTab] = useState<'general' | 'residents'>('general')
 
@@ -425,6 +434,8 @@ function App() {
     setPropertyListError('')
     setBuildingListError('')
     setUnitListError('')
+    setDestructiveConfirmation(null)
+    setIsDestructiveActionRunning(false)
   }, [propertyTypes])
 
   const { navigateWithGuard } = useRouteChangeGuard({
@@ -1009,22 +1020,27 @@ function App() {
     }
   }
 
-  const handleDeactivateProperty = async (id: number) => {
-    if (!window.confirm('Bu yapıyı pasifleştirmek istediğinizden emin misiniz?')) {
-      return
-    }
-    try {
-      await deactivateProperty(id)
-      await loadPropertyList()
-      if (selectedProperty?.id === id) {
-        const updatedList = await getProperties(true)
-        const updatedProp = updatedList.find((p) => p.id === id)
-        if (updatedProp) setSelectedProperty(updatedProp)
-      }
-      showToast('Yapı pasifleştirildi.')
-    } catch (err) {
-      setPropertyListError(err instanceof Error ? err.message : 'Yapı pasifleştirilemedi.')
-    }
+  const handleDeactivateProperty = (id: number) => {
+    if (destructiveConfirmation || isLogoutDialogOpen) return
+    setDestructiveConfirmation({
+      title: 'Yapıyı Pasifleştir',
+      message: 'Bu yapıyı pasifleştirmek istediğinizden emin misiniz?',
+      confirmLabel: 'Pasifleştir',
+      action: async () => {
+        try {
+          await deactivateProperty(id)
+          await loadPropertyList()
+          if (selectedProperty?.id === id) {
+            const updatedList = await getProperties(true)
+            const updatedProp = updatedList.find((p) => p.id === id)
+            if (updatedProp) setSelectedProperty(updatedProp)
+          }
+          showToast('Yapı pasifleştirildi.')
+        } catch (err) {
+          setPropertyListError(err instanceof Error ? err.message : 'Yapı pasifleştirilemedi.')
+        }
+      },
+    })
   }
 
   // ==========================================
@@ -1229,22 +1245,27 @@ function App() {
     }
   }
 
-  const handleDeleteBuildingClick = async (id: number) => {
-    if (!window.confirm('Bu binayı silmek istediğinizden emin misiniz?')) {
-      return
-    }
-    try {
-      await deleteBuilding(id)
-      await Promise.all([loadAllBuildingList(), loadPropertyList()])
-      if (selectedBuilding?.id === id) {
-        setSelectedBuilding(null)
-        setUnits([])
-        setSelectedOccupancyUnit(null)
-      }
-      showToast('Blok silindi.')
-    } catch (err) {
-      setBuildingListError(err instanceof Error ? err.message : 'Blok silinemedi.')
-    }
+  const handleDeleteBuildingClick = (id: number) => {
+    if (destructiveConfirmation || isLogoutDialogOpen) return
+    setDestructiveConfirmation({
+      title: 'Bloğu Sil',
+      message: 'Bu bloğu silmek istediğinizden emin misiniz?',
+      confirmLabel: 'Sil',
+      action: async () => {
+        try {
+          await deleteBuilding(id)
+          await Promise.all([loadAllBuildingList(), loadPropertyList()])
+          if (selectedBuilding?.id === id) {
+            setSelectedBuilding(null)
+            setUnits([])
+            setSelectedOccupancyUnit(null)
+          }
+          showToast('Blok silindi.')
+        } catch (err) {
+          setBuildingListError(err instanceof Error ? err.message : 'Blok silinemedi.')
+        }
+      },
+    })
   }
 
   // ==========================================
@@ -1387,19 +1408,24 @@ function App() {
     }
   }
 
-  const handleDeleteUnitClick = async (id: number) => {
-    if (!window.confirm('Bu bağımsız bölümü silmek istediğinizden emin misiniz?')) {
-      return
-    }
-    try {
-      await deleteUnit(id)
-      await Promise.all([loadAllUnitList(), loadAllBuildingList(), loadPropertyList()])
-      setSelectedOccupancyUnit((current) => (current?.id === id ? null : current))
-      setSelectedUnitDetail((current) => (current?.id === id ? null : current))
-      showToast('Daire silindi.')
-    } catch (err) {
-      setUnitListError(err instanceof Error ? err.message : 'Daire silinemedi.')
-    }
+  const handleDeleteUnitClick = (id: number) => {
+    if (destructiveConfirmation || isLogoutDialogOpen) return
+    setDestructiveConfirmation({
+      title: 'Daireyi Sil',
+      message: 'Bu daireyi silmek istediğinizden emin misiniz?',
+      confirmLabel: 'Sil',
+      action: async () => {
+        try {
+          await deleteUnit(id)
+          await Promise.all([loadAllUnitList(), loadAllBuildingList(), loadPropertyList()])
+          setSelectedOccupancyUnit((current) => (current?.id === id ? null : current))
+          setSelectedUnitDetail((current) => (current?.id === id ? null : current))
+          showToast('Daire silindi.')
+        } catch (err) {
+          setUnitListError(err instanceof Error ? err.message : 'Daire silinemedi.')
+        }
+      },
+    })
   }
 
   const handleOpenUnitDetail = async (unit: Unit, tab: 'general' | 'residents' = 'general') => {
@@ -1504,7 +1530,19 @@ function App() {
   }
 
   const handleLogout = () => {
+    if (destructiveConfirmation || isDestructiveActionRunning) return
     setIsLogoutDialogOpen(true)
+  }
+
+  const confirmDestructiveAction = async () => {
+    if (!destructiveConfirmation || isDestructiveActionRunning) return
+    setIsDestructiveActionRunning(true)
+    try {
+      await destructiveConfirmation.action()
+    } finally {
+      setIsDestructiveActionRunning(false)
+      setDestructiveConfirmation(null)
+    }
   }
 
   const confirmLogout = () => {
@@ -3090,7 +3128,18 @@ function App() {
           )}
         </section>
       )}
-      {isLogoutDialogOpen && (
+      {destructiveConfirmation && (
+        <ConfirmationDialog
+          title={destructiveConfirmation.title}
+          message={destructiveConfirmation.message}
+          confirmLabel={destructiveConfirmation.confirmLabel}
+          danger
+          isLoading={isDestructiveActionRunning}
+          onCancel={() => setDestructiveConfirmation(null)}
+          onConfirm={() => { void confirmDestructiveAction() }}
+        />
+      )}
+      {isLogoutDialogOpen && !destructiveConfirmation && (
         <ConfirmationDialog
           title="Çıkış Yap"
           message={hasUnsavedChanges

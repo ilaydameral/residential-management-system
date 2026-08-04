@@ -19,6 +19,7 @@ import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { useToast } from '../context/ToastContext'
 import { formatUnitDisplay, formatUnitNumber } from '../utils/unitDisplay'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { ConfirmationDialog } from './ConfirmationDialog'
 
 interface OccupancyManagementProps {
   unit: Unit
@@ -115,6 +116,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
   const [occupancyTypesError, setOccupancyTypesError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
 
@@ -388,13 +390,12 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       return
     }
 
-    const confirmed = window.confirm(
-      `${closingOccupancy.userFullName} için bu ikamet ilişkisini ${formatDate(
-        closeDate
-      )} tarihinde sonlandırmak istediğinizden emin misiniz?`
-    )
-    if (!confirmed) return
+    if (closeConfirmationOpen) return
+    setCloseConfirmationOpen(true)
+  }
 
+  const confirmClose = async () => {
+    if (!closingOccupancy || isSubmitting) return
     setIsSubmitting(true)
     try {
       await closeUnitOccupancy(closingOccupancy.id, { endDate: toEndOfDayUtcIso(closeDate) })
@@ -406,6 +407,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       setError(getErrorMessage(closeError, 'Sakin kaydı sonlandırılamadı.'))
     } finally {
       setIsSubmitting(false)
+      setCloseConfirmationOpen(false)
     }
   }
 
@@ -719,6 +721,17 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         })}
       </div>}
       {unsavedChangesDialog}
+      {closeConfirmationOpen && closingOccupancy && !unsavedChangesDialog && (
+        <ConfirmationDialog
+          title="Sakin Kaydını Sonlandır"
+          message={`${closingOccupancy.userFullName} için sakin kaydını ${formatDate(closeDate)} tarihinde sonlandırmak istediğinizden emin misiniz?`}
+          confirmLabel="Sonlandır"
+          danger
+          isLoading={isSubmitting}
+          onCancel={() => setCloseConfirmationOpen(false)}
+          onConfirm={() => { void confirmClose() }}
+        />
+      )}
     </section>
   )
 }
