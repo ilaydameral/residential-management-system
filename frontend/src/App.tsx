@@ -34,6 +34,7 @@ import { CentralUserManagement } from './components/CentralUserManagement'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentUnits } from './components/ResidentUnits'
 import { SearchableSelect } from './components/SearchableSelect'
+import { ThemeToggle } from './components/ThemeToggle'
 import { useAuth } from './context/AuthContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
@@ -1541,6 +1542,7 @@ function App() {
                   </span>
                 ))}
               </div>
+              <ThemeToggle />
               <button className="secondary-button" onClick={handleLogout}>
                 Çıkış Yap
               </button>
@@ -1572,6 +1574,7 @@ function App() {
             </span>
           ))}
         </div>
+        <ThemeToggle />
         <button className="secondary-button" onClick={handleLogout}>
           Çıkış Yap
         </button>
@@ -2536,7 +2539,7 @@ function App() {
                         placeholder="Örn: A, B, GUN-01"
                         required
                       />
-                      <small className="field-help" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      <small className="field-help">
                         Site içinde bloğu kısa ve benzersiz biçimde tanımlar. Örn: A, B, GUN-01
                       </small>
                     </div>
@@ -2753,7 +2756,7 @@ function App() {
                       }}
                       required
                     />
-                    <small className="field-help" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    <small className="field-help">
                       0: Zemin Kat, Negatif: Bodrum Kat (örn: -1), Pozitif: Normal Kat (örn: 2)
                     </small>
                   </div>
