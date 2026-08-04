@@ -17,8 +17,8 @@ const SUMMARY_CARDS: Array<{
   { key: 'buildingCount', label: 'Toplam Blok', tone: 'indigo' },
   { key: 'unitCount', label: 'Toplam Daire', tone: 'slate' },
   { key: 'activeOccupancyCount', label: 'Aktif Sakin', tone: 'green' },
-  { key: 'occupiedUnitCount', label: 'Dolu Daire', tone: 'amber' },
-  { key: 'vacantUnitCount', label: 'Boş Daire', tone: 'cyan' },
+  { key: 'occupiedUnitCount', label: 'Dolu Daire', tone: 'green' },
+  { key: 'vacantUnitCount', label: 'Boş Daire', tone: 'slate' },
 ]
 
 const QUICK_ACTIONS: Array<{

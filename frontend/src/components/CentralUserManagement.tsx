@@ -11,6 +11,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { ManagedUser, Role } from '../types'
+import { RowActionsMenu } from './RowActionsMenu'
 
 interface CentralUserManagementProps {
   onDirtyChange: (isDirty: boolean) => void
@@ -259,7 +260,11 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
     }
   }
 
-  const hasFilters = Boolean(search || roleFilter !== 'all' || statusFilter !== 'all')
+  const activeFilterCount = [
+    search.trim() !== '',
+    roleFilter !== 'all',
+    statusFilter !== 'all',
+  ].filter(Boolean).length
 
   return (
     <section className="central-user-view">
@@ -272,7 +277,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
         <div className="form-field"><label htmlFor="managed-user-search">Kullanıcı Ara</label><input id="managed-user-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad veya e-posta" /></div>
         <div className="form-field"><label htmlFor="managed-user-role">Rol</label><select id="managed-user-role" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option value="all">Tüm roller</option>{availableRoleCodes.map((code) => <option key={code} value={code}>{getRoleLabel(code)}</option>)}</select></div>
         <div className="form-field"><label htmlFor="managed-user-status">Hesap Durumu</label><select id="managed-user-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tüm durumlar</option><option value="active">Aktif</option><option value="inactive">Pasif</option></select></div>
-        <button className="secondary-button entity-filter-clear" type="button" disabled={!hasFilters} onClick={() => { setSearch(''); setRoleFilter('all'); setStatusFilter('all') }}>Filtreleri Temizle</button>
+        <button className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`} type="button" disabled={activeFilterCount === 0} onClick={() => { setSearch(''); setRoleFilter('all'); setStatusFilter('all') }}><span>Filtreleri Temizle</span>{activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}</button>
       </section>
 
       {actionError && drawerMode === 'none' && <p className="status-message error-message" role="alert">{actionError}</p>}
@@ -284,17 +289,17 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
       {!isLoading && !loadError && filteredUsers.length > 0 && (
         <section className="panel entity-table-panel">
           <div className="responsive-table-wrapper">
-            <table className="management-table user-management-table">
+            <table className="management-table user-management-table sticky-columns-table">
               <thead><tr><th>Ad Soyad</th><th>E-posta</th><th>Roller</th><th>Aktif Daire Sayısı</th><th>Hesap Durumu</th><th>Oluşturulma Tarihi</th><th>İşlemler</th></tr></thead>
               <tbody>{filteredUsers.map((managedUser) => (
                 <tr key={managedUser.id}>
                   <td><strong>{managedUser.fullName}</strong>{managedUser.id === currentUser?.id && <span className="table-secondary-text">Sizin hesabınız</span>}</td>
                   <td>{managedUser.email}</td>
-                  <td><div className="user-role-list">{managedUser.roles.map((code) => <span key={code} className="user-role-chip">{getRoleLabel(code)}</span>)}</div></td>
+                  <td><div className="user-role-list">{managedUser.roles.map((code) => <span key={code} className={`user-role-chip ${code.toLowerCase()}`}>{getRoleLabel(code)}</span>)}</div></td>
                   <td>{managedUser.activeUnitCount}</td>
                   <td><span className={`status-badge ${managedUser.isActive ? 'active' : 'inactive'}`}>{managedUser.isActive ? 'Aktif' : 'Pasif'}</span></td>
                   <td>{formatDate(managedUser.createdAt)}</td>
-                  <td><div className="compact-actions">{isAdmin && <><button type="button" onClick={() => void openEdit(managedUser)}>Düzenle</button><button type="button" onClick={() => void openRoles(managedUser)}>Rolleri Yönet</button><button className={managedUser.isActive ? 'danger' : ''} type="button" onClick={() => void handleStatusChange(managedUser)}>{managedUser.isActive ? 'Pasif Yap' : 'Aktif Yap'}</button></>}<button type="button" onClick={() => onViewUnits(managedUser.email)}>Bağlı Daireler</button></div></td>
+                  <td><RowActionsMenu label={managedUser.fullName} primaryAction={{ label: 'Bağlı Daireler', onSelect: () => onViewUnits(managedUser.email) }} secondaryActions={isAdmin ? [{ label: 'Düzenle', onSelect: () => { void openEdit(managedUser) } }, { label: 'Rolleri Yönet', onSelect: () => { void openRoles(managedUser) } }, { label: managedUser.isActive ? 'Pasif Yap' : 'Aktif Yap', danger: managedUser.isActive, onSelect: () => { void handleStatusChange(managedUser) } }] : []} /></td>
                 </tr>
               ))}</tbody>
             </table>

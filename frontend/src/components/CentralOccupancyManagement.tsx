@@ -9,6 +9,7 @@ import {
 } from '../api'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { formatUnitNumber } from '../utils/unitDisplay'
+import { RowActionsMenu } from './RowActionsMenu'
 import type {
   Building,
   CreateUnitOccupancyPayload,
@@ -401,7 +402,14 @@ export function CentralOccupancyManagement({
     </div>
   )
 
-  const hasActiveFilters = Boolean(search || propertyFilter !== 'all' || buildingFilter !== 'all' || unitSearch || typeFilter !== 'all' || statusFilter !== 'all')
+  const activeFilterCount = [
+    search.trim() !== '',
+    propertyFilter !== 'all',
+    buildingFilter !== 'all',
+    unitSearch.trim() !== '',
+    typeFilter !== 'all',
+    statusFilter !== 'all',
+  ].filter(Boolean).length
   const combinedError = loadError || referenceDataError
   const combinedLoading = isLoading || isReferenceDataLoading
 
@@ -421,7 +429,7 @@ export function CentralOccupancyManagement({
           <div className="form-field"><label htmlFor="resident-type">İkamet Türü</label><select id="resident-type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Tüm türler</option>{occupancyTypes.map((type) => <option key={type.id} value={type.id}>{getTypeLabel(type.code, type.name)}</option>)}</select></div>
           <div className="form-field"><label htmlFor="resident-status">Durum</label><select id="resident-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tüm durumlar</option><option value="Aktif">Aktif</option><option value="Sonlandırılmış">Sonlandırılmış</option><option value="Pasif">Pasif</option></select></div>
         </div>
-        <button className="secondary-button entity-filter-clear" type="button" disabled={!hasActiveFilters} onClick={() => { setSearch(''); setPropertyFilter('all'); setBuildingFilter('all'); setUnitSearch(''); setTypeFilter('all'); setStatusFilter('all') }}>Filtreleri Temizle</button>
+        <button className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`} type="button" disabled={activeFilterCount === 0} onClick={() => { setSearch(''); setPropertyFilter('all'); setBuildingFilter('all'); setUnitSearch(''); setTypeFilter('all'); setStatusFilter('all') }}><span>Filtreleri Temizle</span>{activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}</button>
       </section>
 
       {combinedLoading && <p className="status-message">Site sakinleri yükleniyor...</p>}
@@ -432,7 +440,7 @@ export function CentralOccupancyManagement({
       {!combinedLoading && !combinedError && filteredOccupancies.length > 0 && (
         <section className="panel entity-table-panel residents-table-panel">
           <div className="responsive-table-wrapper">
-            <table className="management-table residents-table">
+            <table className="management-table residents-table sticky-columns-table">
               <thead><tr><th>Sakin Adı</th><th>E-posta</th><th>Yapı</th><th>Blok / Bina</th><th>Daire / Bölüm No</th><th>İkamet Türü</th><th>Birincil Durumu</th><th>Başlangıç</th><th>Bitiş</th><th>Durum</th><th>İşlemler</th></tr></thead>
               <tbody>{filteredOccupancies.map((occupancy) => {
                 const status = getStatus(occupancy)
@@ -443,11 +451,11 @@ export function CentralOccupancyManagement({
                   <td data-label="Blok / Bina">{occupancy.buildingName}</td>
                   <td data-label="Daire / Bölüm No">{formatUnitNumber(occupancy.unitNumber)}</td>
                   <td data-label="İkamet Türü">{getTypeLabel(occupancy.occupancyTypeCode, occupancy.occupancyTypeName)}</td>
-                  <td data-label="Birincil Durumu">{occupancy.isPrimary ? (status === 'Aktif' ? 'Birincil Sakin' : 'Döneminde Birincil') : '—'}</td>
+                  <td data-label="Birincil Durumu">{occupancy.isPrimary ? <span className={`status-badge ${status === 'Aktif' ? 'primary-badge' : 'historical-primary-badge'}`}>{status === 'Aktif' ? 'Birincil Sakin' : 'Döneminde Birincil'}</span> : '—'}</td>
                   <td data-label="Başlangıç">{formatDate(occupancy.startDate)}</td>
                   <td data-label="Bitiş">{formatDate(occupancy.endDate)}</td>
                   <td data-label="Durum"><span className={`status-badge ${status === 'Aktif' ? 'active' : 'inactive'}`}>{status}</span></td>
-                  <td data-label="İşlemler"><div className="compact-actions"><button type="button" onClick={() => onOpenUnitDetail(occupancy.unitId)}>Daire Detayı</button><button type="button" onClick={() => void openEdit(occupancy)}>Düzenle</button>{status === 'Aktif' && <button className="danger" type="button" onClick={() => void openClose(occupancy)}>Sonlandır</button>}</div></td>
+                  <td data-label="İşlemler"><RowActionsMenu label={occupancy.userFullName} primaryAction={{ label: 'Daire Detayı', onSelect: () => onOpenUnitDetail(occupancy.unitId) }} secondaryActions={[{ label: 'Düzenle', onSelect: () => { void openEdit(occupancy) } }, ...(status === 'Aktif' ? [{ label: 'Sonlandır', danger: true, onSelect: () => { void openClose(occupancy) } }] : [])]} /></td>
                 </tr>
               })}</tbody>
             </table>

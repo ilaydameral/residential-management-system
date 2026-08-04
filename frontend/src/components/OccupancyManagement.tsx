@@ -670,7 +670,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
                 </div>
                 <div className="occupancy-badges">
                   {occupancy.isPrimary && (
-                    <span className="status-badge primary-badge">
+                    <span className={`status-badge ${isCurrent ? 'primary-badge' : 'historical-primary-badge'}`}>
                       {isCurrent ? 'Birincil Sakin' : 'Döneminde Birincil'}
                     </span>
                   )}

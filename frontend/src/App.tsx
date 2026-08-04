@@ -33,6 +33,7 @@ import { CentralOccupancyManagement } from './components/CentralOccupancyManagem
 import { CentralUserManagement } from './components/CentralUserManagement'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentUnits } from './components/ResidentUnits'
+import { RowActionsMenu } from './components/RowActionsMenu'
 import { SearchableSelect } from './components/SearchableSelect'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useAuth } from './context/AuthContext'
@@ -462,6 +463,24 @@ function App() {
       (unitStatusFilter === 'active' ? unit.isActive : !unit.isActive)
     return matchesSearch && matchesProperty && matchesBuilding && matchesFloor && matchesOccupancy && matchesStatus
   })
+  const propertyFilterCount = [
+    propertySearch.trim() !== '',
+    propertyTypeFilter !== 'all',
+    propertyStatusFilter !== 'all',
+  ].filter(Boolean).length
+  const buildingFilterCount = [
+    buildingSearch.trim() !== '',
+    buildingPropertyFilter !== 'all',
+    buildingStatusFilter !== 'all',
+  ].filter(Boolean).length
+  const unitFilterCount = [
+    unitSearch.trim() !== '',
+    unitPropertyFilter !== 'all',
+    unitBuildingFilter !== 'all',
+    unitFloorFilter !== 'all',
+    unitOccupancyFilter !== 'all',
+    unitStatusFilter !== 'all',
+  ].filter(Boolean).length
   const isLoadingCentralUnits = isLoadingAllUnits || isLoadingAllBuildings
   const centralUnitError = unitListError || buildingListError
   const selectedBuildingFormProperty = properties.find(
@@ -1710,15 +1729,17 @@ function App() {
               </select>
             </div>
             <button
-              className="secondary-button entity-filter-clear"
+              className={`secondary-button entity-filter-clear ${propertyFilterCount > 0 ? 'has-active-filters' : ''}`}
               type="button"
+              disabled={propertyFilterCount === 0}
               onClick={() => {
                 setPropertySearch('')
                 setPropertyTypeFilter('all')
                 setPropertyStatusFilter('all')
               }}
             >
-              Filtreleri Temizle
+              <span>Filtreleri Temizle</span>
+              {propertyFilterCount > 0 && <span className="filter-count-badge" aria-label={`${propertyFilterCount} aktif filtre`}>{propertyFilterCount}</span>}
             </button>
           </section>
 
@@ -1746,7 +1767,7 @@ function App() {
           {!isLoadingProperties && !propertyListError && filteredProperties.length > 0 && (
             <section className="panel entity-table-panel">
               <div className="responsive-table-wrapper">
-                <table className="management-table">
+                <table className="management-table sticky-columns-table">
                   <thead>
                     <tr>
                       <th>Yapı Adı</th>
@@ -1774,17 +1795,14 @@ function App() {
                           </span>
                         </td>
                         <td data-label="İşlemler">
-                          <div className="compact-actions">
-                            <button type="button" onClick={() => void handleSelectProperty(property)}>Detay</button>
-                            {canEditProperty && (
-                              <button type="button" onClick={() => void handleEditPropertyClick(property)}>Düzenle</button>
-                            )}
-                            {canDeactivateProperty && property.isActive && (
-                              <button className="danger" type="button" onClick={() => void handleDeactivateProperty(property.id)}>
-                                Pasifleştir
-                              </button>
-                            )}
-                          </div>
+                          <RowActionsMenu
+                            label={property.name}
+                            primaryAction={{ label: 'Detay', onSelect: () => { void handleSelectProperty(property) } }}
+                            secondaryActions={[
+                              ...(canEditProperty ? [{ label: 'Düzenle', onSelect: () => { void handleEditPropertyClick(property) } }] : []),
+                              ...(canDeactivateProperty && property.isActive ? [{ label: 'Pasifleştir', danger: true, onSelect: () => { void handleDeactivateProperty(property.id) } }] : []),
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -1843,15 +1861,17 @@ function App() {
               </select>
             </div>
             <button
-              className="secondary-button entity-filter-clear"
+              className={`secondary-button entity-filter-clear ${buildingFilterCount > 0 ? 'has-active-filters' : ''}`}
               type="button"
+              disabled={buildingFilterCount === 0}
               onClick={() => {
                 setBuildingSearch('')
                 setBuildingPropertyFilter('all')
                 setBuildingStatusFilter('all')
               }}
             >
-              Filtreleri Temizle
+              <span>Filtreleri Temizle</span>
+              {buildingFilterCount > 0 && <span className="filter-count-badge" aria-label={`${buildingFilterCount} aktif filtre`}>{buildingFilterCount}</span>}
             </button>
           </section>
 
@@ -1879,7 +1899,7 @@ function App() {
           {!isLoadingAllBuildings && !buildingListError && filteredBuildings.length > 0 && (
             <section className="panel entity-table-panel">
               <div className="responsive-table-wrapper">
-                <table className="management-table">
+                <table className="management-table sticky-columns-table">
                   <thead>
                     <tr>
                       <th>Blok Adı / Kodu</th>
@@ -1906,17 +1926,14 @@ function App() {
                           </span>
                         </td>
                         <td data-label="İşlemler">
-                          <div className="compact-actions">
-                            <button type="button" onClick={() => void handleSelectBuilding(building)}>Detay</button>
-                            {canEditBuilding && (
-                              <button type="button" onClick={() => void handleEditBuildingClick(building)}>Düzenle</button>
-                            )}
-                            {canDeleteBuilding && (
-                              <button className="danger" type="button" onClick={() => void handleDeleteBuildingClick(building.id)}>
-                                Sil
-                              </button>
-                            )}
-                          </div>
+                          <RowActionsMenu
+                            label={building.name}
+                            primaryAction={{ label: 'Detay', onSelect: () => { void handleSelectBuilding(building) } }}
+                            secondaryActions={[
+                              ...(canEditBuilding ? [{ label: 'Düzenle', onSelect: () => { void handleEditBuildingClick(building) } }] : []),
+                              ...(canDeleteBuilding ? [{ label: 'Sil', danger: true, onSelect: () => { void handleDeleteBuildingClick(building.id) } }] : []),
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -2089,8 +2106,9 @@ function App() {
                 <option value="inactive">Pasif</option>
               </select>
             </div>
-            <button className="secondary-button entity-filter-clear" type="button" onClick={() => { setUnitSearch(''); setUnitPropertyFilter('all'); setUnitBuildingFilter('all'); setUnitFloorFilter('all'); setUnitOccupancyFilter('all'); setUnitStatusFilter('all') }}>
-              Filtreleri Temizle
+            <button className={`secondary-button entity-filter-clear ${unitFilterCount > 0 ? 'has-active-filters' : ''}`} type="button" disabled={unitFilterCount === 0} onClick={() => { setUnitSearch(''); setUnitPropertyFilter('all'); setUnitBuildingFilter('all'); setUnitFloorFilter('all'); setUnitOccupancyFilter('all'); setUnitStatusFilter('all') }}>
+              <span>Filtreleri Temizle</span>
+              {unitFilterCount > 0 && <span className="filter-count-badge" aria-label={`${unitFilterCount} aktif filtre`}>{unitFilterCount}</span>}
             </button>
           </section>
 
@@ -2107,7 +2125,7 @@ function App() {
           {!isLoadingCentralUnits && !centralUnitError && filteredUnits.length > 0 && (
             <section className="panel entity-table-panel">
               <div className="responsive-table-wrapper">
-                <table className="management-table unit-management-table">
+                <table className="management-table unit-management-table sticky-columns-table">
                   <thead><tr><th>Daire / Bölüm No</th><th>Yapı</th><th>Blok / Bina</th><th>Kat</th><th>Tür</th><th>Brüt Alan</th><th>Net Alan</th><th>Doluluk</th><th>Durum</th><th>İşlemler</th></tr></thead>
                   <tbody>
                     {filteredUnits.map((unit) => (
@@ -2122,12 +2140,15 @@ function App() {
                         <td><span className={`occupancy-state ${unit.activeOccupancyCount > 0 ? 'occupied' : 'vacant'}`}>{unit.activeOccupancyCount > 0 ? `Dolu (${unit.activeOccupancyCount})` : 'Boş'}</span></td>
                         <td><span className={`status-badge ${unit.isActive ? 'active' : 'inactive'}`}>{unit.isActive ? 'Aktif' : 'Pasif'}</span></td>
                         <td>
-                          <div className="compact-actions">
-                            <button type="button" onClick={() => void handleOpenUnitDetail(unit)}>Detay</button>
-                            {canEditUnit && <button type="button" onClick={() => void handleEditUnitClick(unit)}>Düzenle</button>}
-                            {canManageOccupancies && <button type="button" onClick={() => void handleOpenUnitDetail(unit, 'residents')}>Sakinleri Yönet</button>}
-                            {canDeleteUnit && <button className="danger" type="button" onClick={() => void handleDeleteUnitClick(unit.id)}>Sil</button>}
-                          </div>
+                          <RowActionsMenu
+                            label={formatUnitNumber(unit.unitNumber)}
+                            primaryAction={{ label: 'Detay', onSelect: () => { void handleOpenUnitDetail(unit) } }}
+                            secondaryActions={[
+                              ...(canEditUnit ? [{ label: 'Düzenle', onSelect: () => { void handleEditUnitClick(unit) } }] : []),
+                              ...(canManageOccupancies ? [{ label: 'Sakinleri Yönet', onSelect: () => { void handleOpenUnitDetail(unit, 'residents') } }] : []),
+                              ...(canDeleteUnit ? [{ label: 'Sil', danger: true, onSelect: () => { void handleDeleteUnitClick(unit.id) } }] : []),
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
