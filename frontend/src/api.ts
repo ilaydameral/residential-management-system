@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config'
 import type {
   ApiErrorResponse,
+  AccountProfile,
   AuthenticatedUser,
   Building,
   CreateBuildingPayload,
@@ -270,6 +271,13 @@ export async function getMyUnits(): Promise<ResidentUnit[]> {
     headers: getAuthHeaders(),
   })
   return handleResponse<ResidentUnit[]>(response)
+}
+
+export async function getMyAccountProfile(): Promise<AccountProfile> {
+  const response = await safeFetch(`${API_BASE_URL}/api/account/me`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AccountProfile>(response)
 }
 
 // Unit Occupancies API

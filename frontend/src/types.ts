@@ -110,9 +110,21 @@ export interface ResidentUnit {
   buildingName: string
   unitNumber: string
   floorNumber: number
+  unitTypeName: string
+  grossArea: number | null
+  netArea: number | null
   occupancyType: OccupancyTypeCode
   isPrimary: boolean
   startDate: string
+}
+
+export interface AccountProfile {
+  id: number
+  fullName: string
+  email: string
+  roles: string[]
+  isActive: boolean
+  createdAt: string
 }
 
 export interface CreateUnitPayload {

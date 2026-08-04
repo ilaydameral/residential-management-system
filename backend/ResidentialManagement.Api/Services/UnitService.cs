@@ -237,6 +237,9 @@ public class UnitService : IUnitService
                 BuildingName = uo.Unit.Building.Name,
                 UnitNumber = uo.Unit.UnitNumber,
                 FloorNumber = uo.Unit.FloorNumber,
+                UnitTypeName = uo.Unit.UnitType.Name,
+                GrossArea = uo.Unit.GrossArea,
+                NetArea = uo.Unit.NetArea,
                 OccupancyType = uo.OccupancyType.Code,
                 IsPrimary = uo.IsPrimary,
                 StartDate = uo.StartDate

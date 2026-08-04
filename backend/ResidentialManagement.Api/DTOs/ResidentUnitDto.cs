@@ -12,6 +12,12 @@ public class ResidentUnitDto
 
     public int FloorNumber { get; set; }
 
+    public string UnitTypeName { get; set; } = string.Empty;
+
+    public decimal? GrossArea { get; set; }
+
+    public decimal? NetArea { get; set; }
+
     public string OccupancyType { get; set; } = string.Empty;
 
     public bool IsPrimary { get; set; }

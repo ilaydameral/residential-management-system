@@ -6,6 +6,7 @@ public interface IUserService
 {
     Task<List<UserManagementDto>> GetAllAsync(string? search, string? role, bool? isActive);
     Task<UserDetailDto?> GetDetailAsync(int id);
+    Task<AccountProfileDto?> GetCurrentProfileAsync(int id);
     Task<List<UserSearchResultDto>> SearchAsync(string query, bool includeInactive = false);
     Task<UserManagementDto> CreateAsync(CreateManagedUserDto createDto);
     Task<UserManagementDto?> UpdateAsync(int id, UpdateManagedUserDto updateDto);

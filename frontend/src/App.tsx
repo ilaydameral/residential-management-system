@@ -35,7 +35,7 @@ import { CentralUserManagement } from './components/CentralUserManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { OccupancyManagement } from './components/OccupancyManagement'
-import { ResidentUnits } from './components/ResidentUnits'
+import { ResidentPortal } from './components/ResidentPortal'
 import { RowActionsMenu } from './components/RowActionsMenu'
 import { SearchableSelect } from './components/SearchableSelect'
 import { ThemeToggle } from './components/ThemeToggle'
@@ -466,8 +466,14 @@ function App() {
     }
 
     if (isResidentView) {
-      if (location.pathname !== '/resident/my-units') {
-        navigate('/resident/my-units', { replace: true })
+      const isKnownResidentRoute =
+        location.pathname === '/resident/home' ||
+        location.pathname === '/resident/my-units' ||
+        Boolean(matchPath('/resident/my-units/:unitId', location.pathname)) ||
+        location.pathname === '/resident/account'
+
+      if (!isKnownResidentRoute) {
+        navigate('/resident/home', { replace: true })
       }
       return
     }
@@ -813,7 +819,7 @@ function App() {
   }
 
   if (isResidentView) {
-    return <ResidentUnits />
+    return <ResidentPortal />
   }
 
   // ==========================================

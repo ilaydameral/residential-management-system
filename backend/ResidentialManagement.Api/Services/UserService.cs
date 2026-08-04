@@ -138,6 +138,27 @@ public class UserService : IUserService
             .FirstOrDefaultAsync();
     }
 
+    public async Task<AccountProfileDto?> GetCurrentProfileAsync(int id)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(user => user.Id == id)
+            .Select(user => new AccountProfileDto
+            {
+                Id = user.Id,
+                FullName = (user.FirstName + " " + user.LastName).Trim(),
+                Email = user.Email,
+                Roles = user.UserRoles
+                    .Where(userRole => userRole.Role.IsActive)
+                    .OrderBy(userRole => userRole.RoleId)
+                    .Select(userRole => userRole.Role.Code)
+                    .ToList(),
+                IsActive = user.IsActive,
+                CreatedAt = user.CreatedAt
+            })
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<UserManagementDto> CreateAsync(CreateManagedUserDto createDto)
     {
         var normalizedEmail = createDto.Email.Trim().ToLowerInvariant();
