@@ -1950,6 +1950,84 @@ code {
   width: min(620px, 100%);
 }
 
+.central-user-view {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.user-toolbar {
+  grid-template-columns: minmax(240px, 1.5fr) repeat(2, minmax(180px, 1fr)) auto;
+}
+
+.user-management-table {
+  min-width: 1120px;
+  table-layout: fixed;
+}
+
+.user-management-table th:nth-child(1) { width: 165px; }
+.user-management-table th:nth-child(2) { width: 220px; }
+.user-management-table th:nth-child(3) { width: 225px; }
+.user-management-table th:nth-child(4) { width: 115px; }
+.user-management-table th:nth-child(5) { width: 120px; }
+.user-management-table th:nth-child(6) { width: 135px; }
+.user-management-table th:nth-child(7) { width: 250px; }
+
+.user-management-table td:nth-child(1),
+.user-management-table td:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+
+.user-role-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.user-role-chip {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #3730a3;
+  background: #e0e7ff;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.user-management-drawer {
+  width: min(560px, 100%);
+}
+
+.role-selection-fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  padding: 14px;
+}
+
+.role-selection-fieldset legend {
+  padding: 0 6px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.role-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.role-selection-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
 .occupancy-state {
   display: inline-flex;
   align-items: center;
@@ -2075,6 +2153,10 @@ code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .user-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .residents-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2107,6 +2189,10 @@ code {
   }
 
   .residents-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .role-selection-grid {
     grid-template-columns: 1fr;
   }
 

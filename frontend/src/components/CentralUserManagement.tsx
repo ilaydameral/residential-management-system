@@ -1,0 +1,336 @@
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  createManagedUser,
+  getManagedUserDetail,
+  getRoles,
+  getUsers,
+  setManagedUserActive,
+  updateManagedUser,
+  updateManagedUserRoles,
+} from '../api'
+import { useAuth } from '../context/AuthContext'
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+import type { ManagedUser, Role } from '../types'
+
+interface CentralUserManagementProps {
+  onDirtyChange: (isDirty: boolean) => void
+  onViewUnits: (email: string) => void
+}
+
+type DrawerMode = 'none' | 'create' | 'edit' | 'roles'
+
+interface UserFormState {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  roleCodes: string[]
+  isActive: boolean
+}
+
+const initialForm: UserFormState = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  password: '',
+  roleCodes: [],
+  isActive: true,
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Yönetici',
+  MANAGER: 'Site Yöneticisi',
+  RESIDENT: 'Sakin',
+  TECHNICAL_STAFF: 'Teknik Personel',
+}
+
+function getRoleLabel(code: string): string {
+  return ROLE_LABELS[code] || 'Tanımlı Rol'
+}
+
+function formatDate(value: string): string {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return '—'
+  return new Intl.DateTimeFormat('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(parsed)
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
+}
+
+function normalizeForm(form: UserFormState): UserFormState {
+  return { ...form, roleCodes: [...form.roleCodes].sort() }
+}
+
+export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUserManagementProps) {
+  const { hasRole, user: currentUser } = useAuth()
+  const isAdmin = hasRole('ADMIN')
+  const [users, setUsers] = useState<ManagedUser[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
+
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  const [drawerMode, setDrawerMode] = useState<DrawerMode>('none')
+  const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null)
+  const [form, setForm] = useState<UserFormState>(initialForm)
+  const [formBaseline, setFormBaseline] = useState<UserFormState>(initialForm)
+
+  const isDirty = drawerMode !== 'none' &&
+    JSON.stringify(normalizeForm(form)) !== JSON.stringify(normalizeForm(formBaseline))
+  const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isDirty)
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError('')
+    try {
+      if (isAdmin) {
+        const [userData, roleData] = await Promise.all([getUsers(), getRoles()])
+        setUsers(userData)
+        setRoles(roleData.filter((role) => role.isActive))
+      } else {
+        setUsers(await getUsers())
+        setRoles([])
+      }
+    } catch (error) {
+      setUsers([])
+      setLoadError(getErrorMessage(error, 'Kullanıcılar yüklenemedi.'))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isAdmin])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
+
+  useEffect(() => {
+    onDirtyChange(isDirty)
+  }, [isDirty, onDirtyChange])
+
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange])
+
+  const availableRoleCodes = useMemo(() => {
+    if (roles.length > 0) return roles.map((role) => role.code)
+    return Array.from(new Set(users.flatMap((user) => user.roles))).sort()
+  }, [roles, users])
+
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('tr-TR')
+    return users.filter((user) => {
+      const matchesSearch = !query ||
+        user.fullName.toLocaleLowerCase('tr-TR').includes(query) ||
+        user.email.toLocaleLowerCase('tr-TR').includes(query)
+      const matchesRole = roleFilter === 'all' || user.roles.includes(roleFilter)
+      const matchesStatus = statusFilter === 'all' ||
+        (statusFilter === 'active' ? user.isActive : !user.isActive)
+      return matchesSearch && matchesRole && matchesStatus
+    })
+  }, [roleFilter, search, statusFilter, users])
+
+  const closeDrawerState = () => {
+    setDrawerMode('none')
+    setSelectedUser(null)
+    setForm(initialForm)
+    setFormBaseline(initialForm)
+    setActionError('')
+  }
+
+  const closeDrawer = async () => {
+    if (!(await requestDiscard())) return
+    closeDrawerState()
+  }
+
+  const openCreate = async () => {
+    if (!(await requestDiscard())) return
+    const defaultRole = roles.find((role) => role.code === 'RESIDENT') ?? roles[0]
+    const nextForm = { ...initialForm, roleCodes: defaultRole ? [defaultRole.code] : [] }
+    setActionError('')
+    setSelectedUser(null)
+    setForm(nextForm)
+    setFormBaseline(nextForm)
+    setDrawerMode('create')
+  }
+
+  const openEdit = async (managedUser: ManagedUser) => {
+    if (!(await requestDiscard())) return
+    setActionError('')
+    setSelectedUser(managedUser)
+    setForm(initialForm)
+    setFormBaseline(initialForm)
+    setDrawerMode('edit')
+    setIsDetailLoading(true)
+    try {
+      const detail = await getManagedUserDetail(managedUser.id)
+      const editForm: UserFormState = {
+        firstName: detail.firstName,
+        lastName: detail.lastName,
+        email: detail.email,
+        password: '',
+        roleCodes: detail.roles,
+        isActive: detail.isActive,
+      }
+      setForm(editForm)
+      setFormBaseline(editForm)
+    } catch (error) {
+      setDrawerMode('none')
+      setSelectedUser(null)
+      setActionError(getErrorMessage(error, 'Kullanıcı bilgileri yüklenemedi.'))
+    } finally {
+      setIsDetailLoading(false)
+    }
+  }
+
+  const openRoles = async (managedUser: ManagedUser) => {
+    if (!(await requestDiscard())) return
+    const roleForm = { ...initialForm, roleCodes: [...managedUser.roles] }
+    setActionError('')
+    setSelectedUser(managedUser)
+    setForm(roleForm)
+    setFormBaseline(roleForm)
+    setDrawerMode('roles')
+  }
+
+  const toggleRole = (code: string) => {
+    setForm((current) => ({
+      ...current,
+      roleCodes: current.roleCodes.includes(code)
+        ? current.roleCodes.filter((roleCode) => roleCode !== code)
+        : [...current.roleCodes, code],
+    }))
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setActionError('')
+    if (form.roleCodes.length === 0 && drawerMode !== 'edit') {
+      setActionError('En az bir rol seçmelisiniz.')
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      if (drawerMode === 'create') {
+        await createManagedUser({
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          roleCodes: form.roleCodes,
+          isActive: form.isActive,
+        })
+      } else if (drawerMode === 'edit' && selectedUser) {
+        await updateManagedUser(selectedUser.id, {
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim(),
+        })
+      } else if (drawerMode === 'roles' && selectedUser) {
+        await updateManagedUserRoles(selectedUser.id, { roleCodes: form.roleCodes })
+      }
+      closeDrawerState()
+      await loadData()
+    } catch (error) {
+      setActionError(getErrorMessage(error, 'Kullanıcı işlemi tamamlanamadı.'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleStatusChange = async (managedUser: ManagedUser) => {
+    setActionError('')
+    const nextActive = !managedUser.isActive
+    const action = nextActive ? 'aktif' : 'pasif'
+    if (!window.confirm(`${managedUser.fullName} adlı kullanıcıyı ${action} yapmak istediğinizden emin misiniz?`)) return
+    try {
+      await setManagedUserActive(managedUser.id, nextActive)
+      await loadData()
+    } catch (error) {
+      setActionError(getErrorMessage(error, `Kullanıcı ${action} duruma getirilemedi.`))
+    }
+  }
+
+  const hasFilters = Boolean(search || roleFilter !== 'all' || statusFilter !== 'all')
+
+  return (
+    <section className="central-user-view">
+      <div className="entity-page-actions">
+        <p>{!isLoading && !loadError ? `${filteredUsers.length} kullanıcı gösteriliyor.` : 'Sistem kullanıcılarını merkezi olarak görüntüleyin.'}</p>
+        {isAdmin && <button className="primary-button" type="button" onClick={() => void openCreate()} disabled={roles.length === 0}>Yeni Kullanıcı</button>}
+      </div>
+
+      <section className="panel entity-toolbar user-toolbar" aria-label="Kullanıcı filtreleri">
+        <div className="form-field"><label htmlFor="managed-user-search">Kullanıcı Ara</label><input id="managed-user-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad veya e-posta" /></div>
+        <div className="form-field"><label htmlFor="managed-user-role">Rol</label><select id="managed-user-role" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option value="all">Tüm roller</option>{availableRoleCodes.map((code) => <option key={code} value={code}>{getRoleLabel(code)}</option>)}</select></div>
+        <div className="form-field"><label htmlFor="managed-user-status">Hesap Durumu</label><select id="managed-user-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tüm durumlar</option><option value="active">Aktif</option><option value="inactive">Pasif</option></select></div>
+        <button className="secondary-button entity-filter-clear" type="button" disabled={!hasFilters} onClick={() => { setSearch(''); setRoleFilter('all'); setStatusFilter('all') }}>Filtreleri Temizle</button>
+      </section>
+
+      {actionError && drawerMode === 'none' && <p className="status-message error-message" role="alert">{actionError}</p>}
+      {isLoading && <p className="status-message">Kullanıcılar yükleniyor...</p>}
+      {!isLoading && loadError && <section className="panel entity-state-panel error-state"><p className="status-message error-message">{loadError}</p><button className="secondary-button" type="button" onClick={() => void loadData()}>Tekrar Dene</button></section>}
+      {!isLoading && !loadError && users.length === 0 && <section className="panel entity-state-panel"><h2>Henüz kullanıcı bulunmuyor</h2><p>Sistemde görüntülenecek kullanıcı kaydı bulunmamaktadır.</p></section>}
+      {!isLoading && !loadError && users.length > 0 && filteredUsers.length === 0 && <section className="panel entity-state-panel"><h2>Filtrelere uygun kullanıcı bulunamadı</h2><p>Arama ölçütlerini değiştirin veya filtreleri temizleyin.</p></section>}
+
+      {!isLoading && !loadError && filteredUsers.length > 0 && (
+        <section className="panel entity-table-panel">
+          <div className="responsive-table-wrapper">
+            <table className="management-table user-management-table">
+              <thead><tr><th>Ad Soyad</th><th>E-posta</th><th>Roller</th><th>Aktif Daire Sayısı</th><th>Hesap Durumu</th><th>Oluşturulma Tarihi</th><th>İşlemler</th></tr></thead>
+              <tbody>{filteredUsers.map((managedUser) => (
+                <tr key={managedUser.id}>
+                  <td><strong>{managedUser.fullName}</strong>{managedUser.id === currentUser?.id && <span className="table-secondary-text">Sizin hesabınız</span>}</td>
+                  <td>{managedUser.email}</td>
+                  <td><div className="user-role-list">{managedUser.roles.map((code) => <span key={code} className="user-role-chip">{getRoleLabel(code)}</span>)}</div></td>
+                  <td>{managedUser.activeUnitCount}</td>
+                  <td><span className={`status-badge ${managedUser.isActive ? 'active' : 'inactive'}`}>{managedUser.isActive ? 'Aktif' : 'Pasif'}</span></td>
+                  <td>{formatDate(managedUser.createdAt)}</td>
+                  <td><div className="compact-actions">{isAdmin && <><button type="button" onClick={() => void openEdit(managedUser)}>Düzenle</button><button type="button" onClick={() => void openRoles(managedUser)}>Rolleri Yönet</button><button className={managedUser.isActive ? 'danger' : ''} type="button" onClick={() => void handleStatusChange(managedUser)}>{managedUser.isActive ? 'Pasif Yap' : 'Aktif Yap'}</button></>}<button type="button" onClick={() => onViewUnits(managedUser.email)}>Bağlı Daireler</button></div></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {drawerMode !== 'none' && (
+        <>
+          <button className="drawer-backdrop" type="button" aria-label="Kullanıcı formunu kapat" onClick={() => void closeDrawer()} />
+          <aside className="management-drawer user-management-drawer" role="dialog" aria-modal="true" aria-labelledby="user-drawer-title">
+            <div className="drawer-header"><div><p className="eyebrow">Kullanıcı Yönetimi</p><h2 id="user-drawer-title">{drawerMode === 'create' ? 'Yeni Kullanıcı' : drawerMode === 'edit' ? 'Kullanıcıyı Düzenle' : 'Rolleri Yönet'}</h2></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
+            {actionError && <p className="status-message error-message" role="alert">{actionError}</p>}
+            {isDetailLoading ? <p className="status-message">Kullanıcı bilgileri yükleniyor...</p> : (
+              <form className="property-form drawer-form" onSubmit={handleSubmit}>
+                {drawerMode === 'roles' && selectedUser ? (
+                  <div className="form-field form-field-full"><span className="readonly-label">Kullanıcı</span><strong>{selectedUser.fullName}</strong><small>{selectedUser.email}</small></div>
+                ) : (
+                  <>
+                    <div className="form-field"><label htmlFor="managed-first-name">Ad *</label><input id="managed-first-name" value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} maxLength={75} required /></div>
+                    <div className="form-field"><label htmlFor="managed-last-name">Soyad *</label><input id="managed-last-name" value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} maxLength={75} required /></div>
+                    <div className="form-field form-field-full"><label htmlFor="managed-email">E-posta *</label><input id="managed-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} maxLength={150} required /></div>
+                    {drawerMode === 'create' && <div className="form-field form-field-full"><label htmlFor="managed-password">Geçici Parola *</label><input id="managed-password" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} minLength={8} maxLength={100} autoComplete="new-password" required /><small className="field-help">En az 8 karakter olmalıdır.</small></div>}
+                  </>
+                )}
+
+                {(drawerMode === 'create' || drawerMode === 'roles') && <fieldset className="form-field form-field-full role-selection-fieldset"><legend>Roller *</legend><div className="role-selection-grid">{roles.map((role) => <label key={role.id}><input type="checkbox" checked={form.roleCodes.includes(role.code)} onChange={() => toggleRole(role.code)} /><span>{getRoleLabel(role.code)}</span></label>)}</div></fieldset>}
+                {drawerMode === 'create' && <div className="form-field form-field-full checkbox-field"><label htmlFor="managed-is-active"><input id="managed-is-active" type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /><span>Hesap aktif olarak oluşturulsun</span></label></div>}
+                {drawerMode === 'edit' && <p className="drawer-info-box form-field-full">Parola ve roller bu formdan değiştirilmez.</p>}
+                <div className="drawer-actions form-field-full"><button className="secondary-button" type="button" onClick={() => void closeDrawer()}>Vazgeç</button><button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}</button></div>
+              </form>
+            )}
+          </aside>
+        </>
+      )}
+      {unsavedChangesDialog}
+    </section>
+  )
+}

@@ -51,6 +51,7 @@ builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IUnitOccupancyService, UnitOccupancyService>();
 builder.Services.AddScoped<IOccupancyTypeService, OccupancyTypeService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Configure JWT Authentication

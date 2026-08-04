@@ -175,6 +175,51 @@ export interface UserSearchResult {
   isActive: boolean
 }
 
+export interface ManagedUser {
+  id: number
+  fullName: string
+  email: string
+  roles: string[]
+  isActive: boolean
+  activeUnitCount: number
+  createdAt: string
+}
+
+export interface ManagedUserDetail {
+  id: number
+  firstName: string
+  lastName: string
+  email: string
+  roles: string[]
+  isActive: boolean
+}
+
+export interface Role {
+  id: number
+  code: string
+  name: string
+  isActive: boolean
+}
+
+export interface CreateManagedUserPayload {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  roleCodes: string[]
+  isActive: boolean
+}
+
+export interface UpdateManagedUserPayload {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+export interface UpdateUserRolesPayload {
+  roleCodes: string[]
+}
+
 export interface CreateUnitOccupancyPayload {
   userId: number
   occupancyTypeId: number

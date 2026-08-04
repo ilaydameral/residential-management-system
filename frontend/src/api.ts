@@ -4,6 +4,7 @@ import type {
   AuthenticatedUser,
   Building,
   CreateBuildingPayload,
+  CreateManagedUserPayload,
   CreatePropertyPayload,
   CreateUnitOccupancyPayload,
   CreateUnitPayload,
@@ -11,18 +12,23 @@ import type {
   EndUnitOccupancyPayload,
   LoginRequest,
   LoginResponse,
+  ManagedUser,
+  ManagedUserDetail,
   OccupancyType,
   Property,
   PropertyType,
   ResidentUnit,
   RegisterRequest,
+  Role,
   Unit,
   UnitOccupancy,
   UnitType,
   UpdateBuildingPayload,
+  UpdateManagedUserPayload,
   UpdatePropertyPayload,
   UpdateUnitOccupancyPayload,
   UpdateUnitPayload,
+  UpdateUserRolesPayload,
   UserSearchResult,
 } from './types'
 
@@ -324,6 +330,63 @@ export async function closeUnitOccupancy(
 }
 
 // Safe User Search API
+export async function getUsers(): Promise<ManagedUser[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagedUser[]>(response)
+}
+
+export async function getManagedUserDetail(id: number): Promise<ManagedUserDetail> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagedUserDetail>(response)
+}
+
+export async function createManagedUser(payload: CreateManagedUserPayload): Promise<ManagedUser> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function updateManagedUser(id: number, payload: UpdateManagedUserPayload): Promise<ManagedUser> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function setManagedUserActive(id: number, isActive: boolean): Promise<ManagedUser> {
+  const action = isActive ? 'activate' : 'deactivate'
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}/${action}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function updateManagedUserRoles(id: number, payload: UpdateUserRolesPayload): Promise<ManagedUser> {
+  const response = await safeFetch(`${API_BASE_URL}/api/users/${id}/roles`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagedUser>(response)
+}
+
+export async function getRoles(): Promise<Role[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/roles`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Role[]>(response)
+}
+
 export async function searchUsers(query: string): Promise<UserSearchResult[]> {
   const params = new URLSearchParams({ query: query.trim() })
   const response = await safeFetch(`${API_BASE_URL}/api/users/search?${params.toString()}`, {

@@ -30,6 +30,7 @@ import {
 import { Login } from './components/Login'
 import DashboardOverview from './components/DashboardOverview'
 import { CentralOccupancyManagement } from './components/CentralOccupancyManagement'
+import { CentralUserManagement } from './components/CentralUserManagement'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentUnits } from './components/ResidentUnits'
 import { SearchableSelect } from './components/SearchableSelect'
@@ -238,6 +239,7 @@ function App() {
   const [unitOccupancyFilter, setUnitOccupancyFilter] = useState('all')
   const [unitStatusFilter, setUnitStatusFilter] = useState('all')
   const [unitFormPropertyId, setUnitFormPropertyId] = useState(0)
+  const [residentInitialSearch, setResidentInitialSearch] = useState('')
 
   // Single Apartment Setup State
   const [singleApartmentFloorCount, setSingleApartmentFloorCount] = useState(1)
@@ -336,6 +338,7 @@ function App() {
     setUnitOccupancyFilter('all')
     setUnitStatusFilter('all')
     setUnitFormPropertyId(0)
+    setResidentInitialSearch('')
     setPropertyListError('')
     setBuildingListError('')
     setUnitListError('')
@@ -1353,6 +1356,17 @@ function App() {
     setSelectedUnitDetail(null)
     setUnitDetailTab('general')
     setUnitFormPropertyId(0)
+    setResidentInitialSearch('')
+  }
+
+  const handleViewUserUnits = async (email: string) => {
+    if (!(await requestDiscard())) return
+    setResidentInitialSearch(email)
+    setActiveManagementView('residents')
+    setOpenNavigationGroup(null)
+    setIsSidebarOpen(false)
+    setSelectedUnitDetail(null)
+    setOccupancyFormDirty(false)
   }
 
   const handleNavigationItemClick = (view: ManagementView) => {
@@ -1385,6 +1399,8 @@ function App() {
         ? 'Tüm yapılara bağlı blokları tek merkezden yönetin.'
         : activeManagementView === 'units'
           ? 'Tüm daire ve bağımsız bölümleri tek merkezden yönetin.'
+          : activeManagementView === 'users'
+            ? 'Sistem kullanıcılarını, hesap durumlarını ve rollerini tek merkezden yönetin.'
           : activeManagementView === 'residents'
             ? 'Aktif ve geçmiş sakin ilişkilerini tek merkezden yönetin.'
             : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
@@ -1620,11 +1636,11 @@ function App() {
       )}
 
       {isManagementPanel && activeManagementView === 'users' && (
-        <section className="section-container">
-          <section className="panel empty-state-box management-placeholder">
-            <h2>Kullanıcılar</h2>
-            <p>Kullanıcı yönetimi içeriği sonraki geliştirmelerde bu ekrana eklenecektir.</p>
-          </section>
+        <section className="section-container entity-management-view">
+          <CentralUserManagement
+            onDirtyChange={handleOccupancyDirtyChange}
+            onViewUnits={(email) => { void handleViewUserUnits(email) }}
+          />
         </section>
       )}
 
@@ -1639,6 +1655,7 @@ function App() {
             onRetryReferenceData={() => { void Promise.all([loadAllBuildingList(), loadAllUnitList(), loadPropertyList()]) }}
             onOpenUnitDetail={(unitId) => { void handleOpenUnitDetailFromResidents(unitId) }}
             onDirtyChange={handleOccupancyDirtyChange}
+            initialSearch={residentInitialSearch}
           />
         </section>
       )}

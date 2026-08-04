@@ -29,6 +29,7 @@ interface CentralOccupancyManagementProps {
   onRetryReferenceData: () => void
   onOpenUnitDetail: (unitId: number) => void
   onDirtyChange: (isDirty: boolean) => void
+  initialSearch?: string
 }
 
 type DrawerMode = 'none' | 'create' | 'edit' | 'close'
@@ -121,6 +122,7 @@ export function CentralOccupancyManagement({
   onRetryReferenceData,
   onOpenUnitDetail,
   onDirtyChange,
+  initialSearch = '',
 }: CentralOccupancyManagementProps) {
   const [occupancies, setOccupancies] = useState<UnitOccupancy[]>([])
   const [occupancyTypes, setOccupancyTypes] = useState<OccupancyType[]>([])
@@ -178,6 +180,10 @@ export function CentralOccupancyManagement({
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => {
+    setSearch(initialSearch)
+  }, [initialSearch])
 
   useEffect(() => {
     onDirtyChange(isDirty)
