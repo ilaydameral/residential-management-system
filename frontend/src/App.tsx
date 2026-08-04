@@ -6,6 +6,7 @@ import {
   useState,
   type ErrorInfo,
   type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
@@ -44,6 +45,8 @@ import { useToast } from './context/ToastContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
 import { useRouteChangeGuard } from './hooks/useRouteChangeGuard'
+import { useDrawerAccessibility } from './hooks/useDrawerAccessibility'
+import { SaveShortcutHint } from './components/SaveShortcutHint'
 import { formatUnitDisplay, formatUnitNumber } from './utils/unitDisplay'
 import type {
   Building,
@@ -327,6 +330,7 @@ function App() {
   const unitSectionRef = useRef<HTMLElement | null>(null)
   const occupancySectionRef = useRef<HTMLDivElement | null>(null)
   const managementNavigationRef = useRef<HTMLElement | null>(null)
+  const mainContentRef = useRef<HTMLElement | null>(null)
   const structuresTriggerRef = useRef<HTMLButtonElement | null>(null)
   const peopleTriggerRef = useRef<HTMLButtonElement | null>(null)
 
@@ -500,6 +504,15 @@ function App() {
   ])
 
   useEffect(() => {
+    if (!isAuthenticated || isResidentView) return
+    const frameId = window.requestAnimationFrame(() => {
+      if (document.querySelector('.confirmation-overlay, .management-drawer')) return
+      mainContentRef.current?.focus()
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [isAuthenticated, isResidentView, location.pathname, location.search])
+
+  useEffect(() => {
     if (!isManagementPanel) return
 
     const handleOutsidePointerDown = (event: PointerEvent) => {
@@ -514,6 +527,7 @@ function App() {
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      if (document.querySelector('.confirmation-overlay, .management-drawer')) return
 
       if (openNavigationGroup === 'structures') structuresTriggerRef.current?.focus()
       if (openNavigationGroup === 'people') peopleTriggerRef.current?.focus()
@@ -816,6 +830,22 @@ function App() {
       }
     }
   }, [isSingleApartment, buildings, selectedBuilding, unitTypes])
+
+  const propertyDrawerRef = useDrawerAccessibility({
+    isOpen: isPropertyDrawerOpen,
+    onClose: () => { void handleCancelPropertyEdit() },
+    isSaving: isSubmittingProperty || destructiveConfirmation !== null,
+  })
+  const buildingDrawerRef = useDrawerAccessibility({
+    isOpen: isBuildingDrawerOpen,
+    onClose: () => { void handleCancelBuildingEdit() },
+    isSaving: isSubmittingBuilding || destructiveConfirmation !== null,
+  })
+  const unitDrawerRef = useDrawerAccessibility({
+    isOpen: isUnitDrawerOpen,
+    onClose: () => { void handleCancelUnitEdit() },
+    isSaving: isSubmittingUnit || destructiveConfirmation !== null,
+  })
 
   if (loading) {
     return (
@@ -1524,6 +1554,40 @@ function App() {
     setOpenNavigationGroup((current) => (current === group ? null : group))
   }
 
+  const focusNavigationMenuItem = (group: NavigationGroup, position: 'first' | 'last') => {
+    setOpenNavigationGroup(group)
+    window.requestAnimationFrame(() => {
+      const menuId = group === 'structures' ? 'structures-navigation-menu' : 'people-navigation-menu'
+      const items = document.querySelectorAll<HTMLButtonElement>(`#${menuId} [role="menuitem"]`)
+      const target = position === 'first' ? items[0] : items[items.length - 1]
+      target?.focus()
+    })
+  }
+
+  const handleNavigationTriggerKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    group: NavigationGroup,
+  ) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      focusNavigationMenuItem(group, event.key === 'ArrowDown' ? 'first' : 'last')
+    }
+  }
+
+  const handleNavigationMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+    if (items.length === 0) return
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length
+    else if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = items.length - 1
+    else return
+    event.preventDefault()
+    items[nextIndex]?.focus()
+  }
+
   const handleMobileMenuToggle = () => {
     if (isSidebarOpen) setOpenNavigationGroup(null)
     setIsSidebarOpen(!isSidebarOpen)
@@ -1571,6 +1635,7 @@ function App() {
 
   return (
     <div className={isManagementPanel ? 'management-layout' : ''}>
+      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
       {isManagementPanel && (
         <>
           <header className="management-navigation" ref={managementNavigationRef}>
@@ -1618,6 +1683,7 @@ function App() {
                   aria-expanded={openNavigationGroup === 'structures'}
                   aria-controls="structures-navigation-menu"
                   onClick={() => handleNavigationGroupToggle('structures')}
+                  onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'structures')}
                 >
                   Yapı Yönetimi <span aria-hidden="true">⌄</span>
                 </button>
@@ -1626,6 +1692,7 @@ function App() {
                   className={`management-nav-popup ${openNavigationGroup === 'structures' ? 'open' : ''}`}
                   role="menu"
                   hidden={openNavigationGroup !== 'structures'}
+                  onKeyDown={handleNavigationMenuKeyDown}
                 >
                   {MANAGEMENT_MENU.filter((item) => ['properties', 'buildings', 'units'].includes(item.id)).map((item) => (
                     <button
@@ -1663,6 +1730,7 @@ function App() {
                   aria-expanded={openNavigationGroup === 'people'}
                   aria-controls="people-navigation-menu"
                   onClick={() => handleNavigationGroupToggle('people')}
+                  onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'people')}
                 >
                   Kişiler <span aria-hidden="true">⌄</span>
                 </button>
@@ -1671,6 +1739,7 @@ function App() {
                   className={`management-nav-popup compact ${openNavigationGroup === 'people' ? 'open' : ''}`}
                   role="menu"
                   hidden={openNavigationGroup !== 'people'}
+                  onKeyDown={handleNavigationMenuKeyDown}
                 >
                   {MANAGEMENT_MENU.filter((item) => ['users', 'residents'].includes(item.id)).map((item) => (
                     <button
@@ -1741,7 +1810,7 @@ function App() {
         </button>
       </div>}
 
-      <main className={isManagementPanel ? 'management-content' : 'page-shell'}>
+      <main id="main-content" ref={mainContentRef} tabIndex={-1} className={isManagementPanel ? 'management-content' : 'page-shell'}>
       <header className="page-header">
         <p className="eyebrow">Yönetim Paneli</p>
         <h1>{isManagementPanel ? activeViewLabel : 'Site & Gayrimenkul Yönetimi'}</h1>
@@ -2090,11 +2159,11 @@ function App() {
       {isPropertyDrawerOpen && (
         <>
           <button className="drawer-backdrop" type="button" aria-label="Yapı formunu kapat" onClick={() => void handleCancelPropertyEdit()} />
-          <aside className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="property-drawer-title">
+          <aside ref={propertyDrawerRef} tabIndex={-1} className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="property-drawer-title">
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Yapı Yönetimi</p>
-                <h2 id="property-drawer-title">{editingPropertyId ? 'Yapıyı Düzenle' : 'Yeni Yapı'}</h2>
+                <h2 id="property-drawer-title" tabIndex={-1} data-drawer-initial-focus>{editingPropertyId ? 'Yapıyı Düzenle' : 'Yeni Yapı'}</h2>
                 <p className="drawer-description">Yapının temel bilgilerini ve konumunu tanımlayın.</p>
               </div>
               <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelPropertyEdit()}>×</button>
@@ -2134,6 +2203,7 @@ function App() {
                 </div>
               )}
               <div className="drawer-actions form-field-full">
+                <SaveShortcutHint />
                 <button className="secondary-button" type="button" onClick={() => void handleCancelPropertyEdit()}>Vazgeç</button>
                 <button className="primary-button" type="submit" disabled={isSubmittingProperty}>{isSubmittingProperty ? 'Kaydediliyor...' : 'Kaydet'}</button>
               </div>
@@ -2145,11 +2215,11 @@ function App() {
       {isBuildingDrawerOpen && (
         <>
           <button className="drawer-backdrop" type="button" aria-label="Blok formunu kapat" onClick={() => void handleCancelBuildingEdit()} />
-          <aside className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="building-drawer-title">
+          <aside ref={buildingDrawerRef} tabIndex={-1} className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="building-drawer-title">
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Blok Yönetimi</p>
-                <h2 id="building-drawer-title">{editingBuildingId ? 'Bloğu Düzenle' : 'Yeni Blok'}</h2>
+                <h2 id="building-drawer-title" tabIndex={-1} data-drawer-initial-focus>{editingBuildingId ? 'Bloğu Düzenle' : 'Yeni Blok'}</h2>
                 <p className="drawer-description">Bağlı yapı ve blok bilgilerini düzenleyin.</p>
               </div>
               <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelBuildingEdit()}>×</button>
@@ -2193,6 +2263,7 @@ function App() {
                 </div>
               )}
               <div className="drawer-actions form-field-full">
+                <SaveShortcutHint />
                 <button className="secondary-button" type="button" onClick={() => void handleCancelBuildingEdit()}>Vazgeç</button>
                 <button className="primary-button" type="submit" disabled={isSubmittingBuilding}>{isSubmittingBuilding ? 'Kaydediliyor...' : 'Kaydet'}</button>
               </div>
@@ -2374,8 +2445,8 @@ function App() {
       {isUnitDrawerOpen && (
         <>
           <button className="drawer-backdrop" type="button" aria-label="Daire formunu kapat" onClick={() => void handleCancelUnitEdit()} />
-          <aside className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="unit-drawer-title">
-            <div className="drawer-header"><div><p className="eyebrow">Daire Yönetimi</p><h2 id="unit-drawer-title">{editingUnitId ? 'Daireyi Düzenle' : 'Yeni Daire'}</h2><p className="drawer-description">Dairenin bağlı yapısını ve fiziksel bilgilerini düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelUnitEdit()}>×</button></div>
+          <aside ref={unitDrawerRef} tabIndex={-1} className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="unit-drawer-title">
+            <div className="drawer-header"><div><p className="eyebrow">Daire Yönetimi</p><h2 id="unit-drawer-title" tabIndex={-1} data-drawer-initial-focus>{editingUnitId ? 'Daireyi Düzenle' : 'Yeni Daire'}</h2><p className="drawer-description">Dairenin bağlı yapısını ve fiziksel bilgilerini düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelUnitEdit()}>×</button></div>
             {unitError && <p className="status-message error-message">{unitError}</p>}
             <form className="property-form drawer-form" onSubmit={handleUnitSubmit}>
               <h3 className="drawer-section-title form-field-full">Yapı ve Blok</h3>
@@ -2390,7 +2461,7 @@ function App() {
               <div className="form-field"><label htmlFor="unit-net">Net Alan (m²)</label><input id="unit-net" type="number" step="0.01" min="0.01" value={unitForm.netArea ?? ''} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, netArea: event.target.value ? Number(event.target.value) : null }) }} /></div>
               <div className="form-field form-field-full"><label htmlFor="unit-desc">Açıklama</label><textarea id="unit-desc" value={unitForm.description || ''} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, description: event.target.value }) }} rows={3} /></div>
               {editingUnitId && <div className="form-field form-field-full checkbox-field"><label htmlFor="unit-is-active"><input id="unit-is-active" type="checkbox" checked={unitForm.isActive ?? true} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, isActive: event.target.checked }) }} /><span>Aktif Daire</span></label></div>}
-              <div className="drawer-actions form-field-full"><button className="secondary-button" type="button" onClick={() => void handleCancelUnitEdit()}>Vazgeç</button><button className="primary-button" type="submit" disabled={isSubmittingUnit}>{isSubmittingUnit ? 'Kaydediliyor...' : 'Kaydet'}</button></div>
+              <div className="drawer-actions form-field-full"><SaveShortcutHint /><button className="secondary-button" type="button" onClick={() => void handleCancelUnitEdit()}>Vazgeç</button><button className="primary-button" type="submit" disabled={isSubmittingUnit}>{isSubmittingUnit ? 'Kaydediliyor...' : 'Kaydet'}</button></div>
             </form>
           </aside>
         </>

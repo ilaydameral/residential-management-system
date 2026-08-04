@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type CSSProperties,
@@ -21,17 +22,19 @@ interface RowActionsMenuProps {
 }
 
 export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: RowActionsMenuProps) {
+  const menuId = useId()
   const [isOpen, setIsOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const initialMenuFocusRef = useRef<'first' | 'last'>('first')
 
   const closeMenu = (restoreFocus = false) => {
     setIsOpen(false)
     if (restoreFocus) window.requestAnimationFrame(() => triggerRef.current?.focus())
   }
 
-  const openMenu = () => {
+  const openMenu = (initialFocus: 'first' | 'last' = 'first') => {
     const trigger = triggerRef.current
     if (!trigger) return
     const rect = trigger.getBoundingClientRect()
@@ -40,6 +43,7 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
     setMenuStyle(openAbove
       ? { right: window.innerWidth - rect.right, bottom: window.innerHeight - rect.top + 6 }
       : { right: window.innerWidth - rect.right, top: rect.bottom + 6 })
+    initialMenuFocusRef.current = initialFocus
     setIsOpen(true)
   }
 
@@ -52,6 +56,7 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
     }
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (document.querySelector('.confirmation-overlay')) return
         event.preventDefault()
         closeMenu(true)
       }
@@ -62,7 +67,11 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
     document.addEventListener('keydown', handleKeyDown)
     window.addEventListener('resize', handleViewportChange)
     window.addEventListener('scroll', handleViewportChange, true)
-    window.requestAnimationFrame(() => menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus())
+    window.requestAnimationFrame(() => {
+      const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
+      const target = initialMenuFocusRef.current === 'first' ? items?.[0] : items?.[items.length - 1]
+      target?.focus()
+    })
 
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown)
@@ -111,11 +120,12 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
             aria-label={`${label} için diğer işlemler`}
             aria-haspopup="menu"
             aria-expanded={isOpen}
+            aria-controls={menuId}
             onClick={() => isOpen ? closeMenu() : openMenu()}
             onKeyDown={(event) => {
-              if (event.key === 'ArrowDown') {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault()
-                openMenu()
+                openMenu(event.key === 'ArrowDown' ? 'first' : 'last')
               }
             }}
           >
@@ -123,6 +133,7 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
           </button>
           {isOpen && createPortal(
             <div
+              id={menuId}
               ref={menuRef}
               className="row-actions-menu"
               style={menuStyle}

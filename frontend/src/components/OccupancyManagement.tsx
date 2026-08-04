@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   closeUnitOccupancy,
   createUnitOccupancy,
@@ -20,6 +20,7 @@ import { useToast } from '../context/ToastContext'
 import { formatUnitDisplay, formatUnitNumber } from '../utils/unitDisplay'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { ConfirmationDialog } from './ConfirmationDialog'
+import { SaveShortcutHint } from './SaveShortcutHint'
 
 interface OccupancyManagementProps {
   unit: Unit
@@ -119,6 +120,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
   const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
+  const panelRef = useRef<HTMLElement>(null)
 
   const [formMode, setFormMode] = useState<'none' | 'create' | 'edit' | 'close'>('none')
   const [form, setForm] = useState<OccupancyFormState>(createInitialForm)
@@ -150,6 +152,20 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
           : false
 
   const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isFormDirty)
+
+  useEffect(() => {
+    if (formMode !== 'create' && formMode !== 'edit') return
+    const handleSaveShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return
+      if (isSubmitting || document.querySelector('.confirmation-overlay')) return
+      const formElement = panelRef.current?.querySelector<HTMLFormElement>('form.occupancy-form')
+      if (!formElement) return
+      event.preventDefault()
+      formElement.requestSubmit()
+    }
+    document.addEventListener('keydown', handleSaveShortcut)
+    return () => document.removeEventListener('keydown', handleSaveShortcut)
+  }, [formMode, isSubmitting])
 
   const loadOccupancies = useCallback(async () => {
     setIsLoading(true)
@@ -491,7 +507,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
   )
 
   return (
-    <section className="panel occupancy-panel">
+    <section ref={panelRef} className="panel occupancy-panel">
       <div className="occupancy-panel-header">
         <div className="section-heading">
           <p className="eyebrow">Bölüm Detayı</p>
@@ -580,6 +596,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
           {renderOccupancyFields(false)}
 
           <div className="button-group form-field-full">
+            <SaveShortcutHint />
             <button className="primary-button" type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Kaydediliyor...' : 'Atamayı Kaydet'}
             </button>
@@ -599,6 +616,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
           )}
           {renderOccupancyFields(true)}
           <div className="button-group form-field-full">
+            <SaveShortcutHint />
             <button className="primary-button" type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Güncelleniyor...' : 'Kaydı Güncelle'}
             </button>

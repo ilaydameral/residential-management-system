@@ -2311,6 +2311,72 @@ code {
   }
 }
 
+/* Keyboard navigation and accessibility */
+.skip-link {
+  position: fixed;
+  z-index: 2000;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  border: 2px solid var(--color-primary);
+  border-radius: 9px;
+  color: var(--color-text-primary);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 8px 24px var(--color-shadow);
+  font-weight: 800;
+  transform: translateY(-160%);
+  transition: transform 120ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="menuitem"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+#main-content:focus,
+#resident-main-content:focus,
+.management-drawer:focus {
+  outline: none;
+}
+
+.drawer-shortcut-hint {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.drawer-shortcut-hint kbd {
+  display: inline-block;
+  margin-left: 3px;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-secondary);
+  font: inherit;
+  font-weight: 800;
+}
+
+@media (max-width: 480px) {
+  .drawer-shortcut-hint {
+    width: 100%;
+    margin: 0 0 2px;
+    text-align: center;
+  }
+}
+
 /* Central property and building management */
 .entity-management-view {
   display: grid;
@@ -3436,4 +3502,13 @@ code {
   .auth-row {
     grid-template-columns: 1fr;
   }
+}
+
+.auth-input:focus-visible,
+.form-field input:not([type="checkbox"]):focus-visible,
+.form-field select:focus-visible,
+.form-field textarea:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
 }

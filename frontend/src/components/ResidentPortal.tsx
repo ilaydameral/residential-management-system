@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { getMyUnits } from '../api'
 import { useAuth } from '../context/AuthContext'
@@ -25,6 +25,7 @@ export function ResidentPortal() {
   const [isLoadingUnits, setIsLoadingUnits] = useState(true)
   const [unitsError, setUnitsError] = useState('')
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
+  const mainContentRef = useRef<HTMLElement>(null)
 
   const loadUnits = useCallback(async () => {
     setIsLoadingUnits(true)
@@ -41,6 +42,14 @@ export function ResidentPortal() {
 
   useEffect(() => { void loadUnits() }, [loadUnits])
 
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      if (document.querySelector('.confirmation-overlay, .management-drawer')) return
+      mainContentRef.current?.focus()
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [location.pathname])
+
   const detailMatch = matchPath('/resident/my-units/:unitId', location.pathname)
   const groupedUnits = useMemo(() => groupResidentUnits(units), [units])
   const detailUnitId = detailMatch?.params.unitId ? Number(detailMatch.params.unitId) : null
@@ -56,6 +65,7 @@ export function ResidentPortal() {
 
   return (
     <div className="resident-portal">
+      <a className="skip-link" href="#resident-main-content">Ana içeriğe geç</a>
       <header className="resident-navigation">
         <button className="resident-brand" type="button" onClick={() => navigate('/resident/home')}>
           <span aria-hidden="true">SY</span>
@@ -88,7 +98,7 @@ export function ResidentPortal() {
         </div>
       </header>
 
-      <main className="resident-portal-main">
+      <main id="resident-main-content" ref={mainContentRef} tabIndex={-1} className="resident-portal-main" aria-busy={isLoadingUnits}>
         {location.pathname === '/resident/home' && (
           <ResidentHome
             firstName={user?.firstName || 'Merhaba'}

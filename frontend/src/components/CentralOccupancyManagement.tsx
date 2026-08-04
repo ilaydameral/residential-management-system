@@ -13,6 +13,8 @@ import { formatUnitNumber } from '../utils/unitDisplay'
 import { RowActionsMenu } from './RowActionsMenu'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { ConfirmationDialog } from './ConfirmationDialog'
+import { SaveShortcutHint } from './SaveShortcutHint'
+import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import type {
   Building,
   CreateUnitOccupancyPayload,
@@ -272,6 +274,13 @@ export function CentralOccupancyManagement({
     clearDrawerState()
   }
 
+  const drawerRef = useDrawerAccessibility({
+    isOpen: drawerMode !== 'none',
+    onClose: () => { void closeDrawer() },
+    enableSaveShortcut: drawerMode === 'create' || drawerMode === 'edit',
+    isSaving: isSubmitting || closeConfirmationOpen,
+  })
+
   const openCreate = async () => {
     if (!(await requestDiscard())) return
     const defaultType = occupancyTypes.find((type) => type.code === 'TENANT') ?? occupancyTypes[0]
@@ -428,7 +437,7 @@ export function CentralOccupancyManagement({
   const combinedLoading = isLoading || isReferenceDataLoading
 
   return (
-    <section className="central-occupancy-view">
+    <section className="central-occupancy-view" aria-busy={combinedLoading}>
       <div className="entity-page-actions residents-page-actions">
         <p>{!combinedError && !combinedLoading ? `${filteredOccupancies.length} sakin kaydı gösteriliyor.` : 'Aktif ve geçmiş sakin ilişkilerini tek ekrandan yönetin.'}</p>
         <button className="primary-button" type="button" onClick={() => void openCreate()} disabled={occupancyTypes.length === 0 || isReferenceDataLoading}>Yeni Sakin Ata</button>
@@ -480,8 +489,8 @@ export function CentralOccupancyManagement({
       {drawerMode !== 'none' && (
         <>
           <button className="drawer-backdrop" type="button" aria-label="Sakin formunu kapat" onClick={() => void closeDrawer()} />
-          <aside className="management-drawer occupancy-management-drawer" role="dialog" aria-modal="true" aria-labelledby="occupancy-drawer-title">
-            <div className="drawer-header"><div><p className="eyebrow">Sakin Yönetimi</p><h2 id="occupancy-drawer-title">{drawerMode === 'create' ? 'Yeni Sakin Ata' : drawerMode === 'edit' ? 'Sakin Kaydını Düzenle' : 'Sakin Kaydını Sonlandır'}</h2><p className="drawer-description">Daire ile sakin arasındaki ikamet ilişkisini güvenli biçimde yönetin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
+          <aside ref={drawerRef} tabIndex={-1} className="management-drawer occupancy-management-drawer" role="dialog" aria-modal="true" aria-labelledby="occupancy-drawer-title">
+            <div className="drawer-header"><div><p className="eyebrow">Sakin Yönetimi</p><h2 id="occupancy-drawer-title" tabIndex={-1} data-drawer-initial-focus>{drawerMode === 'create' ? 'Yeni Sakin Ata' : drawerMode === 'edit' ? 'Sakin Kaydını Düzenle' : 'Sakin Kaydını Sonlandır'}</h2><p className="drawer-description">Daire ile sakin arasındaki ikamet ilişkisini güvenli biçimde yönetin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {error && <p className="status-message error-message" role="alert">{error}</p>}
 
             {drawerMode === 'close' && activeOccupancy ? (
@@ -506,7 +515,7 @@ export function CentralOccupancyManagement({
                 <div className="form-field"><label htmlFor="central-form-end">Bitiş Tarihi</label><input id="central-form-end" type="date" value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} required={drawerMode === 'edit' && activeOccupancy ? getStatus(activeOccupancy) !== 'Aktif' : false} /></div>
                 <div className="form-field form-field-full"><label htmlFor="central-form-notes">Notlar</label><textarea id="central-form-notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} maxLength={500} rows={3} placeholder="İsteğe bağlı not" /></div>
                 {drawerMode === 'edit' && activeOccupancy && getStatus(activeOccupancy) !== 'Aktif' && <p className="status-message empty-state-box form-field-full">Sonlandırılmış veya pasif kayıt güncellemeyle yeniden aktif hâle getirilemez.</p>}
-                <div className="drawer-actions form-field-full"><button className="secondary-button" type="button" onClick={() => void closeDrawer()}>Vazgeç</button><button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}</button></div>
+                <div className="drawer-actions form-field-full"><SaveShortcutHint /><button className="secondary-button" type="button" onClick={() => void closeDrawer()}>Vazgeç</button><button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}</button></div>
               </form>
             )}
           </aside>
