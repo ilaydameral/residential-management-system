@@ -724,12 +724,18 @@ textarea::placeholder {
 }
 
 .status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  min-height: 26px;
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 0.75rem;
   font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .status-badge.active {
@@ -2323,6 +2329,7 @@ code {
 .residents-table th,
 .residents-table td {
   padding: 13px 11px;
+  vertical-align: middle;
 }
 
 .residents-table th:nth-child(1) { width: 150px; }
@@ -2331,7 +2338,11 @@ code {
 .residents-table th:nth-child(4) { width: 140px; }
 .residents-table th:nth-child(5) { width: 115px; }
 .residents-table th:nth-child(6) { width: 105px; }
-.residents-table th:nth-child(7) { width: 130px; }
+.residents-table th:nth-child(7),
+.residents-table td:nth-child(7) {
+  width: 170px;
+  min-width: 170px;
+}
 .residents-table th:nth-child(8),
 .residents-table th:nth-child(9) { width: 100px; }
 .residents-table th:nth-child(10) { width: 125px; }

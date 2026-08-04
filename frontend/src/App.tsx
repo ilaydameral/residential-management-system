@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
+import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import {
   createBuilding,
   createProperty,
@@ -39,6 +40,7 @@ import { ThemeToggle } from './components/ThemeToggle'
 import { useAuth } from './context/AuthContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
+import { useRouteChangeGuard } from './hooks/useRouteChangeGuard'
 import { formatUnitDisplay, formatUnitNumber } from './utils/unitDisplay'
 import type {
   Building,
@@ -116,6 +118,24 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'residents', label: 'Site Sakinleri' },
 ]
 
+const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
+  overview: '/dashboard',
+  properties: '/properties',
+  buildings: '/buildings',
+  units: '/units',
+  users: '/users',
+  residents: '/residents',
+}
+
+function getManagementView(pathname: string): ManagementView {
+  if (matchPath('/units/:unitId', pathname)) return 'units'
+
+  const matchedView = (Object.entries(MANAGEMENT_VIEW_PATHS) as Array<[ManagementView, string]>)
+    .find(([, path]) => path === pathname)
+
+  return matchedView?.[0] ?? 'overview'
+}
+
 const initialPropertyForm: CreatePropertyPayload & { id?: number; isActive?: boolean } = {
   name: '',
   propertyTypeId: null,
@@ -185,6 +205,13 @@ class OccupancyErrorBoundary extends Component<
 
 function App() {
   const { user, isAuthenticated, loading, logout, hasRole, hasAnyRole } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const activeManagementView = getManagementView(location.pathname)
+  const unitDetailMatch = matchPath('/units/:unitId', location.pathname)
+  const routeUnitId = unitDetailMatch?.params.unitId
+    ? Number(unitDetailMatch.params.unitId)
+    : null
 
   // Role permissions
   const canCreateProperty = hasAnyRole(['ADMIN', 'MANAGER'])
@@ -219,7 +246,6 @@ function App() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null)
   const [selectedOccupancyUnit, setSelectedOccupancyUnit] = useState<Unit | null>(null)
-  const [activeManagementView, setActiveManagementView] = useState<ManagementView>('overview')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [openNavigationGroup, setOpenNavigationGroup] = useState<NavigationGroup | null>(null)
   const [isPropertyDrawerOpen, setIsPropertyDrawerOpen] = useState(false)
@@ -241,7 +267,7 @@ function App() {
   const [unitOccupancyFilter, setUnitOccupancyFilter] = useState('all')
   const [unitStatusFilter, setUnitStatusFilter] = useState('all')
   const [unitFormPropertyId, setUnitFormPropertyId] = useState(0)
-  const [residentInitialSearch, setResidentInitialSearch] = useState('')
+  const residentInitialSearch = new URLSearchParams(location.search).get('search') || ''
 
   // Single Apartment Setup State
   const [singleApartmentFloorCount, setSingleApartmentFloorCount] = useState(1)
@@ -269,6 +295,7 @@ function App() {
   const [isLoadingUnits, setIsLoadingUnits] = useState(false)
   const [isLoadingAllBuildings, setIsLoadingAllBuildings] = useState(false)
   const [isLoadingAllUnits, setIsLoadingAllUnits] = useState(false)
+  const [hasLoadedAllUnits, setHasLoadedAllUnits] = useState(false)
 
   const [isSubmittingProperty, setIsSubmittingProperty] = useState(false)
   const [isSubmittingBuilding, setIsSubmittingBuilding] = useState(false)
@@ -299,6 +326,7 @@ function App() {
     setUnits([])
     setAllBuildings([])
     setAllUnits([])
+    setHasLoadedAllUnits(false)
     setPropertyTypes([])
     setUnitTypes([])
     setSelectedProperty(null)
@@ -319,7 +347,6 @@ function App() {
     setOccupancyFormDirty(false)
     setIsBlockCodeUserEdited(false)
     setSingleApartmentFloorCount(1)
-    setActiveManagementView('overview')
     setIsSidebarOpen(false)
     setOpenNavigationGroup(null)
     setIsPropertyDrawerOpen(false)
@@ -340,11 +367,65 @@ function App() {
     setUnitOccupancyFilter('all')
     setUnitStatusFilter('all')
     setUnitFormPropertyId(0)
-    setResidentInitialSearch('')
     setPropertyListError('')
     setBuildingListError('')
     setUnitListError('')
   }, [])
+
+  const clearRouteTransitionState = useCallback(() => {
+    setIsSidebarOpen(false)
+    setOpenNavigationGroup(null)
+    setSelectedProperty(null)
+    setSelectedBuilding(null)
+    setSelectedOccupancyUnit(null)
+    setBuildings([])
+    setUnits([])
+    setEditingPropertyId(null)
+    setEditingBuildingId(null)
+    setEditingUnitId(null)
+    setPropertyForm({
+      ...initialPropertyForm,
+      propertyTypeId: propertyTypes[0]?.id || null,
+    })
+    setBuildingForm(initialBuildingForm)
+    setUnitForm(initialUnitForm)
+    setPropertyError('')
+    setBuildingError('')
+    setUnitError('')
+    setPropertyFormDirty(false)
+    setBuildingFormDirty(false)
+    setUnitFormDirty(false)
+    setOccupancyFormDirty(false)
+    setIsBlockCodeUserEdited(false)
+    setSingleApartmentFloorCount(1)
+    setIsPropertyDrawerOpen(false)
+    setIsBuildingDrawerOpen(false)
+    setIsUnitDrawerOpen(false)
+    setSelectedUnitDetail(null)
+    setUnitDetailTab('general')
+    setPropertySearch('')
+    setPropertyTypeFilter('all')
+    setPropertyStatusFilter('all')
+    setBuildingSearch('')
+    setBuildingPropertyFilter('all')
+    setBuildingStatusFilter('all')
+    setUnitSearch('')
+    setUnitPropertyFilter('all')
+    setUnitBuildingFilter('all')
+    setUnitFloorFilter('all')
+    setUnitOccupancyFilter('all')
+    setUnitStatusFilter('all')
+    setUnitFormPropertyId(0)
+    setPropertyListError('')
+    setBuildingListError('')
+    setUnitListError('')
+  }, [propertyTypes])
+
+  const { navigateWithGuard } = useRouteChangeGuard({
+    isDirty: hasUnsavedChanges,
+    requestDiscard,
+    onApprovedRouteChange: clearRouteTransitionState,
+  })
 
   const handleOccupancyDirtyChange = useCallback((isDirty: boolean) => {
     setOccupancyFormDirty(isDirty)
@@ -360,6 +441,40 @@ function App() {
       resetUiState()
     }
   }, [isAuthenticated, resetUiState])
+
+  useEffect(() => {
+    if (loading) return
+
+    if (!isAuthenticated) {
+      if (location.pathname !== '/login') navigate('/login', { replace: true })
+      return
+    }
+
+    const isKnownManagementRoute =
+      Object.values(MANAGEMENT_VIEW_PATHS).includes(location.pathname) ||
+      Boolean(matchPath('/units/:unitId', location.pathname))
+
+    if (isManagementPanel) {
+      if (!isKnownManagementRoute) navigate('/dashboard', { replace: true })
+      return
+    }
+
+    if (isResidentView) {
+      if (location.pathname !== '/resident/my-units') {
+        navigate('/resident/my-units', { replace: true })
+      }
+      return
+    }
+
+    if (location.pathname !== '/') navigate('/', { replace: true })
+  }, [
+    isAuthenticated,
+    isManagementPanel,
+    isResidentView,
+    loading,
+    location.pathname,
+    navigate,
+  ])
 
   useEffect(() => {
     if (!isManagementPanel) return
@@ -527,6 +642,7 @@ function App() {
       return null
     } finally {
       setIsLoadingAllUnits(false)
+      setHasLoadedAllUnits(true)
     }
   }, [])
 
@@ -565,6 +681,29 @@ function App() {
     if (!isManagementPanel || !['units', 'residents'].includes(activeManagementView)) return
     void loadAllUnitList()
   }, [activeManagementView, isManagementPanel, loadAllUnitList])
+
+  useEffect(() => {
+    if (routeUnitId == null) {
+      setSelectedUnitDetail(null)
+      return
+    }
+
+    const matchedUnit = allUnits.find((unit) => unit.id === routeUnitId) || null
+    setSelectedUnitDetail(matchedUnit)
+  }, [allUnits, routeUnitId])
+
+  useEffect(() => {
+    const routeSearch = new URLSearchParams(location.search)
+
+    if (activeManagementView === 'buildings') {
+      setBuildingPropertyFilter(routeSearch.get('propertyId') || 'all')
+    }
+
+    if (activeManagementView === 'units' && routeUnitId == null) {
+      setUnitPropertyFilter(routeSearch.get('propertyId') || 'all')
+      setUnitBuildingFilter(routeSearch.get('buildingId') || 'all')
+    }
+  }, [activeManagementView, location.search, routeUnitId])
 
   // Load Buildings when Property is Selected
   useEffect(() => {
@@ -675,6 +814,11 @@ function App() {
   // PROPERTY HANDLERS
   // ==========================================
   const handleSelectProperty = async (property: Property) => {
+    if (isManagementPanel && activeManagementView === 'properties') {
+      await navigateWithGuard(`/buildings?propertyId=${property.id}`)
+      return
+    }
+
     if (!(await requestDiscard())) return
 
     setSelectedProperty(property)
@@ -697,11 +841,6 @@ function App() {
     setBuildingFormDirty(false)
     setUnitFormDirty(false)
     setOccupancyFormDirty(false)
-
-    if (isManagementPanel && activeManagementView === 'properties') {
-      setBuildingPropertyFilter(String(property.id))
-      setActiveManagementView('buildings')
-    }
 
     setTimeout(() => {
       buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -877,6 +1016,13 @@ function App() {
   // BUILDING HANDLERS
   // ==========================================
   const handleSelectBuilding = async (building: Building) => {
+    if (isManagementPanel && activeManagementView === 'buildings') {
+      await navigateWithGuard(
+        `/units?propertyId=${building.propertyId}&buildingId=${building.id}`
+      )
+      return
+    }
+
     if (!(await requestDiscard())) return
 
     const parentProperty = properties.find((property) => property.id === building.propertyId) || null
@@ -901,12 +1047,6 @@ function App() {
     setBuildingFormDirty(false)
     setUnitFormDirty(false)
     setOccupancyFormDirty(false)
-
-    if (isManagementPanel && activeManagementView === 'buildings') {
-      setUnitPropertyFilter(String(building.propertyId))
-      setUnitBuildingFilter(String(building.id))
-      setActiveManagementView('units')
-    }
 
     setTimeout(() => {
       unitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1241,20 +1381,19 @@ function App() {
   }
 
   const handleOpenUnitDetail = async (unit: Unit, tab: 'general' | 'residents' = 'general') => {
-    if (!(await requestDiscard())) return
+    if (!(await navigateWithGuard(`/units/${unit.id}`))) return
     setSelectedUnitDetail(unit)
     setUnitDetailTab(tab)
     setOccupancyFormDirty(false)
   }
 
   const handleOpenUnitDetailFromResidents = async (unitId: number) => {
-    if (!(await requestDiscard())) return
     const unit = allUnits.find((item) => item.id === unitId)
     if (!unit) {
       setUnitListError('Daire detayı açılamadı. Listeyi yenileyip tekrar deneyin.')
       return
     }
-    setActiveManagementView('units')
+    if (!(await navigateWithGuard(`/units/${unitId}`))) return
     setSelectedUnitDetail(unit)
     setUnitDetailTab('general')
     setOccupancyFormDirty(false)
@@ -1263,11 +1402,8 @@ function App() {
   }
 
   const handleCloseUnitDetail = async () => {
-    if (!(await requestDiscard(occupancyFormDirty))) return
-    setSelectedUnitDetail(null)
-    setUnitDetailTab('general')
-    setOccupancyFormDirty(false)
-    await loadAllUnitList()
+    if (!(await navigateWithGuard('/units'))) return
+    void loadAllUnitList()
   }
 
   const handleUnitDetailTabChange = async (tab: 'general' | 'residents') => {
@@ -1278,7 +1414,11 @@ function App() {
   }
 
   const handleOpenOccupancyManagement = async (unit: Unit) => {
-    if (!(await requestDiscard())) return
+    if (isManagementPanel) {
+      if (!(await navigateWithGuard('/residents'))) return
+    } else if (!(await requestDiscard())) {
+      return
+    }
 
     if (!unit || !Number.isInteger(unit.id) || unit.id <= 0) {
       setSelectedOccupancyUnit(null)
@@ -1313,80 +1453,17 @@ function App() {
     setBuildingFormDirty(false)
     setUnitFormDirty(false)
     setOccupancyFormDirty(false)
-    if (isManagementPanel && activeManagementView === 'units') {
-      setActiveManagementView('residents')
-    }
     window.setTimeout(() => {
       occupancySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
   const handleManagementNavigation = async (view: ManagementView) => {
-    if (view === activeManagementView) {
-      setIsSidebarOpen(false)
-      setOpenNavigationGroup(null)
-      return
-    }
-    if (!(await requestDiscard())) return
-
-    setActiveManagementView(view)
-    setIsSidebarOpen(false)
-    setOpenNavigationGroup(null)
-    setSelectedProperty(null)
-    setSelectedBuilding(null)
-    setSelectedOccupancyUnit(null)
-    setBuildings([])
-    setUnits([])
-    setEditingPropertyId(null)
-    setEditingBuildingId(null)
-    setEditingUnitId(null)
-    setPropertyForm({
-      ...initialPropertyForm,
-      propertyTypeId: propertyTypes[0]?.id || null,
-    })
-    setBuildingForm(initialBuildingForm)
-    setUnitForm(initialUnitForm)
-    setPropertyError('')
-    setBuildingError('')
-    setUnitError('')
-    setPropertyFormDirty(false)
-    setBuildingFormDirty(false)
-    setUnitFormDirty(false)
-    setOccupancyFormDirty(false)
-    setIsBlockCodeUserEdited(false)
-    setSingleApartmentFloorCount(1)
-    setIsPropertyDrawerOpen(false)
-    setIsBuildingDrawerOpen(false)
-    setPropertySearch('')
-    setPropertyTypeFilter('all')
-    setPropertyStatusFilter('all')
-    setBuildingSearch('')
-    setBuildingPropertyFilter('all')
-    setBuildingStatusFilter('all')
-    setUnitSearch('')
-    setUnitPropertyFilter('all')
-    setUnitBuildingFilter('all')
-    setUnitFloorFilter('all')
-    setUnitOccupancyFilter('all')
-    setUnitStatusFilter('all')
-    setPropertyListError('')
-    setBuildingListError('')
-    setUnitListError('')
-    setIsUnitDrawerOpen(false)
-    setSelectedUnitDetail(null)
-    setUnitDetailTab('general')
-    setUnitFormPropertyId(0)
-    setResidentInitialSearch('')
+    await navigateWithGuard(MANAGEMENT_VIEW_PATHS[view])
   }
 
   const handleViewUserUnits = async (email: string) => {
-    if (!(await requestDiscard())) return
-    setResidentInitialSearch(email)
-    setActiveManagementView('residents')
-    setOpenNavigationGroup(null)
-    setIsSidebarOpen(false)
-    setSelectedUnitDetail(null)
-    setOccupancyFormDirty(false)
+    await navigateWithGuard(`/residents?search=${encodeURIComponent(email)}`)
   }
 
   const handleNavigationItemClick = (view: ManagementView) => {
@@ -1408,6 +1485,7 @@ function App() {
     if (!(await requestDiscard())) return
     resetUiState()
     logout()
+    navigate('/login', { replace: true })
   }
 
   const activeViewLabel =
@@ -2053,7 +2131,7 @@ function App() {
         </>
       )}
 
-      {isManagementPanel && activeManagementView === 'units' && !selectedUnitDetail && (
+      {isManagementPanel && activeManagementView === 'units' && routeUnitId == null && (
         <section className="section-container entity-management-view">
           <div className="entity-page-actions">
             <p>{filteredUnits.length} daire veya bölüm gösteriliyor.</p>
@@ -2160,7 +2238,31 @@ function App() {
         </section>
       )}
 
-      {isManagementPanel && activeManagementView === 'units' && selectedUnitDetail && (
+      {isManagementPanel && activeManagementView === 'units' && routeUnitId != null && !selectedUnitDetail && (
+        <section className="section-container unit-detail-view">
+          <section className="panel entity-state-panel">
+            {!hasLoadedAllUnits || isLoadingAllUnits ? (
+              <p>Daire detayı yükleniyor...</p>
+            ) : unitListError ? (
+              <>
+                <p className="status-message error-message">{unitListError}</p>
+                <button className="secondary-button" type="button" onClick={() => void loadAllUnitList()}>
+                  Tekrar Dene
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="status-message error-message">İstenen daire bulunamadı.</p>
+                <button className="secondary-button" type="button" onClick={() => void handleCloseUnitDetail()}>
+                  Daire Listesine Dön
+                </button>
+              </>
+            )}
+          </section>
+        </section>
+      )}
+
+      {isManagementPanel && activeManagementView === 'units' && routeUnitId != null && selectedUnitDetail && (
         <section className="section-container unit-detail-view">
           <div className="unit-detail-heading">
             <div>
