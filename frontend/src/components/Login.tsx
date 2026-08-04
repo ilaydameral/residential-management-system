@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
 import { registerApi } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 
 export const Login: React.FC = () => {
   const { login, sessionExpiredMessage, clearSessionMessage } = useAuth()
+  const { showToast } = useToast()
   const [mode, setMode] = useState<'login' | 'register'>('login')
 
   // Login form state
@@ -21,12 +23,10 @@ export const Login: React.FC = () => {
   // Status & Error messages
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const handleTabSwitch = (newMode: 'login' | 'register') => {
     setMode(newMode)
     setErrorMessage(null)
-    setSuccessMessage(null)
     clearSessionMessage()
   }
 
@@ -40,7 +40,6 @@ export const Login: React.FC = () => {
     try {
       setIsSubmitting(true)
       setErrorMessage(null)
-      setSuccessMessage(null)
       clearSessionMessage()
       await login({
         userNameOrEmail: userNameOrEmail.trim(),
@@ -85,7 +84,6 @@ export const Login: React.FC = () => {
     try {
       setIsSubmitting(true)
       setErrorMessage(null)
-      setSuccessMessage(null)
       clearSessionMessage()
 
       await registerApi({
@@ -97,7 +95,7 @@ export const Login: React.FC = () => {
       })
 
       // Registration successful: switch to login mode and pre-fill user name
-      setSuccessMessage('Kayıt başarıyla oluşturuldu. Hesabınıza giriş yapabilirsiniz.')
+      showToast('Kayıt oluşturuldu. Hesabınıza giriş yapabilirsiniz.')
       setUserNameOrEmail(regUserName.trim())
       setPassword('')
       setMode('login')
@@ -158,12 +156,6 @@ export const Login: React.FC = () => {
         {errorMessage && (
           <div className="auth-error">
             <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="auth-success">
-            <span>{successMessage}</span>
           </div>
         )}
 

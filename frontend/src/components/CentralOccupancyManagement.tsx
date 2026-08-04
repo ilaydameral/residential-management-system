@@ -8,8 +8,10 @@ import {
   updateUnitOccupancy,
 } from '../api'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+import { useToast } from '../context/ToastContext'
 import { formatUnitNumber } from '../utils/unitDisplay'
 import { RowActionsMenu } from './RowActionsMenu'
+import { LoadingSkeleton } from './LoadingSkeleton'
 import type {
   Building,
   CreateUnitOccupancyPayload,
@@ -125,6 +127,7 @@ export function CentralOccupancyManagement({
   onDirtyChange,
   initialSearch = '',
 }: CentralOccupancyManagementProps) {
+  const { showToast } = useToast()
   const [occupancies, setOccupancies] = useState<UnitOccupancy[]>([])
   const [occupancyTypes, setOccupancyTypes] = useState<OccupancyType[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -330,6 +333,7 @@ export function CentralOccupancyManagement({
     setError('')
     if (!validateForm()) return
     setIsSubmitting(true)
+    const completedMode = drawerMode
     try {
       const commonPayload: UpdateUnitOccupancyPayload = {
         occupancyTypeId: form.occupancyTypeId,
@@ -346,6 +350,7 @@ export function CentralOccupancyManagement({
       }
       clearDrawerState()
       await loadData()
+      showToast(completedMode === 'create' ? 'Sakin ataması oluşturuldu.' : 'Sakin kaydı güncellendi.')
     } catch (submitError) {
       setError(getErrorMessage(submitError, 'Sakin kaydı kaydedilemedi.'))
     } finally {
@@ -367,6 +372,7 @@ export function CentralOccupancyManagement({
       await closeUnitOccupancy(activeOccupancy.id, { endDate: toEndOfDayUtcIso(closeDate) })
       clearDrawerState()
       await loadData()
+      showToast('Sakin kaydı sonlandırıldı.')
     } catch (closeError) {
       setError(getErrorMessage(closeError, 'Sakin kaydı sonlandırılamadı.'))
     } finally {
@@ -432,10 +438,10 @@ export function CentralOccupancyManagement({
         <button className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`} type="button" disabled={activeFilterCount === 0} onClick={() => { setSearch(''); setPropertyFilter('all'); setBuildingFilter('all'); setUnitSearch(''); setTypeFilter('all'); setStatusFilter('all') }}><span>Filtreleri Temizle</span>{activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}</button>
       </section>
 
-      {combinedLoading && <p className="status-message">Site sakinleri yükleniyor...</p>}
+      {combinedLoading && <LoadingSkeleton variant="table" />}
       {!combinedLoading && combinedError && <section className="panel empty-state-box"><p className="status-message error-message">{combinedError}</p><button className="secondary-button" type="button" onClick={() => { void loadData(); onRetryReferenceData() }}>Tekrar Dene</button></section>}
-      {!combinedLoading && !combinedError && occupancies.length === 0 && <section className="panel empty-state-box"><h2>Henüz sakin kaydı bulunmuyor</h2><p>İlk sakin ilişkisini oluşturmak için “Yeni Sakin Ata” butonunu kullanın.</p></section>}
-      {!combinedLoading && !combinedError && occupancies.length > 0 && filteredOccupancies.length === 0 && <section className="panel empty-state-box"><h2>Filtrelere uygun kayıt bulunamadı</h2><p>Arama ölçütlerini değiştirin veya filtreleri temizleyin.</p></section>}
+      {!combinedLoading && !combinedError && occupancies.length === 0 && <section className="panel empty-state-box actionable-empty-state"><h2>Henüz sakin kaydı bulunmuyor</h2><p>İlk sakin ilişkisini oluşturmak için yeni bir atama yapın.</p><button className="primary-button" type="button" onClick={() => void openCreate()}>Yeni Sakin Ata</button></section>}
+      {!combinedLoading && !combinedError && occupancies.length > 0 && filteredOccupancies.length === 0 && <section className="panel empty-state-box actionable-empty-state"><h2>Filtrelere uygun kayıt bulunamadı</h2><p>Arama ölçütlerini değiştirin veya filtreleri temizleyin.</p><button className="secondary-button" type="button" onClick={() => { setSearch(''); setPropertyFilter('all'); setBuildingFilter('all'); setUnitSearch(''); setTypeFilter('all'); setStatusFilter('all') }}>Filtreleri Temizle</button></section>}
 
       {!combinedLoading && !combinedError && filteredOccupancies.length > 0 && (
         <section className="panel entity-table-panel residents-table-panel">
@@ -467,25 +473,29 @@ export function CentralOccupancyManagement({
         <>
           <button className="drawer-backdrop" type="button" aria-label="Sakin formunu kapat" onClick={() => void closeDrawer()} />
           <aside className="management-drawer occupancy-management-drawer" role="dialog" aria-modal="true" aria-labelledby="occupancy-drawer-title">
-            <div className="drawer-header"><div><p className="eyebrow">Sakin Yönetimi</p><h2 id="occupancy-drawer-title">{drawerMode === 'create' ? 'Yeni Sakin Ata' : drawerMode === 'edit' ? 'Sakin Kaydını Düzenle' : 'Sakin Kaydını Sonlandır'}</h2></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
+            <div className="drawer-header"><div><p className="eyebrow">Sakin Yönetimi</p><h2 id="occupancy-drawer-title">{drawerMode === 'create' ? 'Yeni Sakin Ata' : drawerMode === 'edit' ? 'Sakin Kaydını Düzenle' : 'Sakin Kaydını Sonlandır'}</h2><p className="drawer-description">Daire ile sakin arasındaki ikamet ilişkisini güvenli biçimde yönetin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {error && <p className="status-message error-message" role="alert">{error}</p>}
 
             {drawerMode === 'close' && activeOccupancy ? (
               <form className="property-form drawer-form" onSubmit={handleCloseOccupancy}>
+                <h3 className="drawer-section-title form-field-full">Sonlandırma Bilgileri</h3>
                 <div className="form-field form-field-full readonly-field"><span className="readonly-label">Sonlandırılacak Kayıt</span><strong>{activeOccupancy.userFullName}</strong><small>{activeOccupancy.propertyName} · {activeOccupancy.buildingName} · {formatUnitNumber(activeOccupancy.unitNumber)}</small></div>
                 <div className="form-field form-field-full"><label htmlFor="central-close-date">Bitiş Tarihi *</label><input id="central-close-date" type="date" value={closeDate} onChange={(event) => setCloseDate(event.target.value)} required /></div>
                 <div className="drawer-actions form-field-full"><button className="secondary-button" type="button" onClick={() => void closeDrawer()}>Vazgeç</button><button className="action-button danger-btn" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Sonlandırılıyor...' : 'Sonlandır'}</button></div>
               </form>
             ) : (
               <form className="property-form drawer-form" onSubmit={handleSubmit}>
+                <h3 className="drawer-section-title form-field-full">Sakin ve Daire</h3>
                 {drawerMode === 'create' ? renderUserPicker() : activeOccupancy && <div className="form-field form-field-full readonly-field"><span className="readonly-label">Kullanıcı ve Daire</span><strong>{activeOccupancy.userFullName}</strong><small>{activeOccupancy.userEmail} · {activeOccupancy.propertyName} · {activeOccupancy.buildingName} · {formatUnitNumber(activeOccupancy.unitNumber)}</small></div>}
                 <div className="form-field"><label htmlFor="central-form-property">Yapı *</label><select id="central-form-property" value={form.propertyId || ''} disabled={drawerMode === 'edit'} onChange={(event) => setForm({ ...form, propertyId: Number(event.target.value), buildingId: 0, unitId: 0 })} required><option value="">Yapı seçin</option>{properties.filter((item) => drawerMode === 'edit' || item.isActive).map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></div>
                 <div className="form-field"><label htmlFor="central-form-building">Blok / Bina *</label><select id="central-form-building" value={form.buildingId || ''} disabled={drawerMode === 'edit' || !form.propertyId} onChange={(event) => setForm({ ...form, buildingId: Number(event.target.value), unitId: 0 })} required><option value="">Blok seçin</option>{formBuildings.map((building) => <option key={building.id} value={building.id}>{building.name}</option>)}</select></div>
                 <div className="form-field form-field-full"><label htmlFor="central-form-unit">Daire / Bölüm *</label><select id="central-form-unit" value={form.unitId || ''} disabled={drawerMode === 'edit' || !form.buildingId} onChange={(event) => setForm({ ...form, unitId: Number(event.target.value) })} required><option value="">Daire seçin</option>{formUnits.map((unit) => <option key={unit.id} value={unit.id}>{formatUnitNumber(unit.unitNumber)}</option>)}</select></div>
+                <h3 className="drawer-section-title form-field-full">İkamet Bilgileri</h3>
                 <div className="form-field"><label htmlFor="central-form-type">İkamet Türü *</label><select id="central-form-type" value={form.occupancyTypeId || ''} onChange={(event) => setForm({ ...form, occupancyTypeId: Number(event.target.value) })} required><option value="">İkamet türü seçin</option>{occupancyTypes.map((type) => <option key={type.id} value={type.id}>{getTypeLabel(type.code, type.name)}</option>)}</select></div>
+                <div className="form-field checkbox-field"><label htmlFor="central-form-primary"><input id="central-form-primary" type="checkbox" checked={form.isPrimary} onChange={(event) => setForm({ ...form, isPrimary: event.target.checked })} /><span>Birincil Sakin</span></label><small className="field-help">Bir dairede aynı anda yalnızca bir aktif birincil sakin olabilir.</small></div>
+                <h3 className="drawer-section-title form-field-full">Tarih ve Notlar</h3>
                 <div className="form-field"><label htmlFor="central-form-start">Başlangıç Tarihi *</label><input id="central-form-start" type="date" value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} required /></div>
                 <div className="form-field"><label htmlFor="central-form-end">Bitiş Tarihi</label><input id="central-form-end" type="date" value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} required={drawerMode === 'edit' && activeOccupancy ? getStatus(activeOccupancy) !== 'Aktif' : false} /></div>
-                <div className="form-field checkbox-field"><label htmlFor="central-form-primary"><input id="central-form-primary" type="checkbox" checked={form.isPrimary} onChange={(event) => setForm({ ...form, isPrimary: event.target.checked })} /><span>Birincil Sakin</span></label><small className="field-help">Bir dairede aynı anda yalnızca bir aktif birincil sakin olabilir.</small></div>
                 <div className="form-field form-field-full"><label htmlFor="central-form-notes">Notlar</label><textarea id="central-form-notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} maxLength={500} rows={3} placeholder="İsteğe bağlı not" /></div>
                 {drawerMode === 'edit' && activeOccupancy && getStatus(activeOccupancy) !== 'Aktif' && <p className="status-message empty-state-box form-field-full">Sonlandırılmış veya pasif kayıt güncellemeyle yeniden aktif hâle getirilemez.</p>}
                 <div className="drawer-actions form-field-full"><button className="secondary-button" type="button" onClick={() => void closeDrawer()}>Vazgeç</button><button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}</button></div>

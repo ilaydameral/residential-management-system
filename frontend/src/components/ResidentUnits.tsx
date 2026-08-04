@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getMyUnits } from '../api'
 import { useAuth } from '../context/AuthContext'
 import type { OccupancyTypeCode, ResidentUnit } from '../types'
 import { formatUnitNumber } from '../utils/unitDisplay'
+import { ConfirmationDialog } from './ConfirmationDialog'
+import { LoadingSkeleton } from './LoadingSkeleton'
 
 const OCCUPANCY_TYPE_LABELS: Record<OccupancyTypeCode, string> = {
   OWNER: 'Malik',
@@ -29,9 +32,11 @@ function formatDate(value: string): string {
 
 export function ResidentUnits() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [units, setUnits] = useState<ResidentUnit[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
 
   useEffect(() => {
     let isCancelled = false
@@ -77,7 +82,7 @@ export function ResidentUnits() {
           </span>
           <span className="role-badge resident">Sakin</span>
         </div>
-        <button className="secondary-button" type="button" onClick={() => logout()}>
+        <button className="secondary-button" type="button" onClick={() => setIsLogoutDialogOpen(true)}>
           Çıkış Yap
         </button>
       </div>
@@ -97,7 +102,7 @@ export function ResidentUnits() {
             {!isLoading && !error && <p>{units.length} aktif kayıt bulundu.</p>}
           </div>
 
-          {isLoading && <p className="status-message">Daire bilgileriniz yükleniyor...</p>}
+          {isLoading && <LoadingSkeleton variant="detail" />}
           {error && <p className="status-message error-message" role="alert">{error}</p>}
           {!isLoading && !error && units.length === 0 && (
             <p className="status-message empty-state-box">
@@ -148,6 +153,20 @@ export function ResidentUnits() {
           </div>
         </section>
       </section>
+      {isLogoutDialogOpen && (
+        <ConfirmationDialog
+          title="Çıkış Yap"
+          message="Çıkış yapmak istediğinizden emin misiniz?"
+          confirmLabel="Çıkış Yap"
+          danger
+          onCancel={() => setIsLogoutDialogOpen(false)}
+          onConfirm={() => {
+            setIsLogoutDialogOpen(false)
+            logout()
+            navigate('/login', { replace: true })
+          }}
+        />
+      )}
     </main>
   )
 }

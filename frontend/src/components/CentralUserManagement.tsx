@@ -9,9 +9,11 @@ import {
   updateManagedUserRoles,
 } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { ManagedUser, Role } from '../types'
 import { RowActionsMenu } from './RowActionsMenu'
+import { LoadingSkeleton } from './LoadingSkeleton'
 
 interface CentralUserManagementProps {
   onDirtyChange: (isDirty: boolean) => void
@@ -69,6 +71,7 @@ function normalizeForm(form: UserFormState): UserFormState {
 
 export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUserManagementProps) {
   const { hasRole, user: currentUser } = useAuth()
+  const { showToast } = useToast()
   const isAdmin = hasRole('ADMIN')
   const [users, setUsers] = useState<ManagedUser[]>([])
   const [roles, setRoles] = useState<Role[]>([])
@@ -219,6 +222,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
       return
     }
     setIsSubmitting(true)
+    const completedMode = drawerMode
     try {
       if (drawerMode === 'create') {
         await createManagedUser({
@@ -240,6 +244,13 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
       }
       closeDrawerState()
       await loadData()
+      showToast(
+        completedMode === 'create'
+          ? 'Kullanıcı oluşturuldu.'
+          : completedMode === 'roles'
+            ? 'Kullanıcı rolleri güncellendi.'
+            : 'Kullanıcı bilgileri güncellendi.'
+      )
     } catch (error) {
       setActionError(getErrorMessage(error, 'Kullanıcı işlemi tamamlanamadı.'))
     } finally {
@@ -255,6 +266,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
     try {
       await setManagedUserActive(managedUser.id, nextActive)
       await loadData()
+      showToast(nextActive ? 'Kullanıcı aktif hâle getirildi.' : 'Kullanıcı pasif hâle getirildi.')
     } catch (error) {
       setActionError(getErrorMessage(error, `Kullanıcı ${action} duruma getirilemedi.`))
     }
@@ -281,10 +293,10 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
       </section>
 
       {actionError && drawerMode === 'none' && <p className="status-message error-message" role="alert">{actionError}</p>}
-      {isLoading && <p className="status-message">Kullanıcılar yükleniyor...</p>}
+      {isLoading && <LoadingSkeleton variant="table" />}
       {!isLoading && loadError && <section className="panel entity-state-panel error-state"><p className="status-message error-message">{loadError}</p><button className="secondary-button" type="button" onClick={() => void loadData()}>Tekrar Dene</button></section>}
-      {!isLoading && !loadError && users.length === 0 && <section className="panel entity-state-panel"><h2>Henüz kullanıcı bulunmuyor</h2><p>Sistemde görüntülenecek kullanıcı kaydı bulunmamaktadır.</p></section>}
-      {!isLoading && !loadError && users.length > 0 && filteredUsers.length === 0 && <section className="panel entity-state-panel"><h2>Filtrelere uygun kullanıcı bulunamadı</h2><p>Arama ölçütlerini değiştirin veya filtreleri temizleyin.</p></section>}
+      {!isLoading && !loadError && users.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Henüz kullanıcı bulunmuyor</h2><p>Sistemde görüntülenecek kullanıcı kaydı bulunmamaktadır.</p>{isAdmin && <button className="primary-button" type="button" onClick={() => void openCreate()}>Yeni Kullanıcı</button>}</section>}
+      {!isLoading && !loadError && users.length > 0 && filteredUsers.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Filtrelere uygun kullanıcı bulunamadı</h2><p>Arama ölçütlerini değiştirin veya filtreleri temizleyin.</p><button className="secondary-button" type="button" onClick={() => { setSearch(''); setRoleFilter('all'); setStatusFilter('all') }}>Filtreleri Temizle</button></section>}
 
       {!isLoading && !loadError && filteredUsers.length > 0 && (
         <section className="panel entity-table-panel">
@@ -311,10 +323,11 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
         <>
           <button className="drawer-backdrop" type="button" aria-label="Kullanıcı formunu kapat" onClick={() => void closeDrawer()} />
           <aside className="management-drawer user-management-drawer" role="dialog" aria-modal="true" aria-labelledby="user-drawer-title">
-            <div className="drawer-header"><div><p className="eyebrow">Kullanıcı Yönetimi</p><h2 id="user-drawer-title">{drawerMode === 'create' ? 'Yeni Kullanıcı' : drawerMode === 'edit' ? 'Kullanıcıyı Düzenle' : 'Rolleri Yönet'}</h2></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
+            <div className="drawer-header"><div><p className="eyebrow">Kullanıcı Yönetimi</p><h2 id="user-drawer-title">{drawerMode === 'create' ? 'Yeni Kullanıcı' : drawerMode === 'edit' ? 'Kullanıcıyı Düzenle' : 'Rolleri Yönet'}</h2><p className="drawer-description">Kullanıcı bilgilerini ve yetkili olduğunuz hesap ayarlarını düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {actionError && <p className="status-message error-message" role="alert">{actionError}</p>}
-            {isDetailLoading ? <p className="status-message">Kullanıcı bilgileri yükleniyor...</p> : (
+            {isDetailLoading ? <LoadingSkeleton variant="detail" /> : (
               <form className="property-form drawer-form" onSubmit={handleSubmit}>
+                <h3 className="drawer-section-title form-field-full">Kullanıcı Bilgileri</h3>
                 {drawerMode === 'roles' && selectedUser ? (
                   <div className="form-field form-field-full"><span className="readonly-label">Kullanıcı</span><strong>{selectedUser.fullName}</strong><small>{selectedUser.email}</small></div>
                 ) : (
@@ -326,7 +339,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
                   </>
                 )}
 
-                {(drawerMode === 'create' || drawerMode === 'roles') && <fieldset className="form-field form-field-full role-selection-fieldset"><legend>Roller *</legend><div className="role-selection-grid">{roles.map((role) => <label key={role.id}><input type="checkbox" checked={form.roleCodes.includes(role.code)} onChange={() => toggleRole(role.code)} /><span>{getRoleLabel(role.code)}</span></label>)}</div></fieldset>}
+                {(drawerMode === 'create' || drawerMode === 'roles') && <><h3 className="drawer-section-title form-field-full">Rol ve Hesap Durumu</h3><fieldset className="form-field form-field-full role-selection-fieldset"><legend>Roller *</legend><div className="role-selection-grid">{roles.map((role) => <label key={role.id}><input type="checkbox" checked={form.roleCodes.includes(role.code)} onChange={() => toggleRole(role.code)} /><span>{getRoleLabel(role.code)}</span></label>)}</div></fieldset></>}
                 {drawerMode === 'create' && <div className="form-field form-field-full checkbox-field"><label htmlFor="managed-is-active"><input id="managed-is-active" type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /><span>Hesap aktif olarak oluşturulsun</span></label></div>}
                 {drawerMode === 'edit' && <p className="drawer-info-box form-field-full">Parola ve roller bu formdan değiştirilmez.</p>}
                 <div className="drawer-actions form-field-full"><button className="secondary-button" type="button" onClick={() => void closeDrawer()}>Vazgeç</button><button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}</button></div>

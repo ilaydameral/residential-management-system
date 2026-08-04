@@ -32,12 +32,15 @@ import { Login } from './components/Login'
 import DashboardOverview from './components/DashboardOverview'
 import { CentralOccupancyManagement } from './components/CentralOccupancyManagement'
 import { CentralUserManagement } from './components/CentralUserManagement'
+import { ConfirmationDialog } from './components/ConfirmationDialog'
+import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentUnits } from './components/ResidentUnits'
 import { RowActionsMenu } from './components/RowActionsMenu'
 import { SearchableSelect } from './components/SearchableSelect'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useAuth } from './context/AuthContext'
+import { useToast } from './context/ToastContext'
 import { TURKEY_CITIES } from './data/turkeyLocations'
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
 import { useRouteChangeGuard } from './hooks/useRouteChangeGuard'
@@ -205,6 +208,7 @@ class OccupancyErrorBoundary extends Component<
 
 function App() {
   const { user, isAuthenticated, loading, logout, hasRole, hasAnyRole } = useAuth()
+  const { showToast } = useToast()
   const location = useLocation()
   const navigate = useNavigate()
   const activeManagementView = getManagementView(location.pathname)
@@ -251,6 +255,7 @@ function App() {
   const [isPropertyDrawerOpen, setIsPropertyDrawerOpen] = useState(false)
   const [isBuildingDrawerOpen, setIsBuildingDrawerOpen] = useState(false)
   const [isUnitDrawerOpen, setIsUnitDrawerOpen] = useState(false)
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
   const [selectedUnitDetail, setSelectedUnitDetail] = useState<Unit | null>(null)
   const [unitDetailTab, setUnitDetailTab] = useState<'general' | 'residents'>('general')
 
@@ -352,6 +357,7 @@ function App() {
     setIsPropertyDrawerOpen(false)
     setIsBuildingDrawerOpen(false)
     setIsUnitDrawerOpen(false)
+    setIsLogoutDialogOpen(false)
     setSelectedUnitDetail(null)
     setUnitDetailTab('general')
     setPropertySearch('')
@@ -953,6 +959,7 @@ function App() {
 
     setIsSubmittingProperty(true)
     setPropertyError('')
+    const wasEditing = Boolean(editingPropertyId)
 
     try {
       if (editingPropertyId) {
@@ -988,6 +995,7 @@ function App() {
       setPropertyFormDirty(false)
       setIsPropertyDrawerOpen(false)
       await loadPropertyList()
+      showToast(wasEditing ? 'Yapı güncellendi.' : 'Yapı oluşturuldu.')
     } catch (err) {
       setPropertyError(err instanceof Error ? err.message : 'Yapı kaydedilemedi.')
     } finally {
@@ -1007,6 +1015,7 @@ function App() {
         const updatedProp = updatedList.find((p) => p.id === id)
         if (updatedProp) setSelectedProperty(updatedProp)
       }
+      showToast('Yapı pasifleştirildi.')
     } catch (err) {
       setPropertyListError(err instanceof Error ? err.message : 'Yapı pasifleştirilemedi.')
     }
@@ -1144,6 +1153,7 @@ function App() {
 
     setIsSubmittingBuilding(true)
     setBuildingError('')
+    const wasEditing = Boolean(editingBuildingId)
 
     try {
       if (editingBuildingId) {
@@ -1177,6 +1187,7 @@ function App() {
       setBuildingFormDirty(false)
       setIsBuildingDrawerOpen(false)
       await Promise.all([loadAllBuildingList(), loadPropertyList()])
+      showToast(wasEditing ? 'Blok güncellendi.' : 'Blok oluşturuldu.')
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Blok kaydedilemedi.')
     } finally {
@@ -1204,6 +1215,7 @@ function App() {
       setBuildings([created])
       setSelectedBuilding(created)
       setBuildingFormDirty(false)
+      showToast('Apartman yapısı oluşturuldu.')
     } catch (err) {
       setBuildingError(err instanceof Error ? err.message : 'Apartman yapısı oluşturulamadı.')
     } finally {
@@ -1223,6 +1235,7 @@ function App() {
         setUnits([])
         setSelectedOccupancyUnit(null)
       }
+      showToast('Blok silindi.')
     } catch (err) {
       setBuildingListError(err instanceof Error ? err.message : 'Blok silinemedi.')
     }
@@ -1314,6 +1327,7 @@ function App() {
 
     setIsSubmittingUnit(true)
     setUnitError('')
+    const wasEditing = Boolean(editingUnitId)
 
     try {
       if (editingUnitId) {
@@ -1359,6 +1373,7 @@ function App() {
           refreshedUnits.find((unit) => unit.id === selectedUnitDetail.id) || null
         )
       }
+      showToast(wasEditing ? 'Daire güncellendi.' : 'Daire oluşturuldu.')
     } catch (err) {
       setUnitError(err instanceof Error ? err.message : 'Daire kaydedilemedi.')
     } finally {
@@ -1375,6 +1390,7 @@ function App() {
       await Promise.all([loadAllUnitList(), loadAllBuildingList(), loadPropertyList()])
       setSelectedOccupancyUnit((current) => (current?.id === id ? null : current))
       setSelectedUnitDetail((current) => (current?.id === id ? null : current))
+      showToast('Daire silindi.')
     } catch (err) {
       setUnitListError(err instanceof Error ? err.message : 'Daire silinemedi.')
     }
@@ -1481,8 +1497,12 @@ function App() {
     setIsSidebarOpen(!isSidebarOpen)
   }
 
-  const handleLogout = async () => {
-    if (!(await requestDiscard())) return
+  const handleLogout = () => {
+    setIsLogoutDialogOpen(true)
+  }
+
+  const confirmLogout = () => {
+    setIsLogoutDialogOpen(false)
     resetUiState()
     logout()
     navigate('/login', { replace: true })
@@ -1822,7 +1842,7 @@ function App() {
           </section>
 
           {isLoadingProperties && (
-            <section className="panel entity-state-panel">Yapılar yükleniyor...</section>
+            <LoadingSkeleton variant="table" />
           )}
 
           {!isLoadingProperties && propertyListError && (
@@ -1835,11 +1855,11 @@ function App() {
           )}
 
           {!isLoadingProperties && !propertyListError && properties.length === 0 && (
-            <section className="panel entity-state-panel">Henüz kayıtlı yapı bulunmuyor.</section>
+            <section className="panel entity-state-panel actionable-empty-state"><h2>Henüz yapı bulunmuyor</h2><p>Yönetmeye başlamak için ilk yapıyı ekleyin.</p>{canCreateProperty && <button className="primary-button" type="button" onClick={() => void handleOpenNewProperty()}>Yeni Yapı Ekle</button>}</section>
           )}
 
           {!isLoadingProperties && !propertyListError && properties.length > 0 && filteredProperties.length === 0 && (
-            <section className="panel entity-state-panel">Filtrelere uygun yapı bulunamadı.</section>
+            <section className="panel entity-state-panel actionable-empty-state"><h2>Filtrelere uygun yapı bulunamadı</h2><button className="secondary-button" type="button" onClick={() => { setPropertySearch(''); setPropertyTypeFilter('all'); setPropertyStatusFilter('all') }}>Filtreleri Temizle</button></section>
           )}
 
           {!isLoadingProperties && !propertyListError && filteredProperties.length > 0 && (
@@ -1954,7 +1974,7 @@ function App() {
           </section>
 
           {isLoadingAllBuildings && (
-            <section className="panel entity-state-panel">Bloklar yükleniyor...</section>
+            <LoadingSkeleton variant="table" />
           )}
 
           {!isLoadingAllBuildings && buildingListError && (
@@ -1967,11 +1987,11 @@ function App() {
           )}
 
           {!isLoadingAllBuildings && !buildingListError && allBuildings.length === 0 && (
-            <section className="panel entity-state-panel">Henüz kayıtlı blok bulunmuyor.</section>
+            <section className="panel entity-state-panel actionable-empty-state"><h2>Henüz blok bulunmuyor</h2><p>Aktif bir yapıya ilk blok veya binayı ekleyin.</p>{canCreateBuilding && <button className="primary-button" type="button" onClick={() => void handleOpenNewBuilding()}>Yeni Blok Ekle</button>}</section>
           )}
 
           {!isLoadingAllBuildings && !buildingListError && allBuildings.length > 0 && filteredBuildings.length === 0 && (
-            <section className="panel entity-state-panel">Filtrelere uygun blok bulunamadı.</section>
+            <section className="panel entity-state-panel actionable-empty-state"><h2>Filtrelere uygun blok bulunamadı</h2><button className="secondary-button" type="button" onClick={() => { setBuildingSearch(''); setBuildingPropertyFilter('all'); setBuildingStatusFilter('all') }}>Filtreleri Temizle</button></section>
           )}
 
           {!isLoadingAllBuildings && !buildingListError && filteredBuildings.length > 0 && (
@@ -2031,11 +2051,13 @@ function App() {
               <div>
                 <p className="eyebrow">Yapı Yönetimi</p>
                 <h2 id="property-drawer-title">{editingPropertyId ? 'Yapıyı Düzenle' : 'Yeni Yapı'}</h2>
+                <p className="drawer-description">Yapının temel bilgilerini ve konumunu tanımlayın.</p>
               </div>
               <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelPropertyEdit()}>×</button>
             </div>
             {propertyError && <p className="status-message error-message">{propertyError}</p>}
             <form className="property-form drawer-form" onSubmit={handlePropertySubmit}>
+              <h3 className="drawer-section-title form-field-full">Yapı Bilgileri</h3>
               <div className="form-field form-field-full">
                 <label htmlFor="prop-name">Yapı Adı *</label>
                 <input id="prop-name" value={propertyForm.name} onChange={(event) => { setPropertyFormDirty(true); setPropertyForm({ ...propertyForm, name: event.target.value }) }} required />
@@ -2047,6 +2069,7 @@ function App() {
                   {propertyTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
                 </select>
               </div>
+              <h3 className="drawer-section-title form-field-full">Konum ve Açıklama</h3>
               <div className="form-field form-field-full">
                 <label htmlFor="prop-address">Adres *</label>
                 <input id="prop-address" value={propertyForm.addressLine} onChange={(event) => { setPropertyFormDirty(true); setPropertyForm({ ...propertyForm, addressLine: event.target.value }) }} required />
@@ -2083,11 +2106,13 @@ function App() {
               <div>
                 <p className="eyebrow">Blok Yönetimi</p>
                 <h2 id="building-drawer-title">{editingBuildingId ? 'Bloğu Düzenle' : 'Yeni Blok'}</h2>
+                <p className="drawer-description">Bağlı yapı ve blok bilgilerini düzenleyin.</p>
               </div>
               <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelBuildingEdit()}>×</button>
             </div>
             {buildingError && <p className="status-message error-message">{buildingError}</p>}
             <form className="property-form drawer-form" onSubmit={handleBuildingSubmit}>
+              <h3 className="drawer-section-title form-field-full">Yapı Bağlantısı</h3>
               <div className="form-field form-field-full">
                 <label htmlFor="building-property">Bağlı Yapı *</label>
                 <select id="building-property" value={buildingForm.propertyId || ''} onChange={(event) => { setBuildingFormDirty(true); setBuildingForm({ ...buildingForm, propertyId: Number(event.target.value) }) }} required>
@@ -2095,6 +2120,7 @@ function App() {
                   {properties.filter((property) => property.isActive || property.id === buildingForm.propertyId).map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
                 </select>
               </div>
+              <h3 className="drawer-section-title form-field-full">Blok Bilgileri</h3>
               {isBuildingFormSingleApartment ? (
                 <p className="form-field form-field-full drawer-info-box">Tek apartman yapısında blok bilgileri yapı adına göre otomatik hazırlanır.</p>
               ) : (
@@ -2190,15 +2216,15 @@ function App() {
             </button>
           </section>
 
-          {isLoadingCentralUnits && <section className="panel entity-state-panel">Daireler yükleniyor...</section>}
+          {isLoadingCentralUnits && <LoadingSkeleton variant="table" />}
           {!isLoadingCentralUnits && centralUnitError && (
             <section className="panel entity-state-panel error-state">
               <p className="status-message error-message">{centralUnitError}</p>
               <button className="secondary-button" type="button" onClick={() => void Promise.all([loadAllUnitList(), loadAllBuildingList()])}>Tekrar Dene</button>
             </section>
           )}
-          {!isLoadingCentralUnits && !centralUnitError && allUnits.length === 0 && <section className="panel entity-state-panel">Henüz kayıtlı daire veya bölüm bulunmuyor.</section>}
-          {!isLoadingCentralUnits && !centralUnitError && allUnits.length > 0 && filteredUnits.length === 0 && <section className="panel entity-state-panel">Filtrelere uygun daire bulunamadı.</section>}
+          {!isLoadingCentralUnits && !centralUnitError && allUnits.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Henüz daire bulunmuyor</h2><p>Aktif bir blok veya binaya ilk daireyi ekleyin.</p>{canCreateUnit && <button className="primary-button" type="button" onClick={() => void handleOpenNewUnit()}>Yeni Daire Ekle</button>}</section>}
+          {!isLoadingCentralUnits && !centralUnitError && allUnits.length > 0 && filteredUnits.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Filtrelere uygun daire bulunamadı</h2><button className="secondary-button" type="button" onClick={() => { setUnitSearch(''); setUnitPropertyFilter('all'); setUnitBuildingFilter('all'); setUnitFloorFilter('all'); setUnitOccupancyFilter('all'); setUnitStatusFilter('all') }}>Filtreleri Temizle</button></section>}
 
           {!isLoadingCentralUnits && !centralUnitError && filteredUnits.length > 0 && (
             <section className="panel entity-table-panel">
@@ -2242,7 +2268,7 @@ function App() {
         <section className="section-container unit-detail-view">
           <section className="panel entity-state-panel">
             {!hasLoadedAllUnits || isLoadingAllUnits ? (
-              <p>Daire detayı yükleniyor...</p>
+              <LoadingSkeleton variant="detail" />
             ) : unitListError ? (
               <>
                 <p className="status-message error-message">{unitListError}</p>
@@ -2305,14 +2331,17 @@ function App() {
         <>
           <button className="drawer-backdrop" type="button" aria-label="Daire formunu kapat" onClick={() => void handleCancelUnitEdit()} />
           <aside className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="unit-drawer-title">
-            <div className="drawer-header"><div><p className="eyebrow">Daire Yönetimi</p><h2 id="unit-drawer-title">{editingUnitId ? 'Daireyi Düzenle' : 'Yeni Daire'}</h2></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelUnitEdit()}>×</button></div>
+            <div className="drawer-header"><div><p className="eyebrow">Daire Yönetimi</p><h2 id="unit-drawer-title">{editingUnitId ? 'Daireyi Düzenle' : 'Yeni Daire'}</h2><p className="drawer-description">Dairenin bağlı yapısını ve fiziksel bilgilerini düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelUnitEdit()}>×</button></div>
             {unitError && <p className="status-message error-message">{unitError}</p>}
             <form className="property-form drawer-form" onSubmit={handleUnitSubmit}>
+              <h3 className="drawer-section-title form-field-full">Yapı ve Blok</h3>
               <div className="form-field"><label htmlFor="unit-property">Yapı *</label><select id="unit-property" value={unitFormPropertyId || ''} onChange={(event) => { const propertyId = Number(event.target.value); const firstBuilding = allBuildings.find((building) => building.propertyId === propertyId && building.isActive); setUnitFormDirty(true); setUnitFormPropertyId(propertyId); setUnitForm({ ...unitForm, buildingId: firstBuilding?.id || 0 }) }} required><option value="">Yapı seçin</option>{properties.filter((property) => property.isActive || property.id === unitFormPropertyId).map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></div>
               <div className="form-field"><label htmlFor="unit-building">Blok / Bina *</label><select id="unit-building" value={unitForm.buildingId || ''} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, buildingId: Number(event.target.value) }) }} disabled={!unitFormPropertyId} required><option value="">Blok seçin</option>{unitFormBuildings.map((building) => <option key={building.id} value={building.id}>{building.name}</option>)}</select></div>
+              <h3 className="drawer-section-title form-field-full">Daire Bilgileri</h3>
               <div className="form-field"><label htmlFor="unit-number">Daire / Bölüm No *</label><input id="unit-number" value={unitForm.unitNumber} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, unitNumber: event.target.value }) }} required /></div>
               <div className="form-field"><label htmlFor="unit-type">Bölüm Türü *</label><select id="unit-type" value={unitForm.unitTypeId || ''} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, unitTypeId: Number(event.target.value) }) }} required><option value="">Tür seçin</option>{selectableUnitTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select></div>
               <div className="form-field"><label htmlFor="unit-floor">Kat No *</label><input id="unit-floor" type="number" value={unitForm.floorNumber} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, floorNumber: Math.floor(Number(event.target.value)) }) }} required /><small className="field-help">0: Zemin, negatif: bodrum, pozitif: normal kat</small></div>
+              <h3 className="drawer-section-title form-field-full">Alan ve Açıklama</h3>
               <div className="form-field"><label htmlFor="unit-gross">Brüt Alan (m²)</label><input id="unit-gross" type="number" step="0.01" min="0.01" value={unitForm.grossArea ?? ''} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, grossArea: event.target.value ? Number(event.target.value) : null }) }} /></div>
               <div className="form-field"><label htmlFor="unit-net">Net Alan (m²)</label><input id="unit-net" type="number" step="0.01" min="0.01" value={unitForm.netArea ?? ''} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, netArea: event.target.value ? Number(event.target.value) : null }) }} /></div>
               <div className="form-field form-field-full"><label htmlFor="unit-desc">Açıklama</label><textarea id="unit-desc" value={unitForm.description || ''} onChange={(event) => { setUnitFormDirty(true); setUnitForm({ ...unitForm, description: event.target.value }) }} rows={3} /></div>
@@ -3054,6 +3083,18 @@ function App() {
             </div>
           )}
         </section>
+      )}
+      {isLogoutDialogOpen && (
+        <ConfirmationDialog
+          title="Çıkış Yap"
+          message={hasUnsavedChanges
+            ? 'Kaydedilmemiş değişiklikleriniz var. Çıkış yaparsanız bu değişiklikler kaybolacak.'
+            : 'Çıkış yapmak istediğinizden emin misiniz?'}
+          confirmLabel="Çıkış Yap"
+          danger
+          onCancel={() => setIsLogoutDialogOpen(false)}
+          onConfirm={confirmLogout}
+        />
       )}
       {unsavedChangesDialog}
       </main>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getDashboardSummary } from '../api'
 import type { DashboardSummary } from '../types'
+import { LoadingSkeleton } from './LoadingSkeleton'
 
 type DashboardTargetView = 'properties' | 'units' | 'residents' | 'users'
 
@@ -65,9 +66,7 @@ export default function DashboardOverview({ onNavigate }: DashboardOverviewProps
       </section>
 
       {isLoading && (
-        <section className="panel dashboard-state-panel">
-          <p className="status-message">Yönetim özeti yükleniyor...</p>
-        </section>
+        <LoadingSkeleton variant="dashboard" />
       )}
 
       {!isLoading && error && (

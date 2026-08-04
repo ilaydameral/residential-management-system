@@ -16,7 +16,9 @@ import type {
   UserSearchResult,
 } from '../types'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+import { useToast } from '../context/ToastContext'
 import { formatUnitDisplay, formatUnitNumber } from '../utils/unitDisplay'
+import { LoadingSkeleton } from './LoadingSkeleton'
 
 interface OccupancyManagementProps {
   unit: Unit
@@ -107,6 +109,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyManagementProps) {
+  const { showToast } = useToast()
   const [occupancies, setOccupancies] = useState<UnitOccupancy[]>([])
   const [occupancyTypes, setOccupancyTypes] = useState<OccupancyType[]>([])
   const [occupancyTypesError, setOccupancyTypesError] = useState('')
@@ -114,7 +117,6 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
-  const [success, setSuccess] = useState('')
 
   const [formMode, setFormMode] = useState<'none' | 'create' | 'edit' | 'close'>('none')
   const [form, setForm] = useState<OccupancyFormState>(createInitialForm)
@@ -173,7 +175,6 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
     setUserResults([])
     setError('')
     setLoadError('')
-    setSuccess('')
     void loadOccupancies()
   }, [loadOccupancies])
 
@@ -241,7 +242,6 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
 
   const clearMessages = () => {
     setError('')
-    setSuccess('')
   }
 
   const openCreateForm = async () => {
@@ -343,7 +343,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       setFormMode('none')
       setSelectedUser(null)
       setUserQuery('')
-      setSuccess('Sakin ataması başarıyla oluşturuldu.')
+      showToast('Sakin ataması oluşturuldu.')
     } catch (createError) {
       setError(getErrorMessage(createError, 'Sakin ataması oluşturulamadı.'))
     } finally {
@@ -370,7 +370,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       await loadOccupancies()
       setFormMode('none')
       setEditingOccupancy(null)
-      setSuccess('Sakin kaydı başarıyla güncellendi.')
+      showToast('Sakin kaydı güncellendi.')
     } catch (updateError) {
       setError(getErrorMessage(updateError, 'Sakin kaydı güncellenemedi.'))
     } finally {
@@ -401,7 +401,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       await loadOccupancies()
       setFormMode('none')
       setClosingOccupancy(null)
-      setSuccess('Sakin kaydı başarıyla sonlandırıldı.')
+      showToast('Sakin kaydı sonlandırıldı.')
     } catch (closeError) {
       setError(getErrorMessage(closeError, 'Sakin kaydı sonlandırılamadı.'))
     } finally {
@@ -507,7 +507,6 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
       </div>
 
       {error && <p className="status-message error-message" role="alert">{error}</p>}
-      {success && <p className="status-message success-message" role="status">{success}</p>}
 
       {formMode === 'create' && (
         <form className="property-form occupancy-form" onSubmit={handleCreate}>
@@ -641,7 +640,7 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         {!loadError && <span>{occupancies.length} kayıt</span>}
       </div>
 
-      {isLoading && <p className="status-message">Sakin kayıtları yükleniyor...</p>}
+      {isLoading && <LoadingSkeleton variant="table" rows={3} />}
       {!isLoading && loadError && (
         <div className="status-message error-message" role="alert">
           <p>{loadError}</p>
@@ -651,7 +650,12 @@ export function OccupancyManagement({ unit, onClose, onDirtyChange }: OccupancyM
         </div>
       )}
       {!isLoading && !loadError && occupancies.length === 0 && (
-        <p className="status-message empty-state-box">Bu bağımsız bölüm için henüz sakin kaydı bulunmuyor.</p>
+        <section className="status-message empty-state-box actionable-empty-state">
+          <p>Bu daireye henüz sakin atanmamış.</p>
+          <button className="primary-button compact-button" type="button" onClick={openCreateForm} disabled={occupancyTypes.length === 0}>
+            Yeni Sakin Ata
+          </button>
+        </section>
       )}
 
       {!loadError && <div className="occupancy-card-list">
