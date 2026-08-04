@@ -410,6 +410,12 @@ public class UnitService : IUnitService
             return false;
         }
 
+        var hasOccupancies = await _context.UnitOccupancies.AnyAsync(uo => uo.UnitId == id);
+        if (hasOccupancies)
+        {
+            throw new InvalidOperationException("Bu daireye bağlı sakin kaydı veya geçmişi bulunduğu için silinemez. Kaydı pasifleştirin.");
+        }
+
         _context.Units.Remove(unit);
         await _context.SaveChangesAsync();
 
