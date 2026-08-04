@@ -17,6 +17,7 @@ import { LoadingSkeleton } from './LoadingSkeleton'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { SaveShortcutHint } from './SaveShortcutHint'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
+import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 
 interface CentralUserManagementProps {
   onDirtyChange: (isDirty: boolean) => void
@@ -165,11 +166,12 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
 
   const closeDrawer = async () => {
     if (!(await requestDiscard())) return
-    closeDrawerState()
+    drawerAnimation.close(closeDrawerState)
   }
 
+  const drawerAnimation = useAnimatedDrawer(drawerMode !== 'none')
   const drawerRef = useDrawerAccessibility({
-    isOpen: drawerMode !== 'none',
+    isOpen: drawerAnimation.shouldRender && !drawerAnimation.isClosing,
     onClose: () => { void closeDrawer() },
     isSaving: isSubmitting || isDetailLoading || confirmation !== null,
   })
@@ -206,9 +208,11 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
       setForm(editForm)
       setFormBaseline(editForm)
     } catch (error) {
-      setDrawerMode('none')
-      setSelectedUser(null)
-      setActionError(getErrorMessage(error, 'Kullanıcı bilgileri yüklenemedi.'))
+      drawerAnimation.close(() => {
+        setDrawerMode('none')
+        setSelectedUser(null)
+        setActionError(getErrorMessage(error, 'Kullanıcı bilgileri yüklenemedi.'))
+      })
     } finally {
       setIsDetailLoading(false)
     }
@@ -250,7 +254,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
         action: async () => {
           try {
             await updateManagedUserRoles(selectedUser.id, { roleCodes: form.roleCodes })
-            closeDrawerState()
+            drawerAnimation.close(closeDrawerState)
             await loadData()
             showToast('Kullanıcı rolleri güncellendi.')
           } catch (error) {
@@ -280,7 +284,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
           email: form.email.trim(),
         })
       }
-      closeDrawerState()
+      drawerAnimation.close(closeDrawerState)
       await loadData()
       showToast(
         completedMode === 'create'
@@ -374,10 +378,10 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
         </section>
       )}
 
-      {drawerMode !== 'none' && (
+      {drawerAnimation.shouldRender && drawerMode !== 'none' && (
         <>
-          <button className="drawer-backdrop" type="button" aria-label="Kullanıcı formunu kapat" onClick={() => void closeDrawer()} />
-          <aside ref={drawerRef} tabIndex={-1} className="management-drawer user-management-drawer" role="dialog" aria-modal="true" aria-labelledby="user-drawer-title">
+          <button className={`drawer-backdrop drawer-${drawerAnimation.phase}`} type="button" aria-label="Kullanıcı formunu kapat" disabled={drawerAnimation.isClosing} onClick={() => void closeDrawer()} />
+          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer user-management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="user-drawer-title">
             <div className="drawer-header"><div><p className="eyebrow">Kullanıcı Yönetimi</p><h2 id="user-drawer-title" tabIndex={-1} data-drawer-initial-focus>{drawerMode === 'create' ? 'Yeni Kullanıcı' : drawerMode === 'edit' ? 'Kullanıcıyı Düzenle' : 'Rolleri Yönet'}</h2><p className="drawer-description">Kullanıcı bilgilerini ve yetkili olduğunuz hesap ayarlarını düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {actionError && <p className="status-message error-message" role="alert">{actionError}</p>}
             {isDetailLoading ? <LoadingSkeleton variant="detail" /> : (

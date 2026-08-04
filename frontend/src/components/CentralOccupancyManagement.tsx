@@ -15,6 +15,7 @@ import { LoadingSkeleton } from './LoadingSkeleton'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { SaveShortcutHint } from './SaveShortcutHint'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
+import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import type {
   Building,
   CreateUnitOccupancyPayload,
@@ -271,11 +272,12 @@ export function CentralOccupancyManagement({
 
   const closeDrawer = async () => {
     if (!(await requestDiscard())) return
-    clearDrawerState()
+    drawerAnimation.close(clearDrawerState)
   }
 
+  const drawerAnimation = useAnimatedDrawer(drawerMode !== 'none')
   const drawerRef = useDrawerAccessibility({
-    isOpen: drawerMode !== 'none',
+    isOpen: drawerAnimation.shouldRender && !drawerAnimation.isClosing,
     onClose: () => { void closeDrawer() },
     enableSaveShortcut: drawerMode === 'create' || drawerMode === 'edit',
     isSaving: isSubmitting || closeConfirmationOpen,
@@ -359,7 +361,7 @@ export function CentralOccupancyManagement({
       } else if (drawerMode === 'edit' && activeOccupancy) {
         await updateUnitOccupancy(activeOccupancy.id, commonPayload)
       }
-      clearDrawerState()
+      drawerAnimation.close(clearDrawerState)
       await loadData()
       showToast(completedMode === 'create' ? 'Sakin ataması oluşturuldu.' : 'Sakin kaydı güncellendi.')
     } catch (submitError) {
@@ -386,7 +388,7 @@ export function CentralOccupancyManagement({
     setIsSubmitting(true)
     try {
       await closeUnitOccupancy(activeOccupancy.id, { endDate: toEndOfDayUtcIso(closeDate) })
-      clearDrawerState()
+      drawerAnimation.close(clearDrawerState)
       await loadData()
       showToast('Sakin kaydı sonlandırıldı.')
     } catch (closeError) {
@@ -486,10 +488,10 @@ export function CentralOccupancyManagement({
         </section>
       )}
 
-      {drawerMode !== 'none' && (
+      {drawerAnimation.shouldRender && drawerMode !== 'none' && (
         <>
-          <button className="drawer-backdrop" type="button" aria-label="Sakin formunu kapat" onClick={() => void closeDrawer()} />
-          <aside ref={drawerRef} tabIndex={-1} className="management-drawer occupancy-management-drawer" role="dialog" aria-modal="true" aria-labelledby="occupancy-drawer-title">
+          <button className={`drawer-backdrop drawer-${drawerAnimation.phase}`} type="button" aria-label="Sakin formunu kapat" disabled={drawerAnimation.isClosing} onClick={() => void closeDrawer()} />
+          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer occupancy-management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="occupancy-drawer-title">
             <div className="drawer-header"><div><p className="eyebrow">Sakin Yönetimi</p><h2 id="occupancy-drawer-title" tabIndex={-1} data-drawer-initial-focus>{drawerMode === 'create' ? 'Yeni Sakin Ata' : drawerMode === 'edit' ? 'Sakin Kaydını Düzenle' : 'Sakin Kaydını Sonlandır'}</h2><p className="drawer-description">Daire ile sakin arasındaki ikamet ilişkisini güvenli biçimde yönetin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {error && <p className="status-message error-message" role="alert">{error}</p>}
 

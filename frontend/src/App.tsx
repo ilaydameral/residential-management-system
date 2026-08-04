@@ -46,6 +46,7 @@ import { TURKEY_CITIES } from './data/turkeyLocations'
 import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
 import { useRouteChangeGuard } from './hooks/useRouteChangeGuard'
 import { useDrawerAccessibility } from './hooks/useDrawerAccessibility'
+import { useAnimatedDrawer } from './hooks/useAnimatedDrawer'
 import { SaveShortcutHint } from './components/SaveShortcutHint'
 import { formatUnitDisplay, formatUnitNumber } from './utils/unitDisplay'
 import type {
@@ -831,18 +832,21 @@ function App() {
     }
   }, [isSingleApartment, buildings, selectedBuilding, unitTypes])
 
+  const propertyDrawerAnimation = useAnimatedDrawer(isPropertyDrawerOpen)
+  const buildingDrawerAnimation = useAnimatedDrawer(isBuildingDrawerOpen)
+  const unitDrawerAnimation = useAnimatedDrawer(isUnitDrawerOpen)
   const propertyDrawerRef = useDrawerAccessibility({
-    isOpen: isPropertyDrawerOpen,
+    isOpen: propertyDrawerAnimation.shouldRender && !propertyDrawerAnimation.isClosing,
     onClose: () => { void handleCancelPropertyEdit() },
     isSaving: isSubmittingProperty || destructiveConfirmation !== null,
   })
   const buildingDrawerRef = useDrawerAccessibility({
-    isOpen: isBuildingDrawerOpen,
+    isOpen: buildingDrawerAnimation.shouldRender && !buildingDrawerAnimation.isClosing,
     onClose: () => { void handleCancelBuildingEdit() },
     isSaving: isSubmittingBuilding || destructiveConfirmation !== null,
   })
   const unitDrawerRef = useDrawerAccessibility({
-    isOpen: isUnitDrawerOpen,
+    isOpen: unitDrawerAnimation.shouldRender && !unitDrawerAnimation.isClosing,
     onClose: () => { void handleCancelUnitEdit() },
     isSaving: isSubmittingUnit || destructiveConfirmation !== null,
   })
@@ -976,15 +980,16 @@ function App() {
 
   const handleCancelPropertyEdit = async () => {
     if (!(await requestDiscard(propertyFormDirty))) return
-
-    setEditingPropertyId(null)
-    setPropertyForm({
-      ...initialPropertyForm,
-      propertyTypeId: propertyTypes[0]?.id || null,
+    propertyDrawerAnimation.close(() => {
+      setEditingPropertyId(null)
+      setPropertyForm({
+        ...initialPropertyForm,
+        propertyTypeId: propertyTypes[0]?.id || null,
+      })
+      setPropertyError('')
+      setPropertyFormDirty(false)
+      setIsPropertyDrawerOpen(false)
     })
-    setPropertyError('')
-    setPropertyFormDirty(false)
-    setIsPropertyDrawerOpen(false)
   }
 
   const handlePropertySubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -1023,7 +1028,6 @@ function App() {
         if (selectedProperty?.id === updated.id) {
           setSelectedProperty(updated)
         }
-        setEditingPropertyId(null)
       } else {
         const payload: CreatePropertyPayload = {
           name: propertyForm.name.trim(),
@@ -1035,12 +1039,15 @@ function App() {
         }
         await createProperty(payload)
       }
-      setPropertyForm({
-        ...initialPropertyForm,
-        propertyTypeId: propertyTypes[0]?.id || null,
+      propertyDrawerAnimation.close(() => {
+        setEditingPropertyId(null)
+        setPropertyForm({
+          ...initialPropertyForm,
+          propertyTypeId: propertyTypes[0]?.id || null,
+        })
+        setPropertyFormDirty(false)
+        setIsPropertyDrawerOpen(false)
       })
-      setPropertyFormDirty(false)
-      setIsPropertyDrawerOpen(false)
       await loadPropertyList()
       showToast(wasEditing ? 'Yapı güncellendi.' : 'Yapı oluşturuldu.')
     } catch (err) {
@@ -1184,13 +1191,14 @@ function App() {
 
   const handleCancelBuildingEdit = async () => {
     if (!(await requestDiscard(buildingFormDirty))) return
-
-    setEditingBuildingId(null)
-    setIsBlockCodeUserEdited(false)
-    setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
-    setBuildingError('')
-    setBuildingFormDirty(false)
-    setIsBuildingDrawerOpen(false)
+    buildingDrawerAnimation.close(() => {
+      setEditingBuildingId(null)
+      setIsBlockCodeUserEdited(false)
+      setBuildingForm({ ...initialBuildingForm, propertyId: selectedProperty?.id || 0 })
+      setBuildingError('')
+      setBuildingFormDirty(false)
+      setIsBuildingDrawerOpen(false)
+    })
   }
 
   const handleBuildingSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -1221,7 +1229,6 @@ function App() {
         if (selectedBuilding?.id === updated.id) {
           setSelectedBuilding(updated)
         }
-        setEditingBuildingId(null)
       } else {
         const payload: CreateBuildingPayload = {
           propertyId: targetProperty.id,
@@ -1234,10 +1241,13 @@ function App() {
         }
         await createBuilding(payload)
       }
-      setIsBlockCodeUserEdited(false)
-      setBuildingForm(initialBuildingForm)
-      setBuildingFormDirty(false)
-      setIsBuildingDrawerOpen(false)
+      buildingDrawerAnimation.close(() => {
+        setEditingBuildingId(null)
+        setIsBlockCodeUserEdited(false)
+        setBuildingForm(initialBuildingForm)
+        setBuildingFormDirty(false)
+        setIsBuildingDrawerOpen(false)
+      })
       await Promise.all([loadAllBuildingList(), loadPropertyList()])
       showToast(wasEditing ? 'Blok güncellendi.' : 'Blok oluşturuldu.')
     } catch (err) {
@@ -1342,17 +1352,18 @@ function App() {
 
   const handleCancelUnitEdit = async () => {
     if (!(await requestDiscard(unitFormDirty))) return
-
-    setEditingUnitId(null)
-    setUnitForm({
-      ...initialUnitForm,
-      buildingId: 0,
-      unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+    unitDrawerAnimation.close(() => {
+      setEditingUnitId(null)
+      setUnitForm({
+        ...initialUnitForm,
+        buildingId: 0,
+        unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+      })
+      setUnitFormPropertyId(0)
+      setUnitError('')
+      setUnitFormDirty(false)
+      setIsUnitDrawerOpen(false)
     })
-    setUnitFormPropertyId(0)
-    setUnitError('')
-    setUnitFormDirty(false)
-    setIsUnitDrawerOpen(false)
   }
 
   const handleUnitSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -1399,7 +1410,6 @@ function App() {
           isActive: unitForm.isActive ?? true,
         }
         await updateUnit(editingUnitId, payload)
-        setEditingUnitId(null)
       } else {
         const payload: CreateUnitPayload = {
           buildingId: targetBuilding.id,
@@ -1412,14 +1422,17 @@ function App() {
         }
         await createUnit(payload)
       }
-      setUnitForm({
-        ...initialUnitForm,
-        buildingId: 0,
-        unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+      unitDrawerAnimation.close(() => {
+        setEditingUnitId(null)
+        setUnitForm({
+          ...initialUnitForm,
+          buildingId: 0,
+          unitTypeId: selectableUnitTypes[0]?.id || unitTypes[0]?.id || 0,
+        })
+        setUnitFormPropertyId(0)
+        setUnitFormDirty(false)
+        setIsUnitDrawerOpen(false)
       })
-      setUnitFormPropertyId(0)
-      setUnitFormDirty(false)
-      setIsUnitDrawerOpen(false)
       const [refreshedUnits] = await Promise.all([
         loadAllUnitList(),
         loadAllBuildingList(),
@@ -2156,10 +2169,10 @@ function App() {
         </section>
       )}
 
-      {isPropertyDrawerOpen && (
+      {propertyDrawerAnimation.shouldRender && (
         <>
-          <button className="drawer-backdrop" type="button" aria-label="Yapı formunu kapat" onClick={() => void handleCancelPropertyEdit()} />
-          <aside ref={propertyDrawerRef} tabIndex={-1} className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="property-drawer-title">
+          <button className={`drawer-backdrop drawer-${propertyDrawerAnimation.phase}`} type="button" aria-label="Yapı formunu kapat" disabled={propertyDrawerAnimation.isClosing} onClick={() => void handleCancelPropertyEdit()} />
+          <aside ref={propertyDrawerRef} tabIndex={-1} className={`management-drawer drawer-${propertyDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="property-drawer-title">
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Yapı Yönetimi</p>
@@ -2212,10 +2225,10 @@ function App() {
         </>
       )}
 
-      {isBuildingDrawerOpen && (
+      {buildingDrawerAnimation.shouldRender && (
         <>
-          <button className="drawer-backdrop" type="button" aria-label="Blok formunu kapat" onClick={() => void handleCancelBuildingEdit()} />
-          <aside ref={buildingDrawerRef} tabIndex={-1} className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="building-drawer-title">
+          <button className={`drawer-backdrop drawer-${buildingDrawerAnimation.phase}`} type="button" aria-label="Blok formunu kapat" disabled={buildingDrawerAnimation.isClosing} onClick={() => void handleCancelBuildingEdit()} />
+          <aside ref={buildingDrawerRef} tabIndex={-1} className={`management-drawer drawer-${buildingDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="building-drawer-title">
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Blok Yönetimi</p>
@@ -2442,10 +2455,10 @@ function App() {
         </section>
       )}
 
-      {isUnitDrawerOpen && (
+      {unitDrawerAnimation.shouldRender && (
         <>
-          <button className="drawer-backdrop" type="button" aria-label="Daire formunu kapat" onClick={() => void handleCancelUnitEdit()} />
-          <aside ref={unitDrawerRef} tabIndex={-1} className="management-drawer" role="dialog" aria-modal="true" aria-labelledby="unit-drawer-title">
+          <button className={`drawer-backdrop drawer-${unitDrawerAnimation.phase}`} type="button" aria-label="Daire formunu kapat" disabled={unitDrawerAnimation.isClosing} onClick={() => void handleCancelUnitEdit()} />
+          <aside ref={unitDrawerRef} tabIndex={-1} className={`management-drawer drawer-${unitDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="unit-drawer-title">
             <div className="drawer-header"><div><p className="eyebrow">Daire Yönetimi</p><h2 id="unit-drawer-title" tabIndex={-1} data-drawer-initial-focus>{editingUnitId ? 'Daireyi Düzenle' : 'Yeni Daire'}</h2><p className="drawer-description">Dairenin bağlı yapısını ve fiziksel bilgilerini düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelUnitEdit()}>×</button></div>
             {unitError && <p className="status-message error-message">{unitError}</p>}
             <form className="property-form drawer-form" onSubmit={handleUnitSubmit}>
