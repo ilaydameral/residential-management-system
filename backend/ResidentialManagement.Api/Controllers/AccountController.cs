@@ -22,11 +22,7 @@ public class AccountController : ControllerBase
     [HttpGet("me")]
     public async Task<ActionResult<AccountProfileDto>> GetCurrentProfile()
     {
-        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdValue, out var userId))
-        {
-            throw new UnauthorizedException("Oturum kullanıcı bilgisi doğrulanamadı.");
-        }
+        var userId = GetCurrentUserId();
 
         var profile = await _userService.GetCurrentProfileAsync(userId);
         if (profile is null)
@@ -40,5 +36,40 @@ public class AccountController : ControllerBase
         }
 
         return Ok(profile);
+    }
+
+    [HttpPut("profile")]
+    public async Task<ActionResult<AccountProfileDto>> UpdateCurrentProfile([FromBody] UpdateAccountProfileDto updateDto)
+    {
+        var profile = await _userService.UpdateCurrentProfileAsync(GetCurrentUserId(), updateDto);
+        if (profile is null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                StatusCode = 404,
+                Message = "Kullanıcı hesabı bulunamadı.",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        return Ok(profile);
+    }
+
+    [HttpPut("password")]
+    public async Task<IActionResult> ChangeCurrentPassword([FromBody] ChangeAccountPasswordDto changeDto)
+    {
+        await _userService.ChangeCurrentPasswordAsync(GetCurrentUserId(), changeDto);
+        return NoContent();
+    }
+
+    private int GetCurrentUserId()
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdValue, out var userId))
+        {
+            throw new UnauthorizedException("Oturum kullanıcı bilgisi doğrulanamadı.");
+        }
+
+        return userId;
     }
 }

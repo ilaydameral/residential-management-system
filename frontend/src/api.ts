@@ -25,6 +25,8 @@ import type {
   UnitOccupancy,
   UnitType,
   UpdateBuildingPayload,
+  UpdateAccountProfilePayload,
+  ChangeAccountPasswordPayload,
   UpdateManagedUserPayload,
   UpdatePropertyPayload,
   UpdateUnitOccupancyPayload,
@@ -278,6 +280,24 @@ export async function getMyAccountProfile(): Promise<AccountProfile> {
     headers: getAuthHeaders(),
   })
   return handleResponse<AccountProfile>(response)
+}
+
+export async function updateMyAccountProfile(payload: UpdateAccountProfilePayload): Promise<AccountProfile> {
+  const response = await safeFetch(`${API_BASE_URL}/api/account/profile`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<AccountProfile>(response)
+}
+
+export async function changeMyAccountPassword(payload: ChangeAccountPasswordPayload): Promise<void> {
+  const response = await safeFetch(`${API_BASE_URL}/api/account/password`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  await handleResponse<void>(response)
 }
 
 // Unit Occupancies API

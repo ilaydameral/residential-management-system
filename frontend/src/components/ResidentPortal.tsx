@@ -2,19 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { getMyUnits } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { useRouteChangeGuard } from '../hooks/useRouteChangeGuard'
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { ResidentUnit } from '../types'
 import { groupResidentUnits } from '../utils/residentUnits'
+import { Account } from './Account'
 import { ConfirmationDialog } from './ConfirmationDialog'
-import { ResidentAccount } from './ResidentAccount'
+import { HeaderAccountButton } from './HeaderAccountButton'
+import { HeaderLogoutButton } from './HeaderLogoutButton'
+import { HeaderSettingsButton } from './HeaderSettingsButton'
 import { ResidentHome } from './ResidentHome'
 import { ResidentUnitDetail } from './ResidentUnitDetail'
 import { ResidentUnits } from './ResidentUnits'
+import { Settings } from './Settings'
 import { ThemeToggle } from './ThemeToggle'
 
 const RESIDENT_NAVIGATION = [
   { path: '/resident/home', label: 'Ana Sayfa' },
   { path: '/resident/my-units', label: 'Dairelerim' },
-  { path: '/resident/account', label: 'Hesabım' },
 ]
 
 export function ResidentPortal() {
@@ -25,7 +30,15 @@ export function ResidentPortal() {
   const [isLoadingUnits, setIsLoadingUnits] = useState(true)
   const [unitsError, setUnitsError] = useState('')
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
+  const [settingsDirty, setSettingsDirty] = useState(false)
   const mainContentRef = useRef<HTMLElement>(null)
+  const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(settingsDirty)
+  const clearRouteState = useCallback(() => setSettingsDirty(false), [])
+  const { navigateWithGuard } = useRouteChangeGuard({
+    isDirty: settingsDirty,
+    requestDiscard,
+    onApprovedRouteChange: clearRouteState,
+  })
 
   const loadUnits = useCallback(async () => {
     setIsLoadingUnits(true)
@@ -67,7 +80,7 @@ export function ResidentPortal() {
     <div className="resident-portal">
       <a className="skip-link" href="#resident-main-content">Ana içeriğe geç</a>
       <header className="resident-navigation">
-        <button className="resident-brand" type="button" onClick={() => navigate('/resident/home')}>
+        <button className="resident-brand" type="button" onClick={() => { void navigateWithGuard('/resident/home') }}>
           <span aria-hidden="true">SY</span>
           <span><strong>Site Yönetimi</strong><small>Sakin Portalı</small></span>
         </button>
@@ -79,7 +92,7 @@ export function ResidentPortal() {
               type="button"
               key={item.path}
               aria-current={isNavigationActive(item.path) ? 'page' : undefined}
-              onClick={() => navigate(item.path)}
+              onClick={() => { void navigateWithGuard(item.path) }}
             >
               {item.label}
             </button>
@@ -92,13 +105,19 @@ export function ResidentPortal() {
             <span>Sakin</span>
           </div>
           <ThemeToggle />
-          <button className="secondary-button" type="button" onClick={() => setIsLogoutDialogOpen(true)}>
-            Çıkış Yap
-          </button>
+          <HeaderAccountButton onActivate={() => { void navigateWithGuard('/account') }} />
+          <HeaderSettingsButton onActivate={() => { void navigateWithGuard('/settings') }} />
+          <HeaderLogoutButton onActivate={() => setIsLogoutDialogOpen(true)} />
         </div>
       </header>
 
-      <main id="resident-main-content" ref={mainContentRef} tabIndex={-1} className="resident-portal-main" aria-busy={isLoadingUnits}>
+      <main
+        id="resident-main-content"
+        ref={mainContentRef}
+        tabIndex={-1}
+        className="resident-portal-main"
+        aria-busy={!['/account', '/resident/account', '/settings'].includes(location.pathname) && isLoadingUnits}
+      >
         {location.pathname === '/resident/home' && (
           <ResidentHome
             firstName={user?.firstName || 'Merhaba'}
@@ -127,23 +146,39 @@ export function ResidentPortal() {
             onBack={() => navigate('/resident/my-units')}
           />
         )}
-        {location.pathname === '/resident/account' && <ResidentAccount />}
+        {(location.pathname === '/account' || location.pathname === '/resident/account') && (
+          <Account onOpenSettings={() => { void navigateWithGuard('/settings') }} />
+        )}
+        {location.pathname === '/settings' && (
+          <section className="resident-view-content">
+            <header className="resident-view-header">
+              <p className="eyebrow">Sakin Portalı</p>
+              <h1>Ayarlar</h1>
+              <p>Görünüm ve hesap tercihlerinizi yönetin.</p>
+            </header>
+            <Settings onDirtyChange={setSettingsDirty} requestDiscard={requestDiscard} />
+          </section>
+        )}
       </main>
 
       {isLogoutDialogOpen && (
         <ConfirmationDialog
           title="Çıkış Yap"
-          message="Çıkış yapmak istediğinizden emin misiniz?"
+          message={settingsDirty
+            ? 'Kaydedilmemiş değişiklikleriniz var. Çıkış yaparsanız bu değişiklikler kaybolacak.'
+            : 'Çıkış yapmak istediğinizden emin misiniz?'}
           confirmLabel="Çıkış Yap"
           danger
           onCancel={() => setIsLogoutDialogOpen(false)}
           onConfirm={() => {
             setIsLogoutDialogOpen(false)
+            setSettingsDirty(false)
             logout()
             navigate('/login', { replace: true })
           }}
         />
       )}
+      {unsavedChangesDialog}
     </div>
   )
 }

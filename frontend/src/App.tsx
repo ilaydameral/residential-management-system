@@ -31,14 +31,19 @@ import {
 
 import { Login } from './components/Login'
 import DashboardOverview from './components/DashboardOverview'
+import { Account } from './components/Account'
 import { CentralOccupancyManagement } from './components/CentralOccupancyManagement'
 import { CentralUserManagement } from './components/CentralUserManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
+import { HeaderAccountButton } from './components/HeaderAccountButton'
+import { HeaderLogoutButton } from './components/HeaderLogoutButton'
+import { HeaderSettingsButton } from './components/HeaderSettingsButton'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentPortal } from './components/ResidentPortal'
 import { RowActionsMenu } from './components/RowActionsMenu'
 import { SearchableSelect } from './components/SearchableSelect'
+import { Settings } from './components/Settings'
 import { ThemeToggle } from './components/ThemeToggle'
 import { useAuth } from './context/AuthContext'
 import { useToast } from './context/ToastContext'
@@ -113,7 +118,7 @@ const ROLE_LABEL_MAP: Record<string, string> = {
   TECHNICAL_STAFF: 'Teknik Personel',
 }
 
-type ManagementView = 'overview' | 'properties' | 'buildings' | 'units' | 'users' | 'residents'
+type ManagementView = 'overview' | 'properties' | 'buildings' | 'units' | 'users' | 'residents' | 'account' | 'settings'
 type NavigationGroup = 'structures' | 'people'
 
 interface DestructiveConfirmation {
@@ -130,6 +135,8 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'units', label: 'Daireler' },
   { id: 'users', label: 'Kullanıcılar' },
   { id: 'residents', label: 'Site Sakinleri' },
+  { id: 'account', label: 'Hesabım' },
+  { id: 'settings', label: 'Ayarlar' },
 ]
 
 const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
@@ -139,6 +146,8 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   units: '/units',
   users: '/users',
   residents: '/residents',
+  account: '/account',
+  settings: '/settings',
 }
 
 function getManagementView(pathname: string): ManagementView {
@@ -486,7 +495,9 @@ function App() {
         location.pathname === '/resident/home' ||
         location.pathname === '/resident/my-units' ||
         Boolean(matchPath('/resident/my-units/:unitId', location.pathname)) ||
-        location.pathname === '/resident/account'
+        location.pathname === '/resident/account' ||
+        location.pathname === '/account' ||
+        location.pathname === '/settings'
 
       if (!isKnownResidentRoute) {
         navigate('/resident/home', { replace: true })
@@ -494,7 +505,9 @@ function App() {
       return
     }
 
-    if (location.pathname !== '/') navigate('/', { replace: true })
+    if (location.pathname !== '/' && location.pathname !== '/account' && location.pathname !== '/settings') {
+      navigate('/', { replace: true })
+    }
   }, [
     isAuthenticated,
     isManagementPanel,
@@ -560,11 +573,14 @@ function App() {
     (c) => c.name.toLowerCase() === (propertyForm.city || '').toLowerCase()
   )
   const availableDistricts = matchedCity ? matchedCity.districts : []
-  const showPropertySection = !isManagementPanel || activeManagementView === 'properties'
-  const showBuildingSection = !isManagementPanel || activeManagementView === 'buildings'
-  const showUnitSection = !isManagementPanel || activeManagementView === 'units'
-  const showUnitManagementActions = !isManagementPanel || activeManagementView === 'units'
-  const showOccupancyActions = !isManagementPanel
+  const isStandaloneSettingsView = !isManagementPanel && activeManagementView === 'settings'
+  const isStandaloneAccountView = !isManagementPanel && activeManagementView === 'account'
+  const isStandaloneUtilityView = isStandaloneSettingsView || isStandaloneAccountView
+  const showPropertySection = (!isManagementPanel && !isStandaloneUtilityView) || activeManagementView === 'properties'
+  const showBuildingSection = (!isManagementPanel && !isStandaloneUtilityView) || activeManagementView === 'buildings'
+  const showUnitSection = (!isManagementPanel && !isStandaloneUtilityView) || activeManagementView === 'units'
+  const showUnitManagementActions = (!isManagementPanel && !isStandaloneUtilityView) || activeManagementView === 'units'
+  const showOccupancyActions = !isManagementPanel && !isStandaloneUtilityView
   const filteredProperties = properties.filter((property) => {
     const matchesSearch = property.name.toLocaleLowerCase('tr-TR').includes(
       propertySearch.trim().toLocaleLowerCase('tr-TR')
@@ -1642,7 +1658,11 @@ function App() {
             ? 'Sistem kullanıcılarını, hesap durumlarını ve rollerini tek merkezden yönetin.'
           : activeManagementView === 'residents'
             ? 'Aktif ve geçmiş sakin ilişkilerini tek merkezden yönetin.'
-            : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
+            : activeManagementView === 'account'
+              ? 'Hesabınıza ait temel bilgileri görüntüleyin.'
+              : activeManagementView === 'settings'
+                ? 'Görünüm ve hesap tercihlerinizi yönetin.'
+                : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
   const isStructuresView = ['properties', 'buildings', 'units'].includes(activeManagementView)
   const isPeopleView = ['users', 'residents'].includes(activeManagementView)
 
@@ -1772,6 +1792,7 @@ function App() {
                   ))}
                 </div>
               </div>
+
             </nav>
 
             <div className="management-nav-user">
@@ -1786,9 +1807,9 @@ function App() {
                 ))}
               </div>
               <ThemeToggle />
-              <button className="secondary-button" onClick={handleLogout}>
-                Çıkış Yap
-              </button>
+              <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
+              <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
+              <HeaderLogoutButton onActivate={handleLogout} />
             </div>
           </header>
           {isSidebarOpen && (
@@ -1818,23 +1839,25 @@ function App() {
           ))}
         </div>
         <ThemeToggle />
-        <button className="secondary-button" onClick={handleLogout}>
-          Çıkış Yap
-        </button>
+        <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
+        <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
+        <HeaderLogoutButton onActivate={handleLogout} />
       </div>}
 
       <main id="main-content" ref={mainContentRef} tabIndex={-1} className={isManagementPanel ? 'management-content' : 'page-shell'}>
-      <header className="page-header">
-        <p className="eyebrow">Yönetim Paneli</p>
-        <h1>{isManagementPanel ? activeViewLabel : 'Site & Gayrimenkul Yönetimi'}</h1>
+      {activeManagementView !== 'account' && <header className="page-header">
+        <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
+        <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
         <p className="page-description">
           {isManagementPanel
             ? activeViewDescription
-            : 'Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.'}
+            : isStandaloneSettingsView
+              ? 'Görünüm ve hesap tercihlerinizi yönetin.'
+              : 'Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.'}
         </p>
 
         {/* Selection Breadcrumbs */}
-        {!isManagementPanel && <div className="selection-breadcrumbs">
+        {!isManagementPanel && !isStandaloneSettingsView && <div className="selection-breadcrumbs">
           <div
             className={`breadcrumb-item ${selectedProperty ? 'active' : ''}`}
             onClick={() => selectedProperty && buildingSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
@@ -1873,7 +1896,7 @@ function App() {
             )}
           </div>
         </div>}
-      </header>
+      </header>}
 
       {isManagementPanel && activeManagementView === 'overview' && (
         <section className="section-container">
@@ -1904,6 +1927,14 @@ function App() {
             initialSearch={residentInitialSearch}
           />
         </section>
+      )}
+
+      {activeManagementView === 'account' && (
+        <Account onOpenSettings={() => { void navigateWithGuard('/settings') }} />
+      )}
+
+      {activeManagementView === 'settings' && (
+        <Settings onDirtyChange={handleOccupancyDirtyChange} requestDiscard={requestDiscard} />
       )}
 
       {isManagementPanel && activeManagementView === 'properties' && (

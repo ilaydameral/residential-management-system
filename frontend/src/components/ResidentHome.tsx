@@ -80,7 +80,7 @@ export function ResidentHome({
             </div>
             <div>
               <button className="primary-button" type="button" onClick={() => onNavigate('/resident/my-units')}>Dairelerimi Gör</button>
-              <button className="secondary-button" type="button" onClick={() => onNavigate('/resident/account')}>Hesabımı Gör</button>
+              <button className="secondary-button" type="button" onClick={() => onNavigate('/account')}>Hesabımı Gör</button>
             </div>
           </section>
         </>

@@ -147,6 +147,7 @@ public class UserService : IUserService
             {
                 Id = user.Id,
                 FullName = (user.FirstName + " " + user.LastName).Trim(),
+                UserName = user.UserName,
                 Email = user.Email,
                 Roles = user.UserRoles
                     .Where(userRole => userRole.Role.IsActive)
@@ -157,6 +158,64 @@ public class UserService : IUserService
                 CreatedAt = user.CreatedAt
             })
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<AccountProfileDto?> UpdateCurrentProfileAsync(int id, UpdateAccountProfileDto updateDto)
+    {
+        var normalizedFullName = string.Join(" ", updateDto.FullName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        var lastSeparatorIndex = normalizedFullName.LastIndexOf(' ');
+        if (lastSeparatorIndex <= 0 || lastSeparatorIndex == normalizedFullName.Length - 1)
+        {
+            throw new BadRequestException("Adınızı ve soyadınızı birlikte giriniz.");
+        }
+
+        var firstName = normalizedFullName[..lastSeparatorIndex];
+        var lastName = normalizedFullName[(lastSeparatorIndex + 1)..];
+        if (firstName.Length > 75 || lastName.Length > 75)
+        {
+            throw new BadRequestException("Ad ve soyad alanları ayrı ayrı en fazla 75 karakter olabilir.");
+        }
+
+        var user = await _context.Users.FindAsync(id);
+        if (user is null)
+        {
+            return null;
+        }
+
+        user.FirstName = firstName;
+        user.LastName = lastName;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return await GetCurrentProfileAsync(id);
+    }
+
+    public async Task ChangeCurrentPasswordAsync(int id, ChangeAccountPasswordDto changeDto)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user is null)
+        {
+            throw new KeyNotFoundException("Kullanıcı hesabı bulunamadı.");
+        }
+
+        if (!_passwordService.VerifyPassword(user, user.PasswordHash, changeDto.CurrentPassword))
+        {
+            throw new BadRequestException("Mevcut şifreniz doğru değil.");
+        }
+
+        if (changeDto.CurrentPassword == changeDto.NewPassword)
+        {
+            throw new BadRequestException("Yeni şifreniz mevcut şifrenizden farklı olmalıdır.");
+        }
+
+        if (changeDto.NewPassword != changeDto.ConfirmNewPassword)
+        {
+            throw new BadRequestException("Yeni şifreler birbiriyle eşleşmiyor.");
+        }
+
+        user.PasswordHash = _passwordService.HashPassword(user, changeDto.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
     }
 
     public async Task<UserManagementDto> CreateAsync(CreateManagedUserDto createDto)

@@ -121,10 +121,21 @@ export interface ResidentUnit {
 export interface AccountProfile {
   id: number
   fullName: string
+  userName?: string | null
   email: string
   roles: string[]
   isActive: boolean
   createdAt: string
+}
+
+export interface UpdateAccountProfilePayload {
+  fullName: string
+}
+
+export interface ChangeAccountPasswordPayload {
+  currentPassword: string
+  newPassword: string
+  confirmNewPassword: string
 }
 
 export interface CreateUnitPayload {

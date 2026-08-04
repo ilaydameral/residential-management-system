@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { registerApi } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -6,6 +7,8 @@ import { useToast } from '../context/ToastContext'
 export const Login: React.FC = () => {
   const { login, sessionExpiredMessage, clearSessionMessage } = useAuth()
   const { showToast } = useToast()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [mode, setMode] = useState<'login' | 'register'>('login')
 
   // Login form state
@@ -23,6 +26,13 @@ export const Login: React.FC = () => {
   // Status & Error messages
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    const successMessage = (location.state as { successMessage?: string } | null)?.successMessage
+    if (!successMessage) return
+    showToast(successMessage)
+    navigate('/login', { replace: true, state: null })
+  }, [location.state, navigate, showToast])
 
   const handleTabSwitch = (newMode: 'login' | 'register') => {
     setMode(newMode)

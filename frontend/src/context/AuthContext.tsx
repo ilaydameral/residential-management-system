@@ -17,6 +17,7 @@ interface AuthContextType {
   sessionExpiredMessage: string | null
   login: (credentials: LoginRequest) => Promise<void>
   logout: (reason?: string) => void
+  updateCurrentUserFullName: (fullName: string) => void
   hasRole: (role: string) => boolean
   hasAnyRole: (roles: string[]) => boolean
   clearSessionMessage: () => void
@@ -49,6 +50,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearSessionMessage = () => {
     setSessionExpiredMessage(null)
+  }
+
+  const updateCurrentUserFullName = (fullName: string) => {
+    const normalizedFullName = fullName.trim().replace(/\s+/g, ' ')
+    const separatorIndex = normalizedFullName.lastIndexOf(' ')
+    if (separatorIndex <= 0) return
+
+    setUser((currentUser) => {
+      if (!currentUser) return currentUser
+      const updatedUser = {
+        ...currentUser,
+        firstName: normalizedFullName.slice(0, separatorIndex),
+        lastName: normalizedFullName.slice(separatorIndex + 1),
+      }
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser))
+      return updatedUser
+    })
   }
 
   useEffect(() => {
@@ -112,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sessionExpiredMessage,
         login,
         logout,
+        updateCurrentUserFullName,
         hasRole,
         hasAnyRole,
         clearSessionMessage,
