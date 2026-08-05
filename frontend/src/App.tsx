@@ -35,6 +35,7 @@ import { Account } from './components/Account'
 import { CentralOccupancyManagement } from './components/CentralOccupancyManagement'
 import { CentralUserManagement } from './components/CentralUserManagement'
 import { ManagerAssignmentManagement } from './components/ManagerAssignmentManagement'
+import { ManagerScopeOverview } from './components/ManagerScopeOverview'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -119,7 +120,7 @@ const ROLE_LABEL_MAP: Record<string, string> = {
   TECHNICAL_STAFF: 'Teknik Personel',
 }
 
-type ManagementView = 'overview' | 'properties' | 'buildings' | 'units' | 'users' | 'residents' | 'managerAssignments' | 'account' | 'settings'
+type ManagementView = 'overview' | 'properties' | 'buildings' | 'units' | 'managerScope' | 'users' | 'residents' | 'managerAssignments' | 'account' | 'settings'
 type NavigationGroup = 'structures' | 'people'
 
 interface DestructiveConfirmation {
@@ -134,6 +135,7 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'properties', label: 'Yapılar' },
   { id: 'buildings', label: 'Bloklar' },
   { id: 'units', label: 'Daireler' },
+  { id: 'managerScope', label: 'Sorumlu Olduğum Alanlar' },
   { id: 'users', label: 'Kullanıcılar' },
   { id: 'residents', label: 'Site Sakinleri' },
   { id: 'managerAssignments', label: 'Yönetici Atamaları' },
@@ -146,6 +148,7 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   properties: '/properties',
   buildings: '/buildings',
   units: '/units',
+  managerScope: '/manager/my-scope',
   users: '/users',
   residents: '/residents',
   managerAssignments: '/manager-assignments',
@@ -489,7 +492,18 @@ function App() {
       Boolean(matchPath('/units/:unitId', location.pathname))
 
     if (isManagementPanel) {
+      if (location.pathname === MANAGEMENT_VIEW_PATHS.users && !hasRole('ADMIN')) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
       if (location.pathname === MANAGEMENT_VIEW_PATHS.managerAssignments && !hasRole('ADMIN')) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
+      if (
+        location.pathname === MANAGEMENT_VIEW_PATHS.managerScope &&
+        (!hasRole('MANAGER') || hasRole('ADMIN'))
+      ) {
         navigate('/dashboard', { replace: true })
         return
       }
@@ -1662,6 +1676,8 @@ function App() {
         ? 'Tüm yapılara bağlı blokları tek merkezden yönetin.'
         : activeManagementView === 'units'
           ? 'Tüm daire ve bağımsız bölümleri tek merkezden yönetin.'
+          : activeManagementView === 'managerScope'
+            ? 'Size atanan aktif yapı ve blok sorumluluklarını görüntüleyin.'
           : activeManagementView === 'users'
             ? 'Sistem kullanıcılarını, hesap durumlarını ve rollerini tek merkezden yönetin.'
           : activeManagementView === 'residents'
@@ -1673,7 +1689,7 @@ function App() {
               : activeManagementView === 'settings'
                 ? 'Görünüm ve hesap tercihlerinizi yönetin.'
                 : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
-  const isStructuresView = ['properties', 'buildings', 'units'].includes(activeManagementView)
+  const isStructuresView = ['properties', 'buildings', 'units', 'managerScope'].includes(activeManagementView)
   const isPeopleView = ['users', 'residents', 'managerAssignments'].includes(activeManagementView)
 
   return (
@@ -1737,7 +1753,10 @@ function App() {
                   hidden={openNavigationGroup !== 'structures'}
                   onKeyDown={handleNavigationMenuKeyDown}
                 >
-                  {MANAGEMENT_MENU.filter((item) => ['properties', 'buildings', 'units'].includes(item.id)).map((item) => (
+                  {MANAGEMENT_MENU.filter((item) =>
+                    ['properties', 'buildings', 'units'].includes(item.id) ||
+                    (item.id === 'managerScope' && hasRole('MANAGER') && !hasRole('ADMIN'))
+                  ).map((item) => (
                     <button
                       key={item.id}
                       className={activeManagementView === item.id ? 'active' : ''}
@@ -1750,6 +1769,7 @@ function App() {
                         {item.id === 'properties' && 'Site ve apartman kayıtlarını yönetin.'}
                         {item.id === 'buildings' && 'Blok ve bina kayıtlarına ulaşın.'}
                         {item.id === 'units' && 'Daire ve bağımsız bölümleri yönetin.'}
+                        {item.id === 'managerScope' && 'Aktif sorumluluk alanlarınızı görüntüleyin.'}
                       </small>
                     </button>
                   ))}
@@ -1779,12 +1799,18 @@ function App() {
                 </button>
                 <div
                   id="people-navigation-menu"
-                  className={`management-nav-popup compact ${openNavigationGroup === 'people' ? 'open' : ''}`}
+                  className={`management-nav-popup compact ${hasRole('MANAGER') && !hasRole('ADMIN') ? 'single-item' : ''} ${
+                    openNavigationGroup === 'people' ? 'open' : ''
+                  }`}
                   role="menu"
                   hidden={openNavigationGroup !== 'people'}
                   onKeyDown={handleNavigationMenuKeyDown}
                 >
-                  {MANAGEMENT_MENU.filter((item) => ['users', 'residents'].includes(item.id) || (item.id === 'managerAssignments' && hasRole('ADMIN'))).map((item) => (
+                  {MANAGEMENT_MENU.filter((item) =>
+                    item.id === 'residents' ||
+                    (item.id === 'users' && hasRole('ADMIN')) ||
+                    (item.id === 'managerAssignments' && hasRole('ADMIN'))
+                  ).map((item) => (
                     <button
                       key={item.id}
                       className={activeManagementView === item.id ? 'active' : ''}
@@ -1916,7 +1942,13 @@ function App() {
         </section>
       )}
 
-      {isManagementPanel && activeManagementView === 'users' && (
+      {isManagementPanel && hasRole('MANAGER') && !hasRole('ADMIN') && activeManagementView === 'managerScope' && (
+        <section className="section-container entity-management-view">
+          <ManagerScopeOverview />
+        </section>
+      )}
+
+      {isManagementPanel && hasRole('ADMIN') && activeManagementView === 'users' && (
         <section className="section-container entity-management-view">
           <CentralUserManagement
             onDirtyChange={handleOccupancyDirtyChange}

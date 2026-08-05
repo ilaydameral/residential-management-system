@@ -442,6 +442,13 @@ export async function getManagerAssignments(): Promise<ManagerAssignment[]> {
   return handleResponse<ManagerAssignment[]>(response)
 }
 
+export async function getMyManagerScope(): Promise<ManagerAssignment[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/manager-assignments/my-scope`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagerAssignment[]>(response)
+}
+
 export async function getManagerAssignment(id: number): Promise<ManagerAssignment> {
   const response = await safeFetch(`${API_BASE_URL}/api/manager-assignments/${id}`, {
     headers: getAuthHeaders(),

@@ -21,6 +21,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = AppRoles.Admin)]
     public async Task<ActionResult<List<UserManagementDto>>> GetAll(
         [FromQuery] string? search,
         [FromQuery] string? role,

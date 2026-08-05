@@ -2419,6 +2419,20 @@ code {
   width: 390px;
 }
 
+.management-nav-popup.compact.single-item {
+  top: calc(100% + 8px);
+  width: 260px;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 6px;
+}
+
+.management-nav-popup.compact.single-item button {
+  min-height: 58px;
+  gap: 4px;
+  padding: 10px 11px;
+}
+
 .management-nav-popup.open {
   display: grid;
 }
@@ -2640,6 +2654,13 @@ code {
     border: 0;
     box-shadow: none;
     transform: none;
+  }
+
+  .management-nav-popup.compact.single-item {
+    top: auto;
+    width: 100%;
+    grid-template-columns: 1fr;
+    padding: 4px 0 8px 12px;
   }
 
   .management-nav-popup.open,
@@ -3445,6 +3466,27 @@ textarea:focus-visible,
   min-width: 0;
   max-width: 100%;
 }
+
+.manager-scope-overview {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.manager-scope-summary {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.manager-scope-table {
+  min-width: 720px;
+  table-layout: fixed;
+}
+
+.manager-scope-table th:nth-child(1) { width: 30%; }
+.manager-scope-table th:nth-child(2) { width: 18%; }
+.manager-scope-table th:nth-child(3) { width: 30%; }
+.manager-scope-table th:nth-child(4) { width: 22%; }
 
 .manager-assignment-toolbar {
   grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 0.7fr) auto;
