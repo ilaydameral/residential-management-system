@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ResidentialManagement.Api.Configurations;
 using ResidentialManagement.Api.Entities;
 
 namespace ResidentialManagement.Api.Data;
@@ -21,10 +22,13 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles { get; set; }
     public DbSet<OccupancyType> OccupancyTypes { get; set; }
     public DbSet<UnitOccupancy> UnitOccupancies { get; set; }
+    public DbSet<ManagerAssignment> ManagerAssignments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.ApplyConfiguration(new ManagerAssignmentConfiguration());
 
         modelBuilder.Entity<OccupancyType>(entity =>
         {
