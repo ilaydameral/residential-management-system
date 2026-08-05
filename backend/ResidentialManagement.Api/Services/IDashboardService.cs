@@ -4,5 +4,7 @@ namespace ResidentialManagement.Api.Services;
 
 public interface IDashboardService
 {
-    Task<DashboardSummaryDto> GetSummaryAsync();
+    Task<DashboardSummaryDto> GetSummaryAsync(
+        IReadOnlyCollection<int>? accessiblePropertyIds = null,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null);
 }

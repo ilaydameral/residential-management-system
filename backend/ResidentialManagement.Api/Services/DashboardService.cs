@@ -13,17 +13,35 @@ public class DashboardService : IDashboardService
         _context = context;
     }
 
-    public async Task<DashboardSummaryDto> GetSummaryAsync()
+    public async Task<DashboardSummaryDto> GetSummaryAsync(
+        IReadOnlyCollection<int>? accessiblePropertyIds = null,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
         var utcNow = DateTime.UtcNow;
 
-        var propertyCount = await _context.Properties
+        var properties = _context.Properties
             .AsNoTracking()
-            .CountAsync(property => property.IsActive);
+            .Where(property => property.IsActive);
 
-        var buildingCount = await _context.Buildings
+        if (accessiblePropertyIds is not null)
+        {
+            properties = properties.Where(property =>
+                accessiblePropertyIds.Contains(property.Id));
+        }
+
+        var propertyCount = await properties.CountAsync();
+
+        var buildings = _context.Buildings
             .AsNoTracking()
-            .CountAsync(building => building.IsActive && building.Property.IsActive);
+            .Where(building => building.IsActive && building.Property.IsActive);
+
+        if (accessibleBuildingIds is not null)
+        {
+            buildings = buildings.Where(building =>
+                accessibleBuildingIds.Contains(building.Id));
+        }
+
+        var buildingCount = await buildings.CountAsync();
 
         var activeUnits = _context.Units
             .AsNoTracking()
@@ -31,6 +49,12 @@ public class DashboardService : IDashboardService
                 unit.IsActive &&
                 unit.Building.IsActive &&
                 unit.Building.Property.IsActive);
+
+        if (accessibleBuildingIds is not null)
+        {
+            activeUnits = activeUnits.Where(unit =>
+                accessibleBuildingIds.Contains(unit.BuildingId));
+        }
 
         var unitCount = await activeUnits.CountAsync();
 
@@ -43,6 +67,12 @@ public class DashboardService : IDashboardService
                 occupancy.Unit.IsActive &&
                 occupancy.Unit.Building.IsActive &&
                 occupancy.Unit.Building.Property.IsActive);
+
+        if (accessibleBuildingIds is not null)
+        {
+            activeOccupancies = activeOccupancies.Where(occupancy =>
+                accessibleBuildingIds.Contains(occupancy.Unit.BuildingId));
+        }
 
         var activeOccupancyCount = await activeOccupancies.CountAsync();
         var occupiedUnitCount = await activeOccupancies

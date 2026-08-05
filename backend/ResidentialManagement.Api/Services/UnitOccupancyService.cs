@@ -16,10 +16,18 @@ public class UnitOccupancyService : IUnitOccupancyService
         _context = context;
     }
 
-    public async Task<List<UnitOccupancyDto>> GetAllAsync()
+    public async Task<List<UnitOccupancyDto>> GetAllAsync(
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
-        return await _context.UnitOccupancies
-            .AsNoTracking()
+        var query = _context.UnitOccupancies.AsNoTracking();
+
+        if (accessibleBuildingIds is not null)
+        {
+            query = query.Where(occupancy =>
+                accessibleBuildingIds.Contains(occupancy.Unit.BuildingId));
+        }
+
+        return await query
             .OrderByDescending(uo => uo.IsActive)
             .ThenByDescending(uo => uo.StartDate)
             .Select(uo => new UnitOccupancyDto

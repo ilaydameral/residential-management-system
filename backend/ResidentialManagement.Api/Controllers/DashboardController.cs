@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ResidentialManagement.Api.Authorization;
 using ResidentialManagement.Api.DTOs;
+using ResidentialManagement.Api.Exceptions;
 using ResidentialManagement.Api.Services;
 
 namespace ResidentialManagement.Api.Controllers;
@@ -12,15 +14,46 @@ namespace ResidentialManagement.Api.Controllers;
 public class DashboardController : ControllerBase
 {
     private readonly IDashboardService _dashboardService;
+    private readonly IManagerScopeService _managerScopeService;
 
-    public DashboardController(IDashboardService dashboardService)
+    public DashboardController(
+        IDashboardService dashboardService,
+        IManagerScopeService managerScopeService)
     {
         _dashboardService = dashboardService;
+        _managerScopeService = managerScopeService;
     }
 
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryDto>> GetSummary()
     {
-        return Ok(await _dashboardService.GetSummaryAsync());
+        IReadOnlyCollection<int>? accessiblePropertyIds = null;
+        IReadOnlyCollection<int>? accessibleBuildingIds = null;
+
+        if (User.IsInRole(AppRoles.Manager) && !User.IsInRole(AppRoles.Admin))
+        {
+            var userId = GetCurrentUserId();
+            accessiblePropertyIds = await _managerScopeService.GetAccessiblePropertyIdsAsync(
+                userId,
+                isAdmin: false);
+            accessibleBuildingIds = await _managerScopeService.GetAccessibleBuildingIdsAsync(
+                userId,
+                isAdmin: false);
+        }
+
+        return Ok(await _dashboardService.GetSummaryAsync(
+            accessiblePropertyIds,
+            accessibleBuildingIds));
+    }
+
+    private int GetCurrentUserId()
+    {
+        var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(value, out var userId))
+        {
+            throw new UnauthorizedException("Oturum kullanıcı bilgisi doğrulanamadı.");
+        }
+
+        return userId;
     }
 }
