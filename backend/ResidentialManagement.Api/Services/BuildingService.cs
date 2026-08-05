@@ -15,7 +15,9 @@ public class BuildingService : IBuildingService
         _context = context;
     }
 
-    public async Task<List<BuildingDto>> GetAllBuildingsAsync(bool includeInactive = false)
+    public async Task<List<BuildingDto>> GetAllBuildingsAsync(
+        bool includeInactive = false,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
         var query = _context.Buildings
             .AsNoTracking()
@@ -25,6 +27,11 @@ public class BuildingService : IBuildingService
         if (!includeInactive)
         {
             query = query.Where(b => b.IsActive);
+        }
+
+        if (accessibleBuildingIds is not null)
+        {
+            query = query.Where(b => accessibleBuildingIds.Contains(b.Id));
         }
 
         return await query
@@ -58,7 +65,10 @@ public class BuildingService : IBuildingService
         return building is null ? null : MapToDto(building, building.Property.Name);
     }
 
-    public async Task<List<BuildingDto>?> GetBuildingsByPropertyIdAsync(int propertyId, bool includeInactive = false)
+    public async Task<List<BuildingDto>?> GetBuildingsByPropertyIdAsync(
+        int propertyId,
+        bool includeInactive = false,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
         var propertyExists = await _context.Properties
             .AsNoTracking()
@@ -77,6 +87,11 @@ public class BuildingService : IBuildingService
         if (!includeInactive)
         {
             query = query.Where(b => b.IsActive);
+        }
+
+        if (accessibleBuildingIds is not null)
+        {
+            query = query.Where(b => accessibleBuildingIds.Contains(b.Id));
         }
 
         return await query

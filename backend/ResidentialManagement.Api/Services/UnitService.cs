@@ -16,7 +16,8 @@ public class UnitService : IUnitService
 
     public async Task<List<UnitDto>> GetAllUnitsAsync(
         bool includeInactive = false,
-        int? residentUserId = null)
+        int? residentUserId = null,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
         var utcNow = DateTime.UtcNow;
         var query = _context.Units
@@ -27,6 +28,11 @@ public class UnitService : IUnitService
             .AsQueryable();
 
         query = ApplyReadAccessFilter(query, includeInactive, residentUserId);
+
+        if (accessibleBuildingIds is not null)
+        {
+            query = query.Where(u => accessibleBuildingIds.Contains(u.BuildingId));
+        }
 
         return await query
             .OrderBy(u => u.Building.PropertyId)
@@ -107,7 +113,8 @@ public class UnitService : IUnitService
     public async Task<List<UnitDto>?> GetUnitsByBuildingIdAsync(
         int buildingId,
         bool includeInactive = false,
-        int? residentUserId = null)
+        int? residentUserId = null,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
         var utcNow = DateTime.UtcNow;
         var buildingExists = await _context.Buildings
@@ -127,6 +134,11 @@ public class UnitService : IUnitService
             .Where(u => u.BuildingId == buildingId);
 
         query = ApplyReadAccessFilter(query, includeInactive, residentUserId);
+
+        if (accessibleBuildingIds is not null)
+        {
+            query = query.Where(u => accessibleBuildingIds.Contains(u.BuildingId));
+        }
 
         return await query
             .OrderBy(u => u.UnitNumber)
@@ -160,7 +172,8 @@ public class UnitService : IUnitService
     public async Task<List<UnitDto>?> GetUnitsByPropertyIdAsync(
         int propertyId,
         bool includeInactive = false,
-        int? residentUserId = null)
+        int? residentUserId = null,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
         var utcNow = DateTime.UtcNow;
         var propertyExists = await _context.Properties
@@ -180,6 +193,11 @@ public class UnitService : IUnitService
             .Where(u => u.Building.PropertyId == propertyId);
 
         query = ApplyReadAccessFilter(query, includeInactive, residentUserId);
+
+        if (accessibleBuildingIds is not null)
+        {
+            query = query.Where(u => accessibleBuildingIds.Contains(u.BuildingId));
+        }
 
         return await query
             .OrderBy(u => u.Building.Code)

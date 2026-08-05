@@ -14,7 +14,10 @@ public class PropertyService : IPropertyService
         _context = context;
     }
 
-    public async Task<List<PropertyDto>> GetAllPropertiesAsync(bool includeInactive = false)
+    public async Task<List<PropertyDto>> GetAllPropertiesAsync(
+        bool includeInactive = false,
+        IReadOnlyCollection<int>? accessiblePropertyIds = null,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
         var query = _context.Properties
             .AsNoTracking()
@@ -24,6 +27,11 @@ public class PropertyService : IPropertyService
         if (!includeInactive)
         {
             query = query.Where(p => p.IsActive);
+        }
+
+        if (accessiblePropertyIds is not null)
+        {
+            query = query.Where(p => accessiblePropertyIds.Contains(p.Id));
         }
 
         return await query
@@ -42,23 +50,53 @@ public class PropertyService : IPropertyService
                 District = p.District,
                 Description = p.Description,
                 IsActive = p.IsActive,
-                BuildingCount = p.Buildings.Count,
-                UnitCount = p.Buildings.SelectMany(b => b.Units).Count(),
+                BuildingCount = accessibleBuildingIds == null
+                    ? p.Buildings.Count
+                    : p.Buildings.Count(b => accessibleBuildingIds.Contains(b.Id)),
+                UnitCount = accessibleBuildingIds == null
+                    ? p.Buildings.SelectMany(b => b.Units).Count()
+                    : p.Buildings
+                        .Where(b => accessibleBuildingIds.Contains(b.Id))
+                        .SelectMany(b => b.Units)
+                        .Count(),
                 CreatedAt = p.CreatedAt
             })
             .ToListAsync();
     }
 
-    public async Task<PropertyDto?> GetPropertyByIdAsync(int id)
+    public async Task<PropertyDto?> GetPropertyByIdAsync(
+        int id,
+        IReadOnlyCollection<int>? accessibleBuildingIds = null)
     {
-        var property = await _context.Properties
+        return await _context.Properties
             .AsNoTracking()
-            .Include(p => p.PropertyTypeLookup)
-            .Include(p => p.Buildings)
-                .ThenInclude(b => b.Units)
-            .FirstOrDefaultAsync(p => p.Id == id);
-
-        return property is null ? null : MapToDto(property);
+            .Where(p => p.Id == id)
+            .Select(p => new PropertyDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                PropertyTypeId = p.PropertyTypeId,
+                PropertyType = p.PropertyType,
+                PropertyTypeName = p.PropertyTypeLookup != null
+                    ? p.PropertyTypeLookup.Name
+                    : p.PropertyType,
+                AddressLine = p.AddressLine,
+                City = p.City,
+                District = p.District,
+                Description = p.Description,
+                IsActive = p.IsActive,
+                BuildingCount = accessibleBuildingIds == null
+                    ? p.Buildings.Count
+                    : p.Buildings.Count(b => accessibleBuildingIds.Contains(b.Id)),
+                UnitCount = accessibleBuildingIds == null
+                    ? p.Buildings.SelectMany(b => b.Units).Count()
+                    : p.Buildings
+                        .Where(b => accessibleBuildingIds.Contains(b.Id))
+                        .SelectMany(b => b.Units)
+                        .Count(),
+                CreatedAt = p.CreatedAt
+            })
+            .FirstOrDefaultAsync();
     }
 
     public async Task<PropertyDto> CreatePropertyAsync(CreatePropertyDto createDto)

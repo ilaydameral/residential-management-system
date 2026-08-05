@@ -14,17 +14,24 @@ namespace ResidentialManagement.Api.Controllers;
 public class UnitsController : ControllerBase
 {
     private readonly IUnitService _unitService;
+    private readonly IManagerScopeService _managerScopeService;
 
-    public UnitsController(IUnitService unitService)
+    public UnitsController(
+        IUnitService unitService,
+        IManagerScopeService managerScopeService)
     {
         _unitService = unitService;
+        _managerScopeService = managerScopeService;
     }
 
     [HttpGet]
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnits([FromQuery] bool includeInactive = false)
     {
-        var units = await _unitService.GetAllUnitsAsync(includeInactive, GetResidentUserId());
+        var units = await _unitService.GetAllUnitsAsync(
+            includeInactive,
+            GetResidentUserId(),
+            await GetManagerAccessibleBuildingIdsAsync());
         return Ok(units);
     }
 
@@ -32,6 +39,8 @@ public class UnitsController : ControllerBase
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<UnitDto>> GetUnitById(int id)
     {
+        await EnsureManagerCanAccessUnitAsync(id);
+
         var unit = await _unitService.GetUnitByIdAsync(id, GetResidentUserId());
         if (unit is null)
         {
@@ -50,7 +59,13 @@ public class UnitsController : ControllerBase
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByBuildingId(int buildingId, [FromQuery] bool includeInactive = false)
     {
-        var units = await _unitService.GetUnitsByBuildingIdAsync(buildingId, includeInactive, GetResidentUserId());
+        await EnsureManagerCanAccessBuildingAsync(buildingId);
+
+        var units = await _unitService.GetUnitsByBuildingIdAsync(
+            buildingId,
+            includeInactive,
+            GetResidentUserId(),
+            await GetManagerAccessibleBuildingIdsAsync());
         if (units is null)
         {
             return NotFound(new ErrorResponse
@@ -68,7 +83,19 @@ public class UnitsController : ControllerBase
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByPropertyId(int propertyId, [FromQuery] bool includeInactive = false)
     {
-        var units = await _unitService.GetUnitsByPropertyIdAsync(propertyId, includeInactive, GetResidentUserId());
+        if (IsManagerOnly() && !await _managerScopeService.CanViewPropertyAsync(
+            GetCurrentUserId(),
+            propertyId,
+            isAdmin: false))
+        {
+            throw new ForbiddenException("Bu yapının dairelerini görüntüleme yetkiniz bulunmamaktadır.");
+        }
+
+        var units = await _unitService.GetUnitsByPropertyIdAsync(
+            propertyId,
+            includeInactive,
+            GetResidentUserId(),
+            await GetManagerAccessibleBuildingIdsAsync());
         if (units is null)
         {
             return NotFound(new ErrorResponse
@@ -91,6 +118,8 @@ public class UnitsController : ControllerBase
             return BadRequest(ModelState);
         }
 
+        await EnsureManagerCanAccessBuildingAsync(createDto.BuildingId);
+
         var createdUnit = await _unitService.CreateUnitAsync(createDto);
 
         return CreatedAtAction(
@@ -108,6 +137,9 @@ public class UnitsController : ControllerBase
         {
             return BadRequest(ModelState);
         }
+
+        await EnsureManagerCanAccessUnitAsync(id);
+        await EnsureManagerCanAccessBuildingAsync(updateDto.BuildingId);
 
         var updatedUnit = await _unitService.UpdateUnitAsync(id, updateDto);
         if (updatedUnit is null)
@@ -150,6 +182,16 @@ public class UnitsController : ControllerBase
             return null;
         }
 
+        return GetCurrentUserId();
+    }
+
+    private bool IsManagerOnly()
+    {
+        return User.IsInRole(AppRoles.Manager) && !User.IsInRole(AppRoles.Admin);
+    }
+
+    private int GetCurrentUserId()
+    {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(userIdClaim, out var userId))
         {
@@ -157,5 +199,36 @@ public class UnitsController : ControllerBase
         }
 
         return userId;
+    }
+
+    private async Task<IReadOnlyCollection<int>?> GetManagerAccessibleBuildingIdsAsync()
+    {
+        return IsManagerOnly()
+            ? await _managerScopeService.GetAccessibleBuildingIdsAsync(
+                GetCurrentUserId(),
+                isAdmin: false)
+            : null;
+    }
+
+    private async Task EnsureManagerCanAccessBuildingAsync(int buildingId)
+    {
+        if (IsManagerOnly() && !await _managerScopeService.CanAccessBuildingAsync(
+            GetCurrentUserId(),
+            buildingId,
+            isAdmin: false))
+        {
+            throw new ForbiddenException("Bu bloğun dairelerine erişim yetkiniz bulunmamaktadır.");
+        }
+    }
+
+    private async Task EnsureManagerCanAccessUnitAsync(int unitId)
+    {
+        if (IsManagerOnly() && !await _managerScopeService.CanAccessUnitAsync(
+            GetCurrentUserId(),
+            unitId,
+            isAdmin: false))
+        {
+            throw new ForbiddenException("Bu daire üzerinde işlem yapma yetkiniz bulunmamaktadır.");
+        }
     }
 }
