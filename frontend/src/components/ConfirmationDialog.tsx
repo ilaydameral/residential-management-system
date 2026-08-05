@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 
 interface ConfirmationDialogProps {
   title: string
@@ -7,8 +7,10 @@ interface ConfirmationDialogProps {
   cancelLabel?: string
   danger?: boolean
   isLoading?: boolean
+  confirmDisabled?: boolean
   onCancel: () => void
   onConfirm: () => void
+  children?: ReactNode
 }
 
 export function ConfirmationDialog({
@@ -18,8 +20,10 @@ export function ConfirmationDialog({
   cancelLabel = 'Vazgeç',
   danger = false,
   isLoading = false,
+  confirmDisabled = false,
   onCancel,
   onConfirm,
+  children,
 }: ConfirmationDialogProps) {
   const titleId = useId()
   const descriptionId = useId()
@@ -53,7 +57,16 @@ export function ConfirmationDialog({
     }
 
     if (event.key === 'Enter') {
+      const isTextEntry = event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+
+      if (isTextEntry && !event.ctrlKey && !event.metaKey) {
+        if (event.target instanceof HTMLInputElement) event.preventDefault()
+        return
+      }
+
       event.preventDefault()
+      if (!isLoading && !confirmDisabled) onConfirm()
       return
     }
 
@@ -88,6 +101,7 @@ export function ConfirmationDialog({
       >
         <h2 id={titleId}>{title}</h2>
         <p id={descriptionId}>{message}</p>
+        {children}
         <div className="confirmation-actions">
           <button ref={cancelButtonRef} className="secondary-button" type="button" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
@@ -96,7 +110,7 @@ export function ConfirmationDialog({
             className={danger ? 'action-button danger-btn' : 'primary-button'}
             type="button"
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
           >
             {isLoading ? 'İşlem yapılıyor...' : confirmLabel}
           </button>

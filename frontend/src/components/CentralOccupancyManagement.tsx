@@ -439,7 +439,7 @@ export function CentralOccupancyManagement({
   const combinedLoading = isLoading || isReferenceDataLoading
 
   return (
-    <section className="central-occupancy-view" aria-busy={combinedLoading}>
+    <section className="central-occupancy-view entity-management-view" aria-busy={combinedLoading}>
       <div className="entity-page-actions residents-page-actions">
         <p>{!combinedError && !combinedLoading ? `${filteredOccupancies.length} sakin kaydı gösteriliyor.` : 'Aktif ve geçmiş sakin ilişkilerini tek ekrandan yönetin.'}</p>
         <button className="primary-button" type="button" onClick={() => void openCreate()} disabled={occupancyTypes.length === 0 || isReferenceDataLoading}>Yeni Sakin Ata</button>

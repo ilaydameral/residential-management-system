@@ -3441,6 +3441,88 @@ textarea:focus-visible,
   max-width: 100%;
 }
 
+.manager-assignment-view {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.manager-assignment-toolbar {
+  grid-template-columns: minmax(260px, 1.5fr) minmax(180px, 0.7fr) auto;
+}
+
+.manager-assignment-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.manager-assignment-table th:nth-child(1) { width: 15%; }
+.manager-assignment-table th:nth-child(2) { width: 9%; }
+.manager-assignment-table th:nth-child(3) { width: 12%; }
+.manager-assignment-table th:nth-child(4) { width: 12%; }
+.manager-assignment-table th:nth-child(5) { width: 14%; }
+.manager-assignment-table th:nth-child(6) { width: 8%; }
+.manager-assignment-table .manager-assignment-end-column,
+.manager-assignment-table .manager-assignment-end-cell {
+  width: 20%;
+  min-width: 0;
+  max-width: none;
+  white-space: normal;
+}
+
+.manager-assignment-table.sticky-columns-table .manager-assignment-actions-column,
+.manager-assignment-table.sticky-columns-table .manager-assignment-actions-cell {
+  width: 10%;
+  min-width: 0;
+}
+
+.manager-assignment-table td:nth-child(1),
+.manager-assignment-table td:nth-child(3),
+.manager-assignment-table td:nth-child(4),
+.manager-assignment-table td:nth-child(7) {
+  overflow-wrap: anywhere;
+}
+
+.manager-assignment-end-details {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  gap: 5px;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.manager-assignment-end-details > * {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.manager-assignment-end-details .end-reason {
+  word-break: break-word;
+}
+
+.confirmation-form-field {
+  margin-top: 18px;
+  text-align: left;
+}
+
+.confirmation-form-field textarea {
+  resize: vertical;
+}
+
+.confirmation-form-field small {
+  align-self: flex-end;
+}
+
+@media (max-width: 1100px) {
+  .manager-assignment-table {
+    min-width: 1180px;
+  }
+}
+
 .user-toolbar {
   grid-template-columns: minmax(240px, 1.5fr) repeat(2, minmax(180px, 1fr)) auto;
 }
@@ -3663,6 +3745,10 @@ textarea:focus-visible,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .manager-assignment-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .residents-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3690,6 +3776,7 @@ textarea:focus-visible,
   .entity-toolbar,
   .drawer-form,
   .unit-toolbar,
+  .manager-assignment-toolbar,
   .unit-general-grid {
     grid-template-columns: 1fr;
   }

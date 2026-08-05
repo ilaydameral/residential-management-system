@@ -4,6 +4,7 @@ import type {
   AccountProfile,
   AuthenticatedUser,
   Building,
+  CreateManagerAssignmentPayload,
   CreateBuildingPayload,
   CreateManagedUserPayload,
   CreatePropertyPayload,
@@ -11,10 +12,12 @@ import type {
   CreateUnitPayload,
   DashboardSummary,
   EndUnitOccupancyPayload,
+  EndManagerAssignmentPayload,
   LoginRequest,
   LoginResponse,
   ManagedUser,
   ManagedUserDetail,
+  ManagerAssignment,
   OccupancyType,
   Property,
   PropertyType,
@@ -429,4 +432,42 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     headers: getAuthHeaders(),
   })
   return handleResponse<DashboardSummary>(response)
+}
+
+// Manager Assignments API
+export async function getManagerAssignments(): Promise<ManagerAssignment[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/manager-assignments`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagerAssignment[]>(response)
+}
+
+export async function getManagerAssignment(id: number): Promise<ManagerAssignment> {
+  const response = await safeFetch(`${API_BASE_URL}/api/manager-assignments/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ManagerAssignment>(response)
+}
+
+export async function createManagerAssignment(
+  payload: CreateManagerAssignmentPayload
+): Promise<ManagerAssignment> {
+  const response = await safeFetch(`${API_BASE_URL}/api/manager-assignments`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagerAssignment>(response)
+}
+
+export async function endManagerAssignment(
+  id: number,
+  payload: EndManagerAssignmentPayload
+): Promise<ManagerAssignment> {
+  const response = await safeFetch(`${API_BASE_URL}/api/manager-assignments/${id}/end`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ManagerAssignment>(response)
 }

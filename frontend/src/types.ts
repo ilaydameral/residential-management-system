@@ -308,3 +308,35 @@ export interface DashboardSummary {
   occupiedUnitCount: number
   vacantUnitCount: number
 }
+
+export interface ManagerAssignment {
+  id: number
+  managerUserId: number
+  managerUserName: string
+  managerFullName: string
+  managerEmail: string
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  buildingCode: string | null
+  scopeType: 'PROPERTY' | 'BUILDING'
+  assignedAt: string
+  assignedByUserId: number
+  assignedByFullName: string
+  isActive: boolean
+  endedAt: string | null
+  endedByUserId: number | null
+  endedByFullName: string | null
+  endReason: string | null
+}
+
+export interface CreateManagerAssignmentPayload {
+  managerUserId: number
+  propertyId: number
+  buildingId: number | null
+}
+
+export interface EndManagerAssignmentPayload {
+  endReason: string | null
+}

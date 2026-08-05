@@ -338,7 +338,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
   ].filter(Boolean).length
 
   return (
-    <section className="central-user-view" aria-busy={isLoading || isDetailLoading}>
+    <section className="central-user-view entity-management-view" aria-busy={isLoading || isDetailLoading}>
       <div className="entity-page-actions">
         <p>{!isLoading && !loadError ? `${filteredUsers.length} kullanıcı gösteriliyor.` : 'Sistem kullanıcılarını merkezi olarak görüntüleyin.'}</p>
         {isAdmin && <button className="primary-button" type="button" onClick={() => void openCreate()} disabled={roles.length === 0}>Yeni Kullanıcı</button>}
