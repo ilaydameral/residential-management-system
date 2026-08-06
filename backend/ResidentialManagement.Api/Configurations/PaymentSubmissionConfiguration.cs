@@ -16,7 +16,7 @@ public class PaymentSubmissionConfiguration : IEntityTypeConfiguration<PaymentSu
 
             table.HasCheckConstraint(
                 "CK_PaymentSubmissions_Status_Allowed",
-                "[Status] IN ('PENDING', 'APPROVED', 'REJECTED')");
+                "[Status] IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')");
         });
 
         builder.Property(ps => ps.Amount)
@@ -35,6 +35,11 @@ public class PaymentSubmissionConfiguration : IEntityTypeConfiguration<PaymentSu
         builder.HasOne(ps => ps.ReviewedByUser)
             .WithMany()
             .HasForeignKey(ps => ps.ReviewedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(ps => ps.CancelledByUser)
+            .WithMany()
+            .HasForeignKey(ps => ps.CancelledByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(ps => ps.UnitChargeId);

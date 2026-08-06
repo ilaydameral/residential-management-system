@@ -39,6 +39,11 @@ public class PaymentSubmission
     [MaxLength(500)]
     public string? RejectionReason { get; set; }
 
+    public DateTime? CancelledAt { get; set; }
+
+    public int? CancelledByUserId { get; set; }
+    public User? CancelledByUser { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }
