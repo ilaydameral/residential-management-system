@@ -11,6 +11,10 @@ public class DuePeriodConfiguration : IEntityTypeConfiguration<DuePeriod>
         builder.ToTable("DuePeriods", table =>
         {
             table.HasCheckConstraint(
+                "CK_DuePeriods_UnitAmount_Positive",
+                "[UnitAmount] > 0");
+
+            table.HasCheckConstraint(
                 "CK_DuePeriods_Year_Range",
                 "[Year] >= 2020 AND [Year] <= 2100");
 
@@ -22,6 +26,9 @@ public class DuePeriodConfiguration : IEntityTypeConfiguration<DuePeriod>
                 "CK_DuePeriods_Status_Allowed",
                 "[Status] IN ('DRAFT', 'ISSUED', 'CANCELLED')");
         });
+
+        builder.Property(dp => dp.UnitAmount)
+            .HasColumnType("decimal(18,2)");
 
         builder.HasOne(dp => dp.DueDefinition)
             .WithMany(dd => dd.DuePeriods)

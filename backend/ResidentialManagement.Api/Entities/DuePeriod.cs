@@ -15,6 +15,8 @@ public class DuePeriod
     [MaxLength(50)]
     public string PeriodName { get; set; } = string.Empty;
 
+    public decimal UnitAmount { get; set; }
+
     public DateTime DueDate { get; set; }
 
     [MaxLength(50)]

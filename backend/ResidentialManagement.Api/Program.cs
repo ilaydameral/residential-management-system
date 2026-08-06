@@ -55,6 +55,8 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IManagerAssignmentService, ManagerAssignmentService>();
 builder.Services.AddScoped<IManagerScopeService, ManagerScopeService>();
+builder.Services.AddScoped<IDueDefinitionService, DueDefinitionService>();
+builder.Services.AddScoped<IDuePeriodService, DuePeriodService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
