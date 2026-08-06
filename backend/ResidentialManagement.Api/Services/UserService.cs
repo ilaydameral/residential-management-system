@@ -297,9 +297,20 @@ public class UserService : IUserService
             throw new InvalidOperationException("Kendi kullanıcı hesabınızı pasif duruma getiremezsiniz.");
         }
 
-        if (!isActive && user.IsActive && HasActiveAdminRole(user))
+        if (!isActive && user.IsActive)
         {
-            await EnsureAnotherActiveAdminExistsAsync(id);
+            var hasActiveAssignments = await _context.ManagerAssignments
+                .AnyAsync(assignment => assignment.ManagerUserId == id && assignment.IsActive);
+
+            if (hasActiveAssignments)
+            {
+                throw new InvalidOperationException("Üzerinde aktif yönetici ataması bulunan bir kullanıcı pasif duruma getirilemez. Önce yönetici atamalarını sonlandırınız.");
+            }
+
+            if (HasActiveAdminRole(user))
+            {
+                await EnsureAnotherActiveAdminExistsAsync(id);
+            }
         }
 
         user.IsActive = isActive;
@@ -337,6 +348,20 @@ public class UserService : IUserService
         if (user.IsActive && currentlyAdmin && !keepsAdminRole)
         {
             await EnsureAnotherActiveAdminExistsAsync(id);
+        }
+
+        var keepsManagerRole = roles.Any(role => role.Code == AppRoles.Manager);
+        var currentlyManager = HasActiveManagerRole(user);
+
+        if (currentlyManager && !keepsManagerRole)
+        {
+            var hasActiveAssignments = await _context.ManagerAssignments
+                .AnyAsync(assignment => assignment.ManagerUserId == id && assignment.IsActive);
+
+            if (hasActiveAssignments)
+            {
+                throw new InvalidOperationException("Üzerinde aktif yönetici ataması bulunan bir kullanıcının MANAGER rolü kaldırılamaz. Önce yönetici atamalarını sonlandırınız.");
+            }
         }
 
         var assignedAt = DateTime.UtcNow;
@@ -398,6 +423,12 @@ public class UserService : IUserService
     {
         return user.UserRoles.Any(userRole =>
             userRole.Role.IsActive && userRole.Role.Code == AppRoles.Admin);
+    }
+
+    private static bool HasActiveManagerRole(User user)
+    {
+        return user.UserRoles.Any(userRole =>
+            userRole.Role.IsActive && userRole.Role.Code == AppRoles.Manager);
     }
 
     private async Task EnsureAnotherActiveAdminExistsAsync(int excludedUserId)
