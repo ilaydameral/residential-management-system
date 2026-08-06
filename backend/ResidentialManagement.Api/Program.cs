@@ -57,6 +57,7 @@ builder.Services.AddScoped<IManagerAssignmentService, ManagerAssignmentService>(
 builder.Services.AddScoped<IManagerScopeService, ManagerScopeService>();
 builder.Services.AddScoped<IDueDefinitionService, DueDefinitionService>();
 builder.Services.AddScoped<IDuePeriodService, DuePeriodService>();
+builder.Services.AddScoped<IExpenseService, ExpenseService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
