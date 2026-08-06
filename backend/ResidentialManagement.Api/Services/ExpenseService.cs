@@ -11,13 +11,16 @@ public class ExpenseService : IExpenseService
 {
     private readonly AppDbContext _context;
     private readonly IManagerScopeService _managerScopeService;
+    private readonly INotificationService _notificationService;
 
     public ExpenseService(
         AppDbContext context,
-        IManagerScopeService managerScopeService)
+        IManagerScopeService managerScopeService,
+        INotificationService notificationService)
     {
         _context = context;
         _managerScopeService = managerScopeService;
+        _notificationService = notificationService;
     }
 
     public async Task<List<ExpenseDto>> GetAllAsync(
@@ -365,6 +368,25 @@ public class ExpenseService : IExpenseService
 
         expense.UpdatedAt = utcNow;
         expense.UpdatedByUserId = currentUserId;
+
+        var targetUnitIds = targets.Select(t => t.Unit.Id).Distinct().ToList();
+        var residentUserIds = await _context.UnitOccupancies
+            .AsNoTracking()
+            .Where(uo => targetUnitIds.Contains(uo.UnitId) && uo.IsActive && (uo.EndDate == null || uo.EndDate > utcNow))
+            .Select(uo => uo.UserId)
+            .Distinct()
+            .ToListAsync();
+
+        if (residentUserIds.Count > 0)
+        {
+            await _notificationService.AddNotificationEntitiesForUsersAsync(
+                residentUserIds,
+                $"Gider Payı Yansıtıldı: {expense.Title}",
+                $"{expense.Title} gideri dairenize yansıtılmıştır. Son ödeme tarihi: {apportionDto.DueDate:dd.MM.yyyy}.",
+                "FINANCE",
+                "Expense",
+                expense.Id);
+        }
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();

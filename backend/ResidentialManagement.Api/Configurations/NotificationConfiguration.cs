@@ -17,5 +17,10 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
 
         builder.HasIndex(n => new { n.UserId, n.IsRead });
         builder.HasIndex(n => new { n.UserId, n.IsDismissed });
+        builder.HasIndex(n => new { n.UserId, n.IsDismissed, n.IsRead });
+
+        builder.HasIndex(n => new { n.UserId, n.NotificationType, n.RelatedEntityName, n.RelatedEntityId })
+            .IsUnique()
+            .HasFilter("[RelatedEntityName] IS NOT NULL AND [RelatedEntityId] IS NOT NULL");
     }
 }

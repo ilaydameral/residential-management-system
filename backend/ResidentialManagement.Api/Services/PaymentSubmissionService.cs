@@ -12,15 +12,18 @@ public class PaymentSubmissionService : IPaymentSubmissionService
     private readonly AppDbContext _context;
     private readonly IManagerScopeService _managerScopeService;
     private readonly IReceiptStorageService _receiptStorageService;
+    private readonly INotificationService _notificationService;
 
     public PaymentSubmissionService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
-        IReceiptStorageService receiptStorageService)
+        IReceiptStorageService receiptStorageService,
+        INotificationService notificationService)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _receiptStorageService = receiptStorageService;
+        _notificationService = notificationService;
     }
 
     public async Task<List<ResidentUnitChargeDto>> GetMyUnitChargesAsync(int residentUserId)
@@ -337,6 +340,14 @@ public class PaymentSubmissionService : IPaymentSubmissionService
         submission.ReviewedAt = utcNow;
         submission.UpdatedAt = utcNow;
 
+        await _notificationService.AddNotificationEntitiesForUsersAsync(
+            new[] { submission.SubmittedByUserId },
+            "Ödeme Dekontunuz Onaylandı",
+            $"{submission.Amount:N2} TL tutarındaki ödeme dekontu başvurunuz onaylanmıştır.",
+            "FINANCE",
+            "PaymentSubmission",
+            submission.Id);
+
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
 
@@ -377,6 +388,14 @@ public class PaymentSubmissionService : IPaymentSubmissionService
         submission.ReviewedAt = utcNow;
         submission.RejectionReason = dto.RejectionReason.Trim();
         submission.UpdatedAt = utcNow;
+
+        await _notificationService.AddNotificationEntitiesForUsersAsync(
+            new[] { submission.SubmittedByUserId },
+            "Ödeme Dekontunuz Reddedildi",
+            $"{submission.Amount:N2} TL tutarındaki ödeme dekontu başvurunuz reddedilmiştir. Gerekçe: {submission.RejectionReason}",
+            "FINANCE",
+            "PaymentSubmission",
+            submission.Id);
 
         await _context.SaveChangesAsync();
 

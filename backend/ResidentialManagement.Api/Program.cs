@@ -60,6 +60,8 @@ builder.Services.AddScoped<IDuePeriodService, DuePeriodService>();
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IReceiptStorageService, LocalReceiptStorageService>();
 builder.Services.AddScoped<IPaymentSubmissionService, PaymentSubmissionService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IFinancialReportingService, FinancialReportingService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");

@@ -11,13 +11,16 @@ public class DuePeriodService : IDuePeriodService
 {
     private readonly AppDbContext _context;
     private readonly IManagerScopeService _managerScopeService;
+    private readonly INotificationService _notificationService;
 
     public DuePeriodService(
         AppDbContext context,
-        IManagerScopeService managerScopeService)
+        IManagerScopeService managerScopeService,
+        INotificationService notificationService)
     {
         _context = context;
         _managerScopeService = managerScopeService;
+        _notificationService = notificationService;
     }
 
     public async Task<List<DuePeriodDto>> GetAllAsync(
@@ -265,6 +268,24 @@ public class DuePeriodService : IDuePeriodService
         period.IssuedAt = utcNow;
         period.IssuedByUserId = currentUserId;
         period.UpdatedAt = utcNow;
+
+        var residentUserIds = await _context.UnitOccupancies
+            .AsNoTracking()
+            .Where(uo => targetUnits.Contains(uo.UnitId) && uo.IsActive && (uo.EndDate == null || uo.EndDate > utcNow))
+            .Select(uo => uo.UserId)
+            .Distinct()
+            .ToListAsync();
+
+        if (residentUserIds.Count > 0)
+        {
+            await _notificationService.AddNotificationEntitiesForUsersAsync(
+                residentUserIds,
+                $"Yeni Aidat Dönemi Yayınlandı: {period.PeriodName}",
+                $"{period.PeriodName} aidat dönemi borçlandırılmıştır. Son ödeme tarihi: {period.DueDate:dd.MM.yyyy}.",
+                "FINANCE",
+                "DuePeriod",
+                period.Id);
+        }
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
