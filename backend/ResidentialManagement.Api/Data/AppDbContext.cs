@@ -23,12 +23,26 @@ public class AppDbContext : DbContext
     public DbSet<OccupancyType> OccupancyTypes { get; set; }
     public DbSet<UnitOccupancy> UnitOccupancies { get; set; }
     public DbSet<ManagerAssignment> ManagerAssignments { get; set; }
+    public DbSet<DueDefinition> DueDefinitions { get; set; }
+    public DbSet<DuePeriod> DuePeriods { get; set; }
+    public DbSet<UnitCharge> UnitCharges { get; set; }
+    public DbSet<Expense> Expenses { get; set; }
+    public DbSet<Payment> Payments { get; set; }
+    public DbSet<PaymentSubmission> PaymentSubmissions { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfiguration(new ManagerAssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new DueDefinitionConfiguration());
+        modelBuilder.ApplyConfiguration(new DuePeriodConfiguration());
+        modelBuilder.ApplyConfiguration(new ExpenseConfiguration());
+        modelBuilder.ApplyConfiguration(new UnitChargeConfiguration());
+        modelBuilder.ApplyConfiguration(new PaymentSubmissionConfiguration());
+        modelBuilder.ApplyConfiguration(new PaymentConfiguration());
+        modelBuilder.ApplyConfiguration(new NotificationConfiguration());
 
         modelBuilder.Entity<OccupancyType>(entity =>
         {
