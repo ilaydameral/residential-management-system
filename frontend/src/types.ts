@@ -488,6 +488,49 @@ export interface IssuePeriodResult {
   totalIssuedAmount: number
 }
 
+export interface IssuePeriodResultDto {
+  periodId: number
+  periodName: string
+  issuedChargesCount: number
+  totalAmount: number
+}
+
+export interface DuePeriodCollectionSummaryDto {
+  duePeriodId: number
+  periodName: string
+  status: string
+  dueDate: string
+  totalUnitCount: number
+  totalAssessedAmount: number
+  totalCollectedAmount: number
+  totalOutstandingAmount: number
+  paidUnitCount: number
+  partiallyPaidUnitCount: number
+  unpaidUnitCount: number
+  overdueUnitCount: number
+  pendingSubmissionUnitCount: number
+}
+
+export interface DuePeriodUnitCollectionItemDto {
+  unitChargeId: number
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  propertyName: string
+  amount: number
+  paidAmount: number
+  remainingAmount: number
+  pendingSubmissionAmount: number
+  hasPendingSubmission: boolean
+  status: string
+  dueDate: string
+}
+
+export interface DuePeriodCollectionDetailsDto {
+  summary: DuePeriodCollectionSummaryDto
+  units: DuePeriodUnitCollectionItemDto[]
+}
+
 export interface CancelDuePeriodPayload {
   cancellationReason: string
 }

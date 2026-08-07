@@ -37,4 +37,9 @@ public interface IDuePeriodService
         CancelDuePeriodDto cancelDto,
         int currentUserId,
         bool isAdmin);
+
+    Task<DuePeriodCollectionDetailsDto?> GetCollectionDetailsAsync(
+        int duePeriodId,
+        int currentUserId,
+        bool isAdmin);
 }

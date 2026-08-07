@@ -45,6 +45,7 @@ import type {
   UpdateDueDefinitionPayload,
   DuePeriod,
   CreateDraftDuePeriodPayload,
+  DuePeriodCollectionDetailsDto,
   IssuePeriodPreview,
   IssuePeriodResult,
   CancelDuePeriodPayload,
@@ -661,6 +662,13 @@ export async function cancelDraftDuePeriod(id: number, payload: CancelDuePeriodP
     body: JSON.stringify(payload),
   })
   return handleResponse<DuePeriod>(response)
+}
+
+export async function getDuePeriodCollectionDetails(id: number): Promise<DuePeriodCollectionDetailsDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/due-periods/${id}/collection-details`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DuePeriodCollectionDetailsDto>(response)
 }
 
 // Expenses API

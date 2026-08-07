@@ -77,6 +77,15 @@ public class DuePeriodsController : ControllerBase
             : Ok(result);
     }
 
+    [HttpGet("{id:int}/collection-details")]
+    public async Task<ActionResult<DuePeriodCollectionDetailsDto>> GetCollectionDetails(int id)
+    {
+        var result = await _duePeriodService.GetCollectionDetailsAsync(id, GetCurrentUserId(), IsAdmin());
+        return result is null
+            ? NotFound(CreateNotFoundResponse(id))
+            : Ok(result);
+    }
+
     private int GetCurrentUserId()
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);

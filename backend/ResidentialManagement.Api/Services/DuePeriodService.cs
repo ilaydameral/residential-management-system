@@ -401,6 +401,125 @@ public class DuePeriodService : IDuePeriodService
         }
     }
 
+    public async Task<DuePeriodCollectionDetailsDto?> GetCollectionDetailsAsync(int duePeriodId, int currentUserId, bool isAdmin)
+    {
+        var period = await _context.DuePeriods
+            .AsNoTracking()
+            .Include(dp => dp.DueDefinition)
+            .FirstOrDefaultAsync(dp => dp.Id == duePeriodId);
+
+        if (period is null)
+        {
+            return null;
+        }
+
+        var accessiblePropertyIds = await _managerScopeService.GetAccessiblePropertyIdsAsync(currentUserId, isAdmin);
+        var accessibleBuildingIds = await _managerScopeService.GetAccessibleBuildingIdsAsync(currentUserId, isAdmin);
+
+        if (!isAdmin)
+        {
+            var hasAccess = (period.DueDefinition.BuildingId != null && accessibleBuildingIds.Contains(period.DueDefinition.BuildingId.Value)) ||
+                            (period.DueDefinition.BuildingId == null && accessiblePropertyIds.Contains(period.DueDefinition.PropertyId));
+
+            if (!hasAccess)
+            {
+                throw new ForbiddenException("Bu aidat döneminin tahsilat detaylarını görüntüleme yetkiniz bulunmamaktadır.");
+            }
+        }
+
+        var charges = await _context.UnitCharges
+            .AsNoTracking()
+            .Include(uc => uc.Unit)
+                .ThenInclude(u => u.Building)
+                    .ThenInclude(b => b.Property)
+            .Include(uc => uc.Payments)
+            .Include(uc => uc.PaymentSubmissions)
+            .Where(uc => uc.DuePeriodId == duePeriodId && !uc.IsCancelled)
+            .ToListAsync();
+
+        if (!isAdmin)
+        {
+            charges = charges.Where(uc => accessibleBuildingIds.Contains(uc.Unit.BuildingId)).ToList();
+        }
+
+        var utcNow = DateTime.UtcNow;
+        var unitItems = new List<DuePeriodUnitCollectionItemDto>();
+
+        foreach (var uc in charges.OrderBy(c => c.Unit.Building.Property.Name).ThenBy(c => c.Unit.Building.Name).ThenBy(c => c.Unit.UnitNumber))
+        {
+            var paidAmount = uc.Payments
+                .Where(p => !p.IsCancelled)
+                .Sum(p => p.Amount);
+
+            var remainingAmount = uc.Amount - paidAmount;
+            if (remainingAmount < 0) remainingAmount = 0;
+
+            var pendingSubmissions = uc.PaymentSubmissions
+                .Where(ps => ps.Status == "PENDING")
+                .ToList();
+
+            var pendingAmount = pendingSubmissions.Sum(ps => ps.Amount);
+            var hasPending = pendingSubmissions.Count > 0;
+
+            string status;
+            if (remainingAmount <= 0)
+            {
+                status = "PAID";
+            }
+            else if (paidAmount > 0)
+            {
+                status = "PARTIALLY_PAID";
+            }
+            else if (uc.DueDate.Date < utcNow.Date)
+            {
+                status = "OVERDUE";
+            }
+            else
+            {
+                status = "UNPAID";
+            }
+
+            unitItems.Add(new DuePeriodUnitCollectionItemDto
+            {
+                UnitChargeId = uc.Id,
+                UnitId = uc.UnitId,
+                UnitNumber = uc.Unit.UnitNumber,
+                BuildingName = uc.Unit.Building.Name,
+                PropertyName = uc.Unit.Building.Property.Name,
+                Amount = uc.Amount,
+                PaidAmount = paidAmount,
+                RemainingAmount = remainingAmount,
+                PendingSubmissionAmount = pendingAmount,
+                HasPendingSubmission = hasPending,
+                Status = status,
+                DueDate = uc.DueDate,
+            });
+        }
+
+        var summary = new DuePeriodCollectionSummaryDto
+        {
+            DuePeriodId = period.Id,
+            PeriodName = period.PeriodName,
+            Status = period.Status,
+            DueDate = period.DueDate,
+            TotalUnitCount = unitItems.Count,
+            TotalAssessedAmount = unitItems.Sum(u => u.Amount),
+            TotalCollectedAmount = unitItems.Sum(u => u.PaidAmount),
+            TotalOutstandingAmount = unitItems.Sum(u => u.RemainingAmount),
+            PaidUnitCount = unitItems.Count(u => u.Status == "PAID"),
+            PartiallyPaidUnitCount = unitItems.Count(u => u.Status == "PARTIALLY_PAID"),
+            UnpaidUnitCount = unitItems.Count(u => u.Status == "UNPAID"),
+            OverdueUnitCount = unitItems.Count(u => u.Status == "OVERDUE"),
+            PendingSubmissionUnitCount = unitItems.Count(u => u.HasPendingSubmission),
+        };
+
+        return new DuePeriodCollectionDetailsDto
+        {
+            Summary = summary,
+            Units = unitItems,
+        };
+    }
+
     private static System.Linq.Expressions.Expression<Func<DuePeriod, DuePeriodDto>> ToDtoExpression()
     {
         return dp => new DuePeriodDto

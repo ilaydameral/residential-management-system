@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   cancelDraftDuePeriod,
   createDraftDuePeriod,
   getDueDefinitions,
+  getDuePeriodCollectionDetails,
   getDuePeriods,
   getIssuePeriodPreview,
   issueDuePeriod,
@@ -16,6 +17,7 @@ import type {
   CreateDraftDuePeriodPayload,
   DueDefinition,
   DuePeriod,
+  DuePeriodCollectionDetailsDto,
   IssuePeriodPreview,
 } from '../types'
 
@@ -99,6 +101,45 @@ export function DuePeriodsManagement() {
   const [cancellationReason, setCancellationReason] = useState('')
   const [cancelError, setCancelError] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
+
+  // Collection Details Drawer state
+  const [collectionPeriodTarget, setCollectionPeriodTarget] = useState<DuePeriod | null>(null)
+  const [collectionDetails, setCollectionDetails] = useState<DuePeriodCollectionDetailsDto | null>(null)
+  const [isCollectionLoading, setIsCollectionLoading] = useState(false)
+  const [collectionError, setCollectionError] = useState('')
+  const [collectionFilter, setCollectionFilter] = useState<'ALL' | 'PAID' | 'PARTIALLY_PAID' | 'UNPAID' | 'OVERDUE' | 'PENDING_SUBMISSION'>('ALL')
+
+  const collectionDrawerAnimation = useAnimatedDrawer(Boolean(collectionPeriodTarget))
+  const collectionDrawerRef = useDrawerAccessibility({
+    isOpen: collectionDrawerAnimation.shouldRender && !collectionDrawerAnimation.isClosing,
+    onClose: () => setCollectionPeriodTarget(null),
+  })
+
+  const handleOpenCollectionDetails = async (period: DuePeriod) => {
+    setCollectionPeriodTarget(period)
+    setCollectionDetails(null)
+    setCollectionError('')
+    setCollectionFilter('ALL')
+    setIsCollectionLoading(true)
+
+    try {
+      const data = await getDuePeriodCollectionDetails(period.id)
+      setCollectionDetails(data)
+    } catch (err) {
+      setCollectionError(err instanceof Error ? err.message : 'Tahsilat detayları yüklenemedi.')
+    } finally {
+      setIsCollectionLoading(false)
+    }
+  }
+
+  const filteredCollectionUnits = useMemo(() => {
+    if (!collectionDetails) return []
+    if (collectionFilter === 'ALL') return collectionDetails.units
+    if (collectionFilter === 'PENDING_SUBMISSION') {
+      return collectionDetails.units.filter((u) => u.hasPendingSubmission)
+    }
+    return collectionDetails.units.filter((u) => u.status === collectionFilter)
+  }, [collectionDetails, collectionFilter])
 
   // Load due definitions lookup on mount
   useEffect(() => {
@@ -405,7 +446,16 @@ export function DuePeriodsManagement() {
                         </div>
                       </td>
                       <td className="text-right">
-                        {item.status === 'DRAFT' ? (
+                        {item.status === 'ISSUED' ? (
+                          <button
+                            type="button"
+                            className="primary-button"
+                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                            onClick={() => { void handleOpenCollectionDetails(item) }}
+                          >
+                            Tahsilat Detayı
+                          </button>
+                        ) : item.status === 'DRAFT' ? (
                           <div style={{ display: 'inline-flex', gap: '6px' }}>
                             <button
                               type="button"
@@ -668,6 +718,200 @@ export function DuePeriodsManagement() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Collection Details Drawer */}
+      {collectionDrawerAnimation.shouldRender && (
+        <>
+          <button
+            className={`drawer-backdrop drawer-${collectionDrawerAnimation.phase}`}
+            type="button"
+            aria-label="Kapat"
+            disabled={collectionDrawerAnimation.isClosing}
+            onClick={() => setCollectionPeriodTarget(null)}
+          />
+          <aside
+            ref={collectionDrawerRef}
+            tabIndex={-1}
+            className={`management-drawer drawer-${collectionDrawerAnimation.phase}`}
+            role="dialog"
+            aria-modal="true"
+            style={{ width: '880px', maxWidth: '95vw' }}
+          >
+            <div className="drawer-header">
+              <div>
+                <p className="eyebrow">Aidat Tahsilat Raporu</p>
+                <h2>{collectionPeriodTarget?.periodName} — Tahsilat Detayı</h2>
+                <p className="drawer-description">
+                  {collectionPeriodTarget?.dueDefinitionTitle} · Son Ödeme: {formatDate(collectionPeriodTarget?.dueDate)}
+                </p>
+              </div>
+              <button className="drawer-close-button" type="button" onClick={() => setCollectionPeriodTarget(null)}>×</button>
+            </div>
+
+            <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+              {isCollectionLoading ? (
+                <LoadingSkeleton variant="table" rows={6} />
+              ) : collectionError ? (
+                <div className="status-message error-message">{collectionError}</div>
+              ) : collectionDetails ? (
+                <>
+                  {/* Summary Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+                    <div className="panel" style={{ padding: '16px', background: 'var(--color-surface-secondary)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Toplam Daire</span>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                        {collectionDetails.summary.totalUnitCount} Daire
+                      </div>
+                    </div>
+
+                    <div className="panel" style={{ padding: '16px', background: 'var(--color-surface-secondary)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Toplam Tahakkuk</span>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                        {formatCurrency(collectionDetails.summary.totalAssessedAmount)}
+                      </div>
+                    </div>
+
+                    <div className="panel" style={{ padding: '16px', background: 'var(--color-surface-secondary)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Toplam Tahsilat</span>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--color-success)' }}>
+                        {formatCurrency(collectionDetails.summary.totalCollectedAmount)}
+                      </div>
+                    </div>
+
+                    <div className="panel" style={{ padding: '16px', background: 'var(--color-surface-secondary)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>Kalan Borç</span>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: collectionDetails.summary.totalOutstandingAmount > 0 ? 'var(--color-danger)' : 'var(--color-text-primary)' }}>
+                        {formatCurrency(collectionDetails.summary.totalOutstandingAmount)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Pills Summary */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                    <span className="status-badge active" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                      Ödeyen: {collectionDetails.summary.paidUnitCount} Daire
+                    </span>
+                    <span className="status-badge warning" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                      Kısmi Ödeyen: {collectionDetails.summary.partiallyPaidUnitCount} Daire
+                    </span>
+                    <span className="status-badge inactive" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                      Ödenmedi: {collectionDetails.summary.unpaidUnitCount} Daire
+                    </span>
+                    {collectionDetails.summary.overdueUnitCount > 0 && (
+                      <span className="status-badge inactive" style={{ padding: '4px 10px', fontSize: '0.78rem', backgroundColor: '#fef2f2', color: '#991b1b' }}>
+                        Gecikmiş: {collectionDetails.summary.overdueUnitCount} Daire
+                      </span>
+                    )}
+                    {collectionDetails.summary.pendingSubmissionUnitCount > 0 && (
+                      <span className="status-badge" style={{ padding: '4px 10px', fontSize: '0.78rem', backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+                        Bekleyen Dekont: {collectionDetails.summary.pendingSubmissionUnitCount} Daire
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Filter Tabs */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '12px', overflowX: 'auto' }}>
+                    {[
+                      { key: 'ALL', label: `Tümü (${collectionDetails.units.length})` },
+                      { key: 'PAID', label: `Ödendi (${collectionDetails.summary.paidUnitCount})` },
+                      { key: 'PARTIALLY_PAID', label: `Kısmi Ödendi (${collectionDetails.summary.partiallyPaidUnitCount})` },
+                      { key: 'UNPAID', label: `Ödenmedi (${collectionDetails.summary.unpaidUnitCount})` },
+                      { key: 'OVERDUE', label: `Gecikmiş (${collectionDetails.summary.overdueUnitCount})` },
+                      { key: 'PENDING_SUBMISSION', label: `Bekleyen Bildirim (${collectionDetails.summary.pendingSubmissionUnitCount})` },
+                    ].map((tab) => (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        className={collectionFilter === tab.key ? 'primary-button' : 'secondary-button'}
+                        style={{ padding: '4px 12px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                        onClick={() => setCollectionFilter(tab.key as typeof collectionFilter)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Daireler Tablosu */}
+                  <div className="table-responsive">
+                    <table className="management-table">
+                      <thead>
+                        <tr>
+                          <th>Daire</th>
+                          <th>Gayrimenkul / Bina</th>
+                          <th className="text-right">Borç Tutarı</th>
+                          <th className="text-right">Tahsil Edilen</th>
+                          <th className="text-right">Kalan Bakiye</th>
+                          <th>Bekleyen Dekont</th>
+                          <th>Durum</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredCollectionUnits.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
+                              Seçilen filtreye uygun daire bulunamadı.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredCollectionUnits.map((u) => {
+                            let badgeClass = 'inactive'
+                            let badgeText = 'Ödenmedi'
+
+                            if (u.status === 'PAID') {
+                              badgeClass = 'active'
+                              badgeText = 'Ödendi'
+                            } else if (u.status === 'PARTIALLY_PAID') {
+                              badgeClass = 'warning'
+                              badgeText = 'Kısmi Ödendi'
+                            } else if (u.status === 'OVERDUE') {
+                              badgeClass = 'inactive'
+                              badgeText = 'Gecikmiş'
+                            }
+
+                            return (
+                              <tr key={u.unitChargeId}>
+                                <td>
+                                  <strong style={{ color: 'var(--color-text-primary)' }}>Daire {u.unitNumber}</strong>
+                                </td>
+                                <td>
+                                  <span style={{ fontSize: '0.82rem' }}>{u.propertyName} · {u.buildingName}</span>
+                                </td>
+                                <td className="text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                  {formatCurrency(u.amount)}
+                                </td>
+                                <td className="text-right" style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--color-success)', fontWeight: 600 }}>
+                                  {formatCurrency(u.paidAmount)}
+                                </td>
+                                <td className="text-right" style={{ fontVariantNumeric: 'tabular-nums', color: u.remainingAmount > 0 ? 'var(--color-danger)' : 'var(--color-text-primary)', fontWeight: 700 }}>
+                                  {formatCurrency(u.remainingAmount)}
+                                </td>
+                                <td>
+                                  {u.hasPendingSubmission ? (
+                                    <span style={{ fontSize: '0.78rem', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                      {formatCurrency(u.pendingSubmissionAmount)} (İncelemede)
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--color-text-muted)' }}>—</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <span className={`status-badge ${badgeClass}`}>
+                                    {badgeText}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </aside>
+        </>
       )}
     </div>
   )

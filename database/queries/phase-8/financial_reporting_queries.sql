@@ -183,3 +183,70 @@ WHERE e.IsCancelled = 0
 GROUP BY p.Name, ISNULL(b.Name, 'Site Geneli (Tüm Bloklar)'), e.Category
 ORDER BY p.Name, ScopeName, TotalCategoryExpense DESC;
 GO
+
+PRINT '=============================================================================';
+PRINT '5. Due Period Collection Details Query (Per-Unit Breakdown & Aggregates)';
+PRINT '=============================================================================';
+
+DECLARE @TargetDuePeriodId INT = 1; -- Replace with target DuePeriodId
+
+WITH ValidPayments AS (
+    SELECT
+        p.UnitChargeId,
+        SUM(p.Amount) AS TotalPaid
+    FROM dbo.Payments p
+    WHERE p.IsCancelled = 0
+    GROUP BY p.UnitChargeId
+),
+PendingSubmissions AS (
+    SELECT
+        ps.UnitChargeId,
+        SUM(ps.Amount) AS PendingAmount,
+        COUNT(ps.Id) AS PendingCount
+    FROM dbo.PaymentSubmissions ps
+    WHERE ps.Status = 'PENDING'
+    GROUP BY ps.UnitChargeId
+),
+ChargeDetails AS (
+    SELECT
+        uc.Id AS UnitChargeId,
+        uc.UnitId,
+        u.UnitNumber,
+        b.Name AS BuildingName,
+        p.Name AS PropertyName,
+        uc.Amount AS AssessedAmount,
+        ISNULL(vp.TotalPaid, 0.00) AS PaidAmount,
+        CASE
+            WHEN (uc.Amount - ISNULL(vp.TotalPaid, 0.00)) < 0 THEN 0.00
+            ELSE (uc.Amount - ISNULL(vp.TotalPaid, 0.00))
+        END AS RemainingAmount,
+        ISNULL(ps.PendingAmount, 0.00) AS PendingSubmissionAmount,
+        CASE WHEN ISNULL(ps.PendingCount, 0) > 0 THEN 1 ELSE 0 END AS HasPendingSubmission,
+        uc.DueDate,
+        CASE
+            WHEN uc.IsCancelled = 1 THEN 'CANCELLED'
+            WHEN (uc.Amount - ISNULL(vp.TotalPaid, 0.00)) <= 0 THEN 'PAID'
+            WHEN ISNULL(vp.TotalPaid, 0.00) > 0 THEN 'PARTIALLY_PAID'
+            WHEN uc.DueDate < GETUTCDATE() THEN 'OVERDUE'
+            ELSE 'UNPAID'
+        END AS CalculatedStatus
+    FROM dbo.UnitCharges uc
+    INNER JOIN dbo.Units u ON uc.UnitId = u.Id
+    INNER JOIN dbo.Buildings b ON u.BuildingId = b.Id
+    INNER JOIN dbo.Properties p ON b.PropertyId = p.Id
+    LEFT JOIN ValidPayments vp ON uc.Id = vp.UnitChargeId
+    LEFT JOIN PendingSubmissions ps ON uc.Id = ps.UnitChargeId
+    WHERE uc.DuePeriodId = @TargetDuePeriodId AND uc.IsCancelled = 0
+)
+SELECT
+    COUNT(*) AS TotalUnitCount,
+    SUM(AssessedAmount) AS TotalAssessedAmount,
+    SUM(PaidAmount) AS TotalCollectedAmount,
+    SUM(RemainingAmount) AS TotalOutstandingAmount,
+    SUM(CASE WHEN CalculatedStatus = 'PAID' THEN 1 ELSE 0 END) AS PaidUnitCount,
+    SUM(CASE WHEN CalculatedStatus = 'PARTIALLY_PAID' THEN 1 ELSE 0 END) AS PartiallyPaidUnitCount,
+    SUM(CASE WHEN CalculatedStatus = 'UNPAID' THEN 1 ELSE 0 END) AS UnpaidUnitCount,
+    SUM(CASE WHEN CalculatedStatus = 'OVERDUE' THEN 1 ELSE 0 END) AS OverdueUnitCount,
+    SUM(CASE WHEN HasPendingSubmission = 1 THEN 1 ELSE 0 END) AS PendingSubmissionUnitCount
+FROM ChargeDetails;
+GO
