@@ -11,6 +11,7 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 import { HeaderAccountButton } from './HeaderAccountButton'
 import { HeaderLogoutButton } from './HeaderLogoutButton'
 import { HeaderSettingsButton } from './HeaderSettingsButton'
+import { NotificationCenter } from './NotificationCenter'
 import { ResidentFinance } from './ResidentFinance'
 import { ResidentHome } from './ResidentHome'
 import { ResidentUnitDetail } from './ResidentUnitDetail'
@@ -106,6 +107,7 @@ export function ResidentPortal() {
             <strong>{user?.firstName} {user?.lastName}</strong>
             <span>Sakin</span>
           </div>
+          <NotificationCenter onNavigateToUrl={(url) => { void navigateWithGuard(url) }} />
           <ThemeToggle />
           <HeaderAccountButton onActivate={() => { void navigateWithGuard('/account') }} />
           <HeaderSettingsButton onActivate={() => { void navigateWithGuard('/settings') }} />

@@ -46,6 +46,7 @@ import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
 import { HeaderSettingsButton } from './components/HeaderSettingsButton'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
+import { NotificationCenter } from './components/NotificationCenter'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentPortal } from './components/ResidentPortal'
 import { RowActionsMenu } from './components/RowActionsMenu'
@@ -1940,6 +1941,7 @@ function App() {
                   </span>
                 ))}
               </div>
+              <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
               <ThemeToggle />
               <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
               <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
@@ -1972,6 +1974,7 @@ function App() {
             </span>
           ))}
         </div>
+        <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
         <ThemeToggle />
         <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
         <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
