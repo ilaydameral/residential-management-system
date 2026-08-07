@@ -40,6 +40,7 @@ import { FinanceOverview } from './components/FinanceOverview'
 import { DueDefinitionsManagement } from './components/DueDefinitionsManagement'
 import { DuePeriodsManagement } from './components/DuePeriodsManagement'
 import { ExpensesManagement } from './components/ExpensesManagement'
+import { PaymentSubmissionsManagement } from './components/PaymentSubmissionsManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -547,6 +548,7 @@ function App() {
         location.pathname === '/resident/home' ||
         location.pathname === '/resident/my-units' ||
         Boolean(matchPath('/resident/my-units/:unitId', location.pathname)) ||
+        location.pathname === '/resident/finance' ||
         location.pathname === '/resident/account' ||
         location.pathname === '/account' ||
         location.pathname === '/settings'
@@ -2092,23 +2094,7 @@ function App() {
       )}
 
       {isManagementPanel && activeManagementView === 'paymentSubmissions' && (
-        <section className="section-container">
-          <div className="panel p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-              {activeViewLabel}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-4">
-              Bu modülün detaylı yönetim arayüzü sonraki adımda aktifleştirilecektir. Genel finansal durumu takip etmek için Finansal Genel Bakış ekranına göz atabilirsiniz.
-            </p>
-            <button
-              type="button"
-              className="primary-button inline-flex items-center gap-2"
-              onClick={() => handleNavigationItemClick('financeOverview')}
-            >
-              <span>📊 Finansal Genel Bakış'a Git</span>
-            </button>
-          </div>
-        </section>
+        <PaymentSubmissionsManagement />
       )}
 
       {activeManagementView === 'account' && (

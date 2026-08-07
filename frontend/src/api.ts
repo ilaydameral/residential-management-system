@@ -60,6 +60,7 @@ import type {
   RejectPaymentSubmissionPayload,
   NotificationDto,
   UnreadNotificationCountDto,
+  ResidentUnitCharge,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -781,7 +782,7 @@ export async function rejectPaymentSubmission(id: number, payload: RejectPayment
   return handleResponse<PaymentSubmission>(response)
 }
 
-export async function getPaymentSubmissionReceiptFile(id: number): Promise<{ blob: Blob; fileName: string }> {
+export async function getPaymentSubmissionReceiptFile(id: number): Promise<{ blob: Blob; fileName: string; contentType: string }> {
   const response = await safeFetch(`${API_BASE_URL}/api/management/payment-submissions/${id}/receipt`, {
     headers: getAuthHeaders(),
   })
@@ -789,15 +790,16 @@ export async function getPaymentSubmissionReceiptFile(id: number): Promise<{ blo
     await handleResponse(response)
   }
   const blob = await response.blob()
+  const contentType = response.headers.get('Content-Type') || blob.type || 'application/octet-stream'
   const contentDisposition = response.headers.get('Content-Disposition')
-  let fileName = `receipt_${id}.pdf`
+  let fileName = `receipt_${id}`
   if (contentDisposition) {
     const match = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;'"\n]+)['"]?/)
     if (match && match[1]) {
       fileName = decodeURIComponent(match[1])
     }
   }
-  return { blob, fileName }
+  return { blob, fileName, contentType }
 }
 
 // Notifications API
@@ -837,4 +839,43 @@ export async function dismissNotification(id: number): Promise<NotificationDto> 
     headers: getAuthHeaders(),
   })
   return handleResponse<NotificationDto>(response)
+}
+
+// Resident Finance API
+export async function getResidentUnitCharges(): Promise<ResidentUnitCharge[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/finance/unit-charges`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ResidentUnitCharge[]>(response)
+}
+
+export async function getResidentUnitChargeById(id: number): Promise<ResidentUnitCharge> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/finance/unit-charges/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ResidentUnitCharge>(response)
+}
+
+export async function createResidentPaymentSubmission(formData: FormData): Promise<PaymentSubmission> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/finance/payment-submissions`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+  })
+  return handleResponse<PaymentSubmission>(response)
+}
+
+export async function getResidentPaymentSubmissions(): Promise<PaymentSubmission[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/finance/payment-submissions`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<PaymentSubmission[]>(response)
+}
+
+export async function cancelResidentPaymentSubmission(id: number): Promise<PaymentSubmission> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/finance/payment-submissions/${id}/cancel`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<PaymentSubmission>(response)
 }

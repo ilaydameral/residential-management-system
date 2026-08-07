@@ -401,6 +401,7 @@ export interface ResidentFinanceSummaryDto {
   totalPaid: number
   totalOutstanding: number
   overdueChargeCount: number
+  pendingSubmissionCount: number
   activeOccupancyUnitCount: number
 }
 
@@ -591,35 +592,26 @@ export interface PaymentSubmission {
   id: number
   unitChargeId: number
   unitChargeTitle: string
-  unitChargeType: string
-  unitChargeDueDate: string
-  unitChargeAmount: number
   unitId: number
   unitNumber: string
-  buildingId: number
   buildingName: string
-  propertyId: number
   propertyName: string
   submittedByUserId: number
-  submittedByUserName: string
-  submittedByUserEmail: string
+  submittedByFullName: string
   amount: number
   paymentDate: string
   paymentMethod: string
-  referenceCode: string
+  referenceCode: string | null
+  receiptAttachmentUrl: string | null
   userNotes: string | null
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
-  receiptFileName: string
-  receiptContentType: string
-  receiptFileSizeBytes: number
   reviewedByUserId: number | null
-  reviewedByUserName: string | null
+  reviewedByFullName: string | null
   reviewedAt: string | null
   rejectionReason: string | null
   cancelledAt: string | null
-  cancelledByUserId: number | null
+  cancelledByFullName: string | null
   createdAt: string
-  updatedAt: string | null
 }
 
 export interface ApprovePaymentSubmissionPayload {
@@ -629,4 +621,22 @@ export interface ApprovePaymentSubmissionPayload {
 
 export interface RejectPaymentSubmissionPayload {
   rejectionReason: string
+}
+
+export interface ResidentUnitCharge {
+  id: number
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  propertyName: string
+  title: string
+  description: string | null
+  amount: number
+  paidAmount: number
+  remainingAmount: number
+  status: 'CANCELLED' | 'PAID' | 'PARTIALLY_PAID' | 'OVERDUE' | 'UNPAID'
+  dueDate: string
+  chargeType: string
+  isCancelled: boolean
+  createdAt: string
 }
