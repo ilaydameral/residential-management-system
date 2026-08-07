@@ -36,6 +36,9 @@ import { CentralOccupancyManagement } from './components/CentralOccupancyManagem
 import { CentralUserManagement } from './components/CentralUserManagement'
 import { ManagerAssignmentManagement } from './components/ManagerAssignmentManagement'
 import { ManagerScopeOverview } from './components/ManagerScopeOverview'
+import { FinanceOverview } from './components/FinanceOverview'
+import { DueDefinitionsManagement } from './components/DueDefinitionsManagement'
+import { DuePeriodsManagement } from './components/DuePeriodsManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -120,8 +123,24 @@ const ROLE_LABEL_MAP: Record<string, string> = {
   TECHNICAL_STAFF: 'Teknik Personel',
 }
 
-type ManagementView = 'overview' | 'properties' | 'buildings' | 'units' | 'managerScope' | 'users' | 'residents' | 'managerAssignments' | 'account' | 'settings'
-type NavigationGroup = 'structures' | 'people'
+type ManagementView =
+  | 'overview'
+  | 'properties'
+  | 'buildings'
+  | 'units'
+  | 'managerScope'
+  | 'users'
+  | 'residents'
+  | 'managerAssignments'
+  | 'financeOverview'
+  | 'dueDefinitions'
+  | 'duePeriods'
+  | 'expenses'
+  | 'paymentSubmissions'
+  | 'account'
+  | 'settings'
+
+type NavigationGroup = 'structures' | 'people' | 'finance'
 
 interface DestructiveConfirmation {
   title: string
@@ -139,6 +158,11 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'users', label: 'Kullanıcılar' },
   { id: 'residents', label: 'Site Sakinleri' },
   { id: 'managerAssignments', label: 'Yönetici Atamaları' },
+  { id: 'financeOverview', label: 'Finansal Genel Bakış' },
+  { id: 'dueDefinitions', label: 'Aidat Tanımları' },
+  { id: 'duePeriods', label: 'Aidat Dönemleri' },
+  { id: 'expenses', label: 'Giderler & Borçlandırma' },
+  { id: 'paymentSubmissions', label: 'Ödeme Dekont Onayları' },
   { id: 'account', label: 'Hesabım' },
   { id: 'settings', label: 'Ayarlar' },
 ]
@@ -152,6 +176,11 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   users: '/users',
   residents: '/residents',
   managerAssignments: '/manager-assignments',
+  financeOverview: '/management/finance',
+  dueDefinitions: '/management/finance/due-definitions',
+  duePeriods: '/management/finance/due-periods',
+  expenses: '/management/finance/expenses',
+  paymentSubmissions: '/management/finance/payment-submissions',
   account: '/account',
   settings: '/settings',
 }
@@ -349,6 +378,7 @@ function App() {
   const mainContentRef = useRef<HTMLElement | null>(null)
   const structuresTriggerRef = useRef<HTMLButtonElement | null>(null)
   const peopleTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const financeTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const hasUnsavedChanges =
     propertyFormDirty || buildingFormDirty || unitFormDirty || occupancyFormDirty
@@ -1688,9 +1718,20 @@ function App() {
               ? 'Hesabınıza ait temel bilgileri görüntüleyin.'
               : activeManagementView === 'settings'
                 ? 'Görünüm ve hesap tercihlerinizi yönetin.'
-                : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
+                : activeManagementView === 'financeOverview'
+                  ? 'Site geneli finansal durum, tahsilat grafikleri ve borçlu daireler özeti.'
+                  : activeManagementView === 'dueDefinitions'
+                    ? 'Düzenli aidat şablonlarını ve birim tutarları yönetin.'
+                    : activeManagementView === 'duePeriods'
+                      ? 'Dönem bazlı aidat taslakları oluşturun ve borçlandırmaları yayınlayın.'
+                      : activeManagementView === 'expenses'
+                        ? 'Gider kayıtları oluşturun ve dairelere borçlandırma modlarıyla dağıtın.'
+                        : activeManagementView === 'paymentSubmissions'
+                          ? 'Sakinlerden gelen ödeme dekontlarını inceleyin, onaylayın veya reddedin.'
+                          : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
   const isStructuresView = ['properties', 'buildings', 'units', 'managerScope'].includes(activeManagementView)
   const isPeopleView = ['users', 'residents', 'managerAssignments'].includes(activeManagementView)
+  const isFinanceView = ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(activeManagementView)
 
   return (
     <div className={isManagementPanel ? 'management-layout' : ''}>
@@ -1825,6 +1866,58 @@ function App() {
                           : item.id === 'residents'
                             ? 'Daire sakinlerini yönetin.'
                             : 'Yönetici sorumluluklarını yönetin.'}
+                      </small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Finans Yönetimi Navigation Group */}
+              <div
+                className="management-nav-group"
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setOpenNavigationGroup(null)
+                  }
+                }}
+              >
+                <button
+                  ref={financeTriggerRef}
+                  className={`management-nav-trigger ${isFinanceView ? 'active' : ''} ${
+                    openNavigationGroup === 'finance' ? 'open' : ''
+                  }`}
+                  type="button"
+                  aria-expanded={openNavigationGroup === 'finance'}
+                  aria-controls="finance-navigation-menu"
+                  onClick={() => handleNavigationGroupToggle('finance')}
+                  onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'finance')}
+                >
+                  Finans Yönetimi <span aria-hidden="true">⌄</span>
+                </button>
+                <div
+                  id="finance-navigation-menu"
+                  className={`management-nav-popup ${openNavigationGroup === 'finance' ? 'open' : ''}`}
+                  role="menu"
+                  hidden={openNavigationGroup !== 'finance'}
+                  onKeyDown={handleNavigationMenuKeyDown}
+                >
+                  {MANAGEMENT_MENU.filter((item) =>
+                    ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(item.id)
+                  ).map((item) => (
+                    <button
+                      key={item.id}
+                      className={activeManagementView === item.id ? 'active' : ''}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleNavigationItemClick(item.id)}
+                    >
+                      <strong>{item.label}</strong>
+                      <small>
+                        {item.id === 'financeOverview' && 'Finansal genel durumu ve grafikleri takip edin.'}
+                        {item.id === 'dueDefinitions' && 'Düzenli aidat tanımlarını yönetin.'}
+                        {item.id === 'duePeriods' && 'Aidat dönemlerini oluşturun ve borçlandırın.'}
+                        {item.id === 'expenses' && 'Gider kayıtları oluşturun ve borçlandırın.'}
+                        {item.id === 'paymentSubmissions' && 'Ödeme dekontlarını inceleyin ve onaylayın.'}
                       </small>
                     </button>
                   ))}
@@ -1976,6 +2069,40 @@ function App() {
       {isManagementPanel && hasRole('ADMIN') && activeManagementView === 'managerAssignments' && (
         <section className="section-container entity-management-view">
           <ManagerAssignmentManagement onDirtyChange={handleOccupancyDirtyChange} />
+        </section>
+      )}
+
+      {isManagementPanel && activeManagementView === 'financeOverview' && (
+        <section className="section-container">
+          <FinanceOverview />
+        </section>
+      )}
+
+      {isManagementPanel && activeManagementView === 'dueDefinitions' && (
+        <DueDefinitionsManagement />
+      )}
+
+      {isManagementPanel && activeManagementView === 'duePeriods' && (
+        <DuePeriodsManagement />
+      )}
+
+      {isManagementPanel && ['expenses', 'paymentSubmissions'].includes(activeManagementView) && (
+        <section className="section-container">
+          <div className="panel p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              {activeViewLabel}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-4">
+              Bu modülün detaylı yönetim arayüzü sonraki adımda aktifleştirilecektir. Genel finansal durumu takip etmek için Finansal Genel Bakış ekranına göz atabilirsiniz.
+            </p>
+            <button
+              type="button"
+              className="primary-button inline-flex items-center gap-2"
+              onClick={() => handleNavigationItemClick('financeOverview')}
+            >
+              <span>📊 Finansal Genel Bakış'a Git</span>
+            </button>
+          </div>
         </section>
       )}
 

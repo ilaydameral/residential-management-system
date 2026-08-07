@@ -340,3 +340,197 @@ export interface CreateManagerAssignmentPayload {
 export interface EndManagerAssignmentPayload {
   endReason: string | null
 }
+
+// ============================================================================
+// Phase 8: Financial Management DTOs
+// ============================================================================
+
+export interface NotificationDto {
+  id: number
+  userId: number
+  title: string
+  message: string
+  notificationType: string
+  relatedEntityName: string | null
+  relatedEntityId: number | null
+  isRead: boolean
+  readAt: string | null
+  isDismissed: boolean
+  dismissedAt: string | null
+  createdAt: string
+}
+
+export interface UnreadNotificationCountDto {
+  unreadCount: number
+}
+
+export interface ManagementFinanceSummaryDto {
+  totalCharged: number
+  totalPaid: number
+  totalOutstanding: number
+  overdueAmount: number
+  pendingSubmissionCount: number
+  totalUnitsCount: number
+  overdueUnitCount: number
+}
+
+export interface MonthlyCollectionSummaryDto {
+  year: number
+  month: number
+  periodName: string
+  totalCharged: number
+  totalCollected: number
+  outstandingBalance: number
+  collectionPercentage: number
+  cumulativeCollectionPercentage: number
+}
+
+export interface UnitOutstandingReportDto {
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  propertyName: string
+  totalCharged: number
+  totalPaid: number
+  remainingBalance: number
+  overdueChargeCount: number
+}
+
+export interface ResidentFinanceSummaryDto {
+  totalCharged: number
+  totalPaid: number
+  totalOutstanding: number
+  overdueChargeCount: number
+  activeOccupancyUnitCount: number
+}
+
+export interface DueDefinition {
+  id: number
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  title: string
+  description: string | null
+  amount: number
+  dueDay: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string | null
+}
+
+export interface CreateDueDefinitionPayload {
+  propertyId: number
+  buildingId: number | null
+  title: string
+  description?: string | null
+  amount: number
+  dueDay: number
+}
+
+export interface UpdateDueDefinitionPayload {
+  title: string
+  description?: string | null
+  amount: number
+  dueDay: number
+}
+
+export interface DuePeriod {
+  id: number
+  dueDefinitionId: number
+  dueDefinitionTitle: string
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  year: number
+  month: number
+  periodName: string
+  unitAmount: number
+  status: 'DRAFT' | 'ISSUED' | 'CANCELLED'
+  dueDate: string
+  issuedAt: string | null
+  issuedByFullName?: string | null
+  cancelledAt: string | null
+  cancelledByFullName?: string | null
+  cancellationReason: string | null
+  createdAt: string
+  createdByFullName?: string | null
+}
+
+export interface CreateDraftDuePeriodPayload {
+  dueDefinitionId: number
+  year: number
+  month: number
+}
+
+export interface IssuePeriodPreview {
+  periodId: number
+  periodName: string
+  dueDefinitionId: number
+  dueDefinitionTitle: string
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  targetUnitCount: number
+  unitDuesAmount: number
+  totalExpectedAmount: number
+  dueDate: string
+}
+
+export interface IssuePeriodResult {
+  periodId: number
+  periodName: string
+  issuedAt: string
+  generatedChargeCount: number
+  totalIssuedAmount: number
+}
+
+export interface CancelDuePeriodPayload {
+  cancellationReason: string
+}
+
+export interface PaymentSubmission {
+  id: number
+  unitChargeId: number
+  unitChargeTitle: string
+  unitChargeType: string
+  unitChargeDueDate: string
+  unitChargeAmount: number
+  unitId: number
+  unitNumber: string
+  buildingId: number
+  buildingName: string
+  propertyId: number
+  propertyName: string
+  submittedByUserId: number
+  submittedByUserName: string
+  submittedByUserEmail: string
+  amount: number
+  paymentDate: string
+  paymentMethod: string
+  referenceCode: string
+  userNotes: string | null
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+  receiptFileName: string
+  receiptContentType: string
+  receiptFileSizeBytes: number
+  reviewedByUserId: number | null
+  reviewedByUserName: string | null
+  reviewedAt: string | null
+  rejectionReason: string | null
+  cancelledAt: string | null
+  cancelledByUserId: number | null
+  createdAt: string
+  updatedAt: string | null
+}
+
+export interface ApprovePaymentSubmissionPayload {
+  transactionReference?: string | null
+  notes?: string | null
+}
+
+export interface RejectPaymentSubmissionPayload {
+  rejectionReason: string
+}
