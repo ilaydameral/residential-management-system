@@ -662,6 +662,80 @@ export async function cancelDraftDuePeriod(id: number, payload: CancelDuePeriodP
   return handleResponse<DuePeriod>(response)
 }
 
+// Expenses API
+export async function getExpenses(params?: {
+  propertyId?: number
+  buildingId?: number
+  category?: string
+  isCancelled?: boolean
+  isApportioned?: boolean
+}): Promise<Expense[]> {
+  const query = new URLSearchParams()
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.category) query.append('category', params.category)
+  if (params?.isCancelled !== undefined) query.append('isCancelled', params.isCancelled.toString())
+  if (params?.isApportioned !== undefined) query.append('isApportioned', params.isApportioned.toString())
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+
+  const response = await safeFetch(`${API_BASE_URL}/api/expenses${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Expense[]>(response)
+}
+
+export async function getExpenseById(id: number): Promise<Expense> {
+  const response = await safeFetch(`${API_BASE_URL}/api/expenses/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Expense>(response)
+}
+
+export async function createExpense(payload: CreateExpensePayload): Promise<Expense> {
+  const response = await safeFetch(`${API_BASE_URL}/api/expenses`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<Expense>(response)
+}
+
+export async function updateExpense(id: number, payload: UpdateExpensePayload): Promise<Expense> {
+  const response = await safeFetch(`${API_BASE_URL}/api/expenses/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<Expense>(response)
+}
+
+export async function cancelExpense(id: number, payload: CancelExpensePayload): Promise<Expense> {
+  const response = await safeFetch(`${API_BASE_URL}/api/expenses/${id}/cancel`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<Expense>(response)
+}
+
+export async function getApportionmentPreview(id: number, payload: ApportionExpensePayload): Promise<ExpenseApportionmentPreview> {
+  const response = await safeFetch(`${API_BASE_URL}/api/expenses/${id}/apportionment-preview`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ExpenseApportionmentPreview>(response)
+}
+
+export async function apportionExpense(id: number, payload: ApportionExpensePayload): Promise<ApportionExpenseResult> {
+  const response = await safeFetch(`${API_BASE_URL}/api/expenses/${id}/apportion`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ApportionExpenseResult>(response)
+}
+
 // Management Payment Submissions API
 export async function getManagementPaymentSubmissions(params?: {
   status?: string

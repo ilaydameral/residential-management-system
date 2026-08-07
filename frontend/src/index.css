@@ -3036,7 +3036,21 @@ textarea:focus-visible,
 }
 
 .row-primary-action {
-  padding: 7px 10px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.row-primary-action.primary {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 1px 3px var(--color-primary-shadow);
+}
+
+.row-primary-action.primary:hover:not(:disabled) {
+  color: var(--color-on-primary);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .row-actions-trigger {
@@ -3054,6 +3068,12 @@ textarea:focus-visible,
   border-color: var(--color-primary-border);
   color: var(--color-primary);
   background: var(--color-primary-soft);
+}
+
+.row-primary-action.primary:hover:not(:disabled) {
+  border-color: var(--color-primary-hover);
+  color: var(--color-on-primary);
+  background: var(--color-primary-hover);
 }
 
 .row-primary-action:focus-visible,
@@ -3080,11 +3100,11 @@ textarea:focus-visible,
   width: 100%;
   border: 0;
   border-radius: 7px;
-  padding: 9px 10px;
+  padding: 6px 10px;
   color: var(--color-text-primary);
   background: transparent;
   text-align: left;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 650;
 }
 
@@ -4592,6 +4612,16 @@ textarea:focus-visible,
 
 .due-toolbar {
   grid-template-columns: repeat(3, minmax(160px, 1fr)) minmax(200px, 1.4fr);
+}
+
+.exp-toolbar {
+  grid-template-columns: repeat(4, minmax(130px, 1fr)) minmax(200px, 1.8fr);
+}
+
+@media (max-width: 1024px) {
+  .exp-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 920px) {

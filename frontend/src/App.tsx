@@ -39,6 +39,7 @@ import { ManagerScopeOverview } from './components/ManagerScopeOverview'
 import { FinanceOverview } from './components/FinanceOverview'
 import { DueDefinitionsManagement } from './components/DueDefinitionsManagement'
 import { DuePeriodsManagement } from './components/DuePeriodsManagement'
+import { ExpensesManagement } from './components/ExpensesManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -2086,7 +2087,11 @@ function App() {
         <DuePeriodsManagement />
       )}
 
-      {isManagementPanel && ['expenses', 'paymentSubmissions'].includes(activeManagementView) && (
+      {isManagementPanel && activeManagementView === 'expenses' && (
+        <ExpensesManagement />
+      )}
+
+      {isManagementPanel && activeManagementView === 'paymentSubmissions' && (
         <section className="section-container">
           <div className="panel p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">

@@ -491,6 +491,102 @@ export interface CancelDuePeriodPayload {
   cancellationReason: string
 }
 
+export interface Expense {
+  id: number
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  title: string
+  category: string
+  amount: number
+  expenseDate: string
+  documentNumber: string | null
+  vendorName: string | null
+  description: string | null
+  attachmentUrl: string | null
+  isCancelled: boolean
+  cancelledAt: string | null
+  cancelledByFullName: string | null
+  cancelReason: string | null
+  isApportioned: boolean
+  apportionedChargeCount: number
+  createdAt: string
+  createdByFullName: string
+  updatedAt: string | null
+  updatedByFullName: string | null
+}
+
+export interface CreateExpensePayload {
+  propertyId: number
+  buildingId?: number | null
+  title: string
+  category: string
+  amount: number
+  expenseDate: string
+  documentNumber?: string | null
+  vendorName?: string | null
+  description?: string | null
+  attachmentUrl?: string | null
+}
+
+export interface UpdateExpensePayload {
+  title: string
+  category: string
+  amount: number
+  expenseDate: string
+  documentNumber?: string | null
+  vendorName?: string | null
+  description?: string | null
+  attachmentUrl?: string | null
+}
+
+export interface CancelExpensePayload {
+  cancelReason: string
+}
+
+export interface ManualUnitApportionmentItem {
+  unitId: number
+  amount: number
+}
+
+export interface ApportionExpensePayload {
+  mode: 'EQUAL_SCOPE' | 'EQUAL_SELECTED' | 'MANUAL_SELECTED'
+  selectedUnitIds?: number[]
+  manualUnitApportionments?: ManualUnitApportionmentItem[]
+  dueDate: string
+}
+
+export interface ExpenseApportionmentPreviewItem {
+  unitId: number
+  buildingName: string
+  unitNumber: string
+  amount: number
+}
+
+export interface ExpenseApportionmentPreview {
+  expenseId: number
+  expenseTitle: string
+  expenseAmount: number
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  mode: string
+  targetUnitCount: number
+  totalAllocatedAmount: number
+  dueDate: string
+  items: ExpenseApportionmentPreviewItem[]
+}
+
+export interface ApportionExpenseResult {
+  expenseId: number
+  expenseTitle: string
+  apportionedAt: string
+  generatedChargeCount: number
+  totalApportionedAmount: number
+}
+
 export interface PaymentSubmission {
   id: number
   unitChargeId: number
