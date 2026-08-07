@@ -55,6 +55,13 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IManagerAssignmentService, ManagerAssignmentService>();
 builder.Services.AddScoped<IManagerScopeService, ManagerScopeService>();
+builder.Services.AddScoped<IDueDefinitionService, DueDefinitionService>();
+builder.Services.AddScoped<IDuePeriodService, DuePeriodService>();
+builder.Services.AddScoped<IExpenseService, ExpenseService>();
+builder.Services.AddScoped<IReceiptStorageService, LocalReceiptStorageService>();
+builder.Services.AddScoped<IPaymentSubmissionService, PaymentSubmissionService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IFinancialReportingService, FinancialReportingService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");

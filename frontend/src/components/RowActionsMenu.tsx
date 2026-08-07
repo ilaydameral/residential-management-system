@@ -13,6 +13,7 @@ export interface RowAction {
   onSelect: () => void
   danger?: boolean
   disabled?: boolean
+  variant?: 'default' | 'primary'
 }
 
 interface RowActionsMenuProps {
@@ -104,7 +105,7 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
   return (
     <div className="row-actions">
       <button
-        className="row-primary-action"
+        className={`row-primary-action ${primaryAction.variant === 'primary' ? 'primary' : ''}`}
         type="button"
         disabled={primaryAction.disabled}
         onClick={primaryAction.onSelect}

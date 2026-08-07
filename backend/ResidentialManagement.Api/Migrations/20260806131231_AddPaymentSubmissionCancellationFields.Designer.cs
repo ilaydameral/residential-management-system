@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResidentialManagement.Api.Data;
 
@@ -11,9 +12,11 @@ using ResidentialManagement.Api.Data;
 namespace ResidentialManagement.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806131231_AddPaymentSubmissionCancellationFields")]
+    partial class AddPaymentSubmissionCancellationFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -422,12 +425,6 @@ namespace ResidentialManagement.Api.Migrations
                     b.HasIndex("UserId", "IsDismissed");
 
                     b.HasIndex("UserId", "IsRead");
-
-                    b.HasIndex("UserId", "IsDismissed", "IsRead");
-
-                    b.HasIndex("UserId", "NotificationType", "RelatedEntityName", "RelatedEntityId")
-                        .IsUnique()
-                        .HasFilter("[RelatedEntityName] IS NOT NULL AND [RelatedEntityId] IS NOT NULL");
 
                     b.ToTable("Notifications", (string)null);
                 });

@@ -41,3 +41,7 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Uploaded Files & Receipts
+App_Data/
+**/App_Data/

@@ -11,6 +11,8 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 import { HeaderAccountButton } from './HeaderAccountButton'
 import { HeaderLogoutButton } from './HeaderLogoutButton'
 import { HeaderSettingsButton } from './HeaderSettingsButton'
+import { NotificationCenter } from './NotificationCenter'
+import { ResidentFinance } from './ResidentFinance'
 import { ResidentHome } from './ResidentHome'
 import { ResidentUnitDetail } from './ResidentUnitDetail'
 import { ResidentUnits } from './ResidentUnits'
@@ -20,6 +22,7 @@ import { ThemeToggle } from './ThemeToggle'
 const RESIDENT_NAVIGATION = [
   { path: '/resident/home', label: 'Ana Sayfa' },
   { path: '/resident/my-units', label: 'Dairelerim' },
+  { path: '/resident/finance', label: 'Finans' },
 ]
 
 export function ResidentPortal() {
@@ -104,6 +107,7 @@ export function ResidentPortal() {
             <strong>{user?.firstName} {user?.lastName}</strong>
             <span>Sakin</span>
           </div>
+          <NotificationCenter onNavigateToUrl={(url) => { void navigateWithGuard(url) }} />
           <ThemeToggle />
           <HeaderAccountButton onActivate={() => { void navigateWithGuard('/account') }} />
           <HeaderSettingsButton onActivate={() => { void navigateWithGuard('/settings') }} />
@@ -136,6 +140,9 @@ export function ResidentPortal() {
             onRetry={() => void loadUnits()}
             onOpenDetail={(unitId) => navigate(`/resident/my-units/${unitId}`)}
           />
+        )}
+        {location.pathname === '/resident/finance' && (
+          <ResidentFinance />
         )}
         {detailMatch && (
           <ResidentUnitDetail

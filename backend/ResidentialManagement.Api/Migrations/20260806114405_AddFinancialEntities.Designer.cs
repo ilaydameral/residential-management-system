@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResidentialManagement.Api.Data;
 
@@ -11,9 +12,11 @@ using ResidentialManagement.Api.Data;
 namespace ResidentialManagement.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806114405_AddFinancialEntities")]
+    partial class AddFinancialEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -181,9 +184,6 @@ namespace ResidentialManagement.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<decimal>("UnitAmount")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -207,8 +207,6 @@ namespace ResidentialManagement.Api.Migrations
                             t.HasCheckConstraint("CK_DuePeriods_Month_Range", "[Month] >= 1 AND [Month] <= 12");
 
                             t.HasCheckConstraint("CK_DuePeriods_Status_Allowed", "[Status] IN ('DRAFT', 'ISSUED', 'CANCELLED')");
-
-                            t.HasCheckConstraint("CK_DuePeriods_UnitAmount_Positive", "[UnitAmount] > 0");
 
                             t.HasCheckConstraint("CK_DuePeriods_Year_Range", "[Year] >= 2020 AND [Year] <= 2100");
                         });
@@ -423,12 +421,6 @@ namespace ResidentialManagement.Api.Migrations
 
                     b.HasIndex("UserId", "IsRead");
 
-                    b.HasIndex("UserId", "IsDismissed", "IsRead");
-
-                    b.HasIndex("UserId", "NotificationType", "RelatedEntityName", "RelatedEntityId")
-                        .IsUnique()
-                        .HasFilter("[RelatedEntityName] IS NOT NULL AND [RelatedEntityId] IS NOT NULL");
-
                     b.ToTable("Notifications", (string)null);
                 });
 
@@ -577,12 +569,6 @@ namespace ResidentialManagement.Api.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<DateTime?>("CancelledAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CancelledByUserId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -632,8 +618,6 @@ namespace ResidentialManagement.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CancelledByUserId");
-
                     b.HasIndex("ReviewedByUserId");
 
                     b.HasIndex("Status");
@@ -646,7 +630,7 @@ namespace ResidentialManagement.Api.Migrations
                         {
                             t.HasCheckConstraint("CK_PaymentSubmissions_Amount_Positive", "[Amount] > 0");
 
-                            t.HasCheckConstraint("CK_PaymentSubmissions_Status_Allowed", "[Status] IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')");
+                            t.HasCheckConstraint("CK_PaymentSubmissions_Status_Allowed", "[Status] IN ('PENDING', 'APPROVED', 'REJECTED')");
                         });
                 });
 
@@ -1408,11 +1392,6 @@ namespace ResidentialManagement.Api.Migrations
 
             modelBuilder.Entity("ResidentialManagement.Api.Entities.PaymentSubmission", b =>
                 {
-                    b.HasOne("ResidentialManagement.Api.Entities.User", "CancelledByUser")
-                        .WithMany()
-                        .HasForeignKey("CancelledByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("ResidentialManagement.Api.Entities.User", "ReviewedByUser")
                         .WithMany()
                         .HasForeignKey("ReviewedByUserId")
@@ -1429,8 +1408,6 @@ namespace ResidentialManagement.Api.Migrations
                         .HasForeignKey("UnitChargeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("CancelledByUser");
 
                     b.Navigation("ReviewedByUser");
 
