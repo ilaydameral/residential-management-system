@@ -30,6 +30,8 @@ public class AppDbContext : DbContext
     public DbSet<Payment> Payments { get; set; }
     public DbSet<PaymentSubmission> PaymentSubmissions { get; set; }
     public DbSet<Notification> Notifications { get; set; }
+    public DbSet<ImportBatch> ImportBatches { get; set; }
+    public DbSet<ImportRowLog> ImportRowLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +45,8 @@ public class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new PaymentSubmissionConfiguration());
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
         modelBuilder.ApplyConfiguration(new NotificationConfiguration());
+        modelBuilder.ApplyConfiguration(new ImportBatchConfiguration());
+        modelBuilder.ApplyConfiguration(new ImportRowLogConfiguration());
 
         modelBuilder.Entity<OccupancyType>(entity =>
         {
