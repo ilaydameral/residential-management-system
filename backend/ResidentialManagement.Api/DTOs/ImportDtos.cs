@@ -78,3 +78,32 @@ public class ImportPreviewResponseDto
     public int TotalFilteredRows { get; set; }
     public List<ImportRowLogDto> Rows { get; set; } = new();
 }
+
+public class ImportReconciliationDto
+{
+    public int AttemptedCreateRows { get; set; }
+    public int SuccessfullyCreatedRows { get; set; }
+    public int SkippedRows { get; set; }
+    public int FailedRows { get; set; }
+}
+
+public class ImportConfirmResponseDto
+{
+    public ImportBatchDto Batch { get; set; } = new();
+    public ImportReconciliationDto Reconciliation { get; set; } = new();
+}
+
+public class ImportSummaryResponseDto
+{
+    public ImportBatchDto Batch { get; set; } = new();
+    public ImportReconciliationDto Reconciliation { get; set; } = new();
+    public List<int> CreatedEntityIds { get; set; } = new();
+}
+
+public class ImportRollbackResponseDto
+{
+    public ImportBatchDto Batch { get; set; } = new();
+    public bool IsSuccess { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int RolledBackRecordCount { get; set; }
+}

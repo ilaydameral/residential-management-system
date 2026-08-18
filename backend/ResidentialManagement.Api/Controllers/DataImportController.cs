@@ -56,6 +56,34 @@ public class DataImportController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("{id:int}/confirm")]
+    public async Task<ActionResult<ImportConfirmResponseDto>> ConfirmBatch(int id)
+    {
+        var result = await _importService.ConfirmBatchAsync(id, GetCurrentUserId(), IsAdmin());
+        return Ok(result);
+    }
+
+    [HttpGet("{id:int}/summary")]
+    public async Task<ActionResult<ImportSummaryResponseDto>> GetSummary(int id)
+    {
+        var result = await _importService.GetSummaryAsync(id, GetCurrentUserId(), IsAdmin());
+        return Ok(result);
+    }
+
+    [HttpPost("{id:int}/rollback")]
+    public async Task<ActionResult<ImportRollbackResponseDto>> RollbackBatch(int id)
+    {
+        var result = await _importService.RollbackBatchAsync(id, GetCurrentUserId(), IsAdmin());
+        return Ok(result);
+    }
+
+    [HttpGet("{id:int}/export-errors")]
+    public async Task<IActionResult> ExportErrors(int id)
+    {
+        var (fileBytes, contentType, fileName) = await _importService.ExportErrorsCsvAsync(id, GetCurrentUserId(), IsAdmin());
+        return File(fileBytes, contentType, fileName);
+    }
+
     private int GetCurrentUserId()
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);

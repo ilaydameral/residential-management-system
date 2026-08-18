@@ -28,4 +28,24 @@ public interface IDataImportService
         int pageSize,
         int currentUserId,
         bool isAdmin);
+
+    Task<ImportConfirmResponseDto> ConfirmBatchAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin);
+
+    Task<ImportSummaryResponseDto> GetSummaryAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin);
+
+    Task<ImportRollbackResponseDto> RollbackBatchAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin);
+
+    Task<(byte[] FileBytes, string ContentType, string FileName)> ExportErrorsCsvAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin);
 }

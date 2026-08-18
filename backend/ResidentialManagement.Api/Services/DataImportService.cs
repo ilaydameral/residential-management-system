@@ -13,6 +13,7 @@ public class DataImportService : IDataImportService
     private readonly IImportFileStorageService _storageService;
     private readonly IImportFileParser _fileParser;
     private readonly IManagerScopeService _managerScopeService;
+    private readonly IPasswordService _passwordService;
 
     private static readonly Dictionary<string, List<TargetFieldOptionDto>> TargetFieldsRegistry = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -77,12 +78,14 @@ public class DataImportService : IDataImportService
         AppDbContext context,
         IImportFileStorageService storageService,
         IImportFileParser fileParser,
-        IManagerScopeService managerScopeService)
+        IManagerScopeService managerScopeService,
+        IPasswordService passwordService)
     {
         _context = context;
         _storageService = storageService;
         _fileParser = fileParser;
         _managerScopeService = managerScopeService;
+        _passwordService = passwordService;
     }
 
     public async Task<ImportUploadResponseDto> UploadFileAsync(
@@ -279,11 +282,7 @@ public class DataImportService : IDataImportService
             batch.ImportedRows = 0;
             batch.ValidatedAt = DateTime.UtcNow;
 
-            if (batch.InvalidRows > 0)
-            {
-                batch.Status = "VALIDATED";
-            }
-            else if (batch.ValidRows > 0)
+            if (batch.InvalidRows == 0 && batch.ValidRows > 0)
             {
                 batch.Status = "READY";
             }
@@ -732,6 +731,595 @@ public class DataImportService : IDataImportService
             TotalFilteredRows = totalFiltered,
             Rows = rowDtos
         };
+    }
+
+    public async Task<ImportConfirmResponseDto> ConfirmBatchAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin)
+    {
+        var batch = await _context.ImportBatches
+            .Include(b => b.RowLogs)
+            .FirstOrDefaultAsync(b => b.Id == batchId);
+
+        if (batch is null)
+        {
+            throw new NotFoundException($"ID'si {batchId} olan içe aktarım partisi bulunamadı.");
+        }
+
+        if (!isAdmin && batch.CreatedByUserId != currentUserId)
+        {
+            throw new ForbiddenException("Bu içe aktarım partisini onaylama yetkiniz bulunmamaktadır.");
+        }
+
+        if (batch.Status != "READY")
+        {
+            throw new BadRequestException($"Yalnızca 'READY' statüsündeki partiler içe aktarılabilir. Mevcut statü: '{batch.Status}'.");
+        }
+
+        var createLogs = batch.RowLogs
+            .Where(r => r.ActionPreview == "CREATE" && r.Status == "VALID")
+            .OrderBy(r => r.RowNumber)
+            .ToList();
+
+        if (createLogs.Count == 0)
+        {
+            throw new BadRequestException("Partide aktarılacak geçerli (CREATE) satır bulunmamaktadır.");
+        }
+
+        var invalidLogsCount = batch.RowLogs.Count(r => r.Status == "INVALID" || r.ActionPreview == "ERROR");
+        if (invalidLogsCount > 0)
+        {
+            throw new BadRequestException("Hatalı (ERROR/INVALID) satır içeren partiler doğrulama düzeltilmeden aktarılamaz.");
+        }
+
+        batch.Status = "IMPORTING";
+        await _context.SaveChangesAsync();
+
+        var accessiblePropertyIds = await _managerScopeService.GetAccessiblePropertyIdsAsync(currentUserId, isAdmin);
+        var accessibleBuildingIds = await _managerScopeService.GetAccessibleBuildingIdsAsync(currentUserId, isAdmin);
+
+        var residentRole = await _context.Roles.FirstOrDefaultAsync(r => r.Code == "RESIDENT");
+        var residentRoleId = residentRole?.Id ?? 3;
+
+        int createdCount = 0;
+        bool isStale = false;
+        string staleMessage = string.Empty;
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                foreach (var log in createLogs)
+                {
+                    var mapped = JsonSerializer.Deserialize<Dictionary<string, string>>(log.RawDataJson) ?? new();
+
+                    int? createdId = await ExecuteRowEntityCreationAsync(
+                        batch.ImportType,
+                        mapped,
+                        isAdmin,
+                        accessiblePropertyIds,
+                        accessibleBuildingIds,
+                        residentRoleId);
+
+                    if (!createdId.HasValue)
+                    {
+                        isStale = true;
+                        staleMessage = $"Satır #{log.RowNumber} için güncelliğini yitirmiş doğrulama tespiti (STALE_VALIDATION). Lütfen partiyi tekrar doğrulayın.";
+                        break;
+                    }
+
+                    log.Status = "IMPORTED";
+                    log.CreatedEntityId = createdId.Value;
+                    createdCount++;
+                }
+
+                if (isStale)
+                {
+                    await tx.RollbackAsync();
+                }
+                else
+                {
+                    batch.ImportedRows = createdCount;
+                    batch.CompletedAt = DateTime.UtcNow;
+                    batch.Status = "COMPLETED";
+                    await _context.SaveChangesAsync();
+                    await tx.CommitAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                isStale = true;
+                staleMessage = $"Aktarım esnasında beklenmeyen bir hata oluştu: {ex.Message}";
+            }
+        });
+
+        if (isStale)
+        {
+            batch.Status = "FAILED";
+            batch.ErrorMessage = staleMessage;
+            await _context.SaveChangesAsync();
+            throw new BadRequestException(staleMessage);
+        }
+
+        var user = await _context.Users.FindAsync(batch.CreatedByUserId);
+        var batchDto = ToBatchDto(batch, user != null ? $"{user.FirstName} {user.LastName}".Trim() : string.Empty);
+
+        return new ImportConfirmResponseDto
+        {
+            Batch = batchDto,
+            Reconciliation = new ImportReconciliationDto
+            {
+                AttemptedCreateRows = createLogs.Count,
+                SuccessfullyCreatedRows = createdCount,
+                SkippedRows = batch.SkippedRows,
+                FailedRows = 0
+            }
+        };
+    }
+
+    private async Task<int?> ExecuteRowEntityCreationAsync(
+        string importType,
+        Dictionary<string, string> mapped,
+        bool isAdmin,
+        List<int> accessiblePropertyIds,
+        List<int> accessibleBuildingIds,
+        int residentRoleId)
+    {
+        switch (importType)
+        {
+            case "PROPERTIES":
+                {
+                    if (!isAdmin) return null;
+                    var name = GetValue(mapped, "Name");
+                    var address = GetValue(mapped, "AddressLine");
+                    var city = GetValue(mapped, "City");
+                    var district = GetValue(mapped, "District");
+                    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(address) || string.IsNullOrWhiteSpace(city) || string.IsNullOrWhiteSpace(district))
+                        return null;
+
+                    var exists = await _context.Properties.AsNoTracking().AnyAsync(p => p.Name.ToLower() == name.ToLower() && p.IsActive);
+                    if (exists) return null;
+
+                    var prop = new Property
+                    {
+                        Name = name,
+                        AddressLine = address,
+                        City = city,
+                        District = district,
+                        Description = GetValue(mapped, "Description"),
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Properties.Add(prop);
+                    await _context.SaveChangesAsync();
+                    return prop.Id;
+                }
+
+            case "BUILDINGS":
+                {
+                    var propName = GetValue(mapped, "PropertyName");
+                    var name = GetValue(mapped, "Name");
+                    var code = GetValue(mapped, "Code");
+                    var floorStr = GetValue(mapped, "FloorCount");
+                    if (string.IsNullOrWhiteSpace(propName) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(floorStr))
+                        return null;
+                    if (!int.TryParse(floorStr, out var floorCount) || floorCount < 1 || floorCount > 200) return null;
+
+                    var prop = await _context.Properties.AsNoTracking().FirstOrDefaultAsync(p => p.Name.ToLower() == propName.ToLower() && p.IsActive);
+                    if (prop is null) return null;
+                    if (!isAdmin && !accessiblePropertyIds.Contains(prop.Id)) return null;
+
+                    var exists = await _context.Buildings.AsNoTracking().AnyAsync(b => b.PropertyId == prop.Id && b.Code.ToLower() == code.ToLower() && b.IsActive);
+                    if (exists) return null;
+
+                    var bld = new Building
+                    {
+                        PropertyId = prop.Id,
+                        Name = name,
+                        Code = code,
+                        FloorCount = floorCount,
+                        Description = GetValue(mapped, "Description"),
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Buildings.Add(bld);
+                    await _context.SaveChangesAsync();
+                    return bld.Id;
+                }
+
+            case "UNITS":
+                {
+                    var propName = GetValue(mapped, "PropertyName");
+                    var buildingCode = GetValue(mapped, "BuildingCode");
+                    var unitNumber = GetValue(mapped, "UnitNumber");
+                    var unitTypeCode = GetValue(mapped, "UnitTypeCode");
+                    if (string.IsNullOrWhiteSpace(propName) || string.IsNullOrWhiteSpace(buildingCode) || string.IsNullOrWhiteSpace(unitNumber) || string.IsNullOrWhiteSpace(unitTypeCode))
+                        return null;
+
+                    var building = await _context.Buildings.AsNoTracking().Include(b => b.Property).FirstOrDefaultAsync(b => b.Property.Name.ToLower() == propName.ToLower() && b.Code.ToLower() == buildingCode.ToLower() && b.IsActive);
+                    if (building is null) return null;
+                    if (!isAdmin && !accessibleBuildingIds.Contains(building.Id)) return null;
+
+                    var unitType = await _context.UnitTypes.AsNoTracking().FirstOrDefaultAsync(ut => ut.Code.ToLower() == unitTypeCode.ToLower() && ut.IsActive);
+                    if (unitType is null) return null;
+
+                    var exists = await _context.Units.AsNoTracking().AnyAsync(u => u.BuildingId == building.Id && u.UnitNumber.ToLower() == unitNumber.ToLower() && u.IsActive);
+                    if (exists) return null;
+
+                    decimal? grossArea = decimal.TryParse(GetValue(mapped, "GrossArea"), out var g) && g > 0 ? g : null;
+                    decimal? netArea = decimal.TryParse(GetValue(mapped, "NetArea"), out var n) && n > 0 ? n : null;
+                    int floorNum = int.TryParse(GetValue(mapped, "FloorNumber"), out var fn) ? fn : 0;
+
+                    var unit = new Unit
+                    {
+                        BuildingId = building.Id,
+                        UnitTypeId = unitType.Id,
+                        UnitNumber = unitNumber,
+                        FloorNumber = floorNum,
+                        GrossArea = grossArea,
+                        NetArea = netArea,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Units.Add(unit);
+                    await _context.SaveChangesAsync();
+                    return unit.Id;
+                }
+
+            case "USERS":
+                {
+                    var userName = GetValue(mapped, "UserName");
+                    var email = GetValue(mapped, "Email");
+                    var firstName = GetValue(mapped, "FirstName");
+                    var lastName = GetValue(mapped, "LastName");
+                    if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+                        return null;
+
+                    var exists = await _context.Users.AsNoTracking().AnyAsync(u => u.UserName.ToLower() == userName.ToLower() || u.Email.ToLower() == email.ToLower());
+                    if (exists) return null;
+
+                    var tempPassword = $"{Guid.NewGuid():N}"[..10] + "!A1";
+                    var user = new User
+                    {
+                        UserName = userName,
+                        Email = email,
+                        FirstName = firstName,
+                        LastName = lastName,
+                        PasswordHash = string.Empty,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    user.PasswordHash = _passwordService.HashPassword(user, tempPassword);
+                    _context.Users.Add(user);
+                    await _context.SaveChangesAsync();
+
+                    _context.UserRoles.Add(new UserRole
+                    {
+                        UserId = user.Id,
+                        RoleId = residentRoleId
+                    });
+                    await _context.SaveChangesAsync();
+
+                    return user.Id;
+                }
+
+            case "OCCUPANCIES":
+                {
+                    var propName = GetValue(mapped, "PropertyName");
+                    var buildingCode = GetValue(mapped, "BuildingCode");
+                    var unitNumber = GetValue(mapped, "UnitNumber");
+                    var userNameOrEmail = GetValue(mapped, "UserNameOrEmail");
+                    var occTypeCode = GetValue(mapped, "OccupancyTypeCode");
+                    var startDateStr = GetValue(mapped, "StartDate");
+                    if (string.IsNullOrWhiteSpace(propName) || string.IsNullOrWhiteSpace(buildingCode) || string.IsNullOrWhiteSpace(unitNumber) || string.IsNullOrWhiteSpace(userNameOrEmail) || string.IsNullOrWhiteSpace(occTypeCode) || string.IsNullOrWhiteSpace(startDateStr))
+                        return null;
+
+                    if (!DateTime.TryParse(startDateStr, out var startDate)) return null;
+                    DateTime? endDate = DateTime.TryParse(GetValue(mapped, "EndDate"), out var ed) ? ed : null;
+
+                    var unit = await _context.Units.AsNoTracking().Include(u => u.Building).ThenInclude(b => b.Property).FirstOrDefaultAsync(u => u.Building.Property.Name.ToLower() == propName.ToLower() && u.Building.Code.ToLower() == buildingCode.ToLower() && u.UnitNumber.ToLower() == unitNumber.ToLower() && u.IsActive);
+                    if (unit is null) return null;
+                    if (!isAdmin && !accessibleBuildingIds.Contains(unit.BuildingId)) return null;
+
+                    var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserName.ToLower() == userNameOrEmail.ToLower() || u.Email.ToLower() == userNameOrEmail.ToLower());
+                    if (user is null) return null;
+
+                    var occType = await _context.OccupancyTypes.AsNoTracking().FirstOrDefaultAsync(ot => ot.Code.ToLower() == occTypeCode.ToLower() && ot.IsActive);
+                    if (occType is null) return null;
+
+                    var collision = await _context.UnitOccupancies.AsNoTracking().AnyAsync(uo => uo.IsActive && (uo.UnitId == unit.Id || uo.UserId == user.Id) && uo.OccupancyTypeId == occType.Id);
+                    if (collision) return null;
+
+                    var occ = new UnitOccupancy
+                    {
+                        UnitId = unit.Id,
+                        UserId = user.Id,
+                        OccupancyTypeId = occType.Id,
+                        StartDate = startDate,
+                        EndDate = endDate,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.UnitOccupancies.Add(occ);
+                    await _context.SaveChangesAsync();
+                    return occ.Id;
+                }
+
+            default:
+                return null;
+        }
+    }
+
+    public async Task<ImportSummaryResponseDto> GetSummaryAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin)
+    {
+        var batch = await GetBatchAndCheckAccessAsync(batchId, currentUserId, isAdmin);
+        var user = await _context.Users.FindAsync(batch.CreatedByUserId);
+
+        var createdIds = await _context.ImportRowLogs
+            .AsNoTracking()
+            .Where(rl => rl.ImportBatchId == batch.Id && rl.CreatedEntityId != null)
+            .Select(rl => rl.CreatedEntityId!.Value)
+            .ToListAsync();
+
+        return new ImportSummaryResponseDto
+        {
+            Batch = ToBatchDto(batch, user != null ? $"{user.FirstName} {user.LastName}".Trim() : string.Empty),
+            Reconciliation = new ImportReconciliationDto
+            {
+                AttemptedCreateRows = batch.ValidRows,
+                SuccessfullyCreatedRows = batch.ImportedRows,
+                SkippedRows = batch.SkippedRows,
+                FailedRows = batch.InvalidRows
+            },
+            CreatedEntityIds = createdIds
+        };
+    }
+
+    public async Task<ImportRollbackResponseDto> RollbackBatchAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin)
+    {
+        var batch = await _context.ImportBatches
+            .Include(b => b.RowLogs)
+            .FirstOrDefaultAsync(b => b.Id == batchId);
+
+        if (batch is null)
+        {
+            throw new NotFoundException($"ID'si {batchId} olan içe aktarım partisi bulunamadı.");
+        }
+
+        if (!isAdmin && batch.CreatedByUserId != currentUserId)
+        {
+            throw new ForbiddenException("Bu içe aktarım partisini geri alma yetkiniz bulunmamaktadır.");
+        }
+
+        if (batch.Status == "ROLLED_BACK")
+        {
+            throw new BadRequestException("Bu içe aktarım partisi daha önce zaten geri alınmış (ROLLED_BACK).");
+        }
+
+        if (batch.Status != "COMPLETED")
+        {
+            throw new BadRequestException($"Yalnızca 'COMPLETED' statüsündeki partiler geri alınabilir. Mevcut statü: '{batch.Status}'.");
+        }
+
+        var createdEntityIds = batch.RowLogs
+            .Where(rl => rl.CreatedEntityId.HasValue)
+            .Select(rl => rl.CreatedEntityId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (createdEntityIds.Count == 0)
+        {
+            batch.Status = "ROLLED_BACK";
+            batch.RolledBackAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            var u = await _context.Users.FindAsync(batch.CreatedByUserId);
+            return new ImportRollbackResponseDto
+            {
+                Batch = ToBatchDto(batch, u != null ? $"{u.FirstName} {u.LastName}".Trim() : string.Empty),
+                IsSuccess = true,
+                Message = "Parti geri alındı (Aktarılan kayıt bulunmuyordu).",
+                RolledBackRecordCount = 0
+            };
+        }
+
+        int rolledBackCount = 0;
+        await CheckRollbackDependenciesAsync(batch.ImportType, createdEntityIds);
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            rolledBackCount = await ExecuteRollbackAsync(batch.ImportType, createdEntityIds);
+
+            batch.Status = "ROLLED_BACK";
+            batch.RolledBackAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
+        });
+
+        var user = await _context.Users.FindAsync(batch.CreatedByUserId);
+        return new ImportRollbackResponseDto
+        {
+            Batch = ToBatchDto(batch, user != null ? $"{user.FirstName} {user.LastName}".Trim() : string.Empty),
+            IsSuccess = true,
+            Message = $"İçe aktarılan {rolledBackCount} adet kayıt başarıyla geri alındı (ROLLED_BACK).",
+            RolledBackRecordCount = rolledBackCount
+        };
+    }
+
+    private async Task CheckRollbackDependenciesAsync(string importType, List<int> createdEntityIds)
+    {
+        switch (importType)
+        {
+            case "PROPERTIES":
+                {
+                    var hasBuildings = await _context.Buildings.AsNoTracking().AnyAsync(b => createdEntityIds.Contains(b.PropertyId));
+                    var hasExpenses = await _context.Expenses.AsNoTracking().AnyAsync(e => createdEntityIds.Contains(e.PropertyId));
+                    var hasDues = await _context.DueDefinitions.AsNoTracking().AnyAsync(d => createdEntityIds.Contains(d.PropertyId));
+                    if (hasBuildings || hasExpenses || hasDues)
+                    {
+                        throw new BadRequestException("İçe aktarılan taşınmazlara bağlı blok, gider veya aidat tanımları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                    }
+                    break;
+                }
+
+            case "BUILDINGS":
+                {
+                    var hasUnits = await _context.Units.AsNoTracking().AnyAsync(u => createdEntityIds.Contains(u.BuildingId));
+                    var hasExpenses = await _context.Expenses.AsNoTracking().AnyAsync(e => e.BuildingId.HasValue && createdEntityIds.Contains(e.BuildingId.Value));
+                    if (hasUnits || hasExpenses)
+                    {
+                        throw new BadRequestException("İçe aktarılan bloklara bağlı daire veya gider kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                    }
+                    break;
+                }
+
+            case "UNITS":
+                {
+                    var hasOccupancies = await _context.UnitOccupancies.AsNoTracking().AnyAsync(uo => createdEntityIds.Contains(uo.UnitId));
+                    var hasCharges = await _context.UnitCharges.AsNoTracking().AnyAsync(uc => createdEntityIds.Contains(uc.UnitId));
+                    if (hasOccupancies || hasCharges)
+                    {
+                        throw new BadRequestException("İçe aktarılan dairelere bağlı ikamet veya borç kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                    }
+                    break;
+                }
+
+            case "USERS":
+                {
+                    var hasOccupancies = await _context.UnitOccupancies.AsNoTracking().AnyAsync(uo => createdEntityIds.Contains(uo.UserId));
+                    var hasSubmissions = await _context.PaymentSubmissions.AsNoTracking().AnyAsync(ps => createdEntityIds.Contains(ps.SubmittedByUserId));
+                    var hasNotifications = await _context.Notifications.AsNoTracking().AnyAsync(n => createdEntityIds.Contains(n.UserId));
+                    if (hasOccupancies || hasSubmissions || hasNotifications)
+                    {
+                        throw new BadRequestException("İçe aktarılan kullanıcılara ait ikamet veya finansal işlemler bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                    }
+                    break;
+                }
+
+            case "OCCUPANCIES":
+                break;
+        }
+    }
+
+    private async Task<int> ExecuteRollbackAsync(string importType, List<int> createdEntityIds)
+    {
+        int count = 0;
+        switch (importType)
+        {
+            case "PROPERTIES":
+                {
+                    var items = await _context.Properties.Where(p => createdEntityIds.Contains(p.Id)).ToListAsync();
+                    _context.Properties.RemoveRange(items);
+                    count = items.Count;
+                    break;
+                }
+
+            case "BUILDINGS":
+                {
+                    var items = await _context.Buildings.Where(b => createdEntityIds.Contains(b.Id)).ToListAsync();
+                    _context.Buildings.RemoveRange(items);
+                    count = items.Count;
+                    break;
+                }
+
+            case "UNITS":
+                {
+                    var items = await _context.Units.Where(u => createdEntityIds.Contains(u.Id)).ToListAsync();
+                    _context.Units.RemoveRange(items);
+                    count = items.Count;
+                    break;
+                }
+
+            case "USERS":
+                {
+                    var roles = await _context.UserRoles.Where(ur => createdEntityIds.Contains(ur.UserId)).ToListAsync();
+                    _context.UserRoles.RemoveRange(roles);
+                    var users = await _context.Users.Where(u => createdEntityIds.Contains(u.Id)).ToListAsync();
+                    _context.Users.RemoveRange(users);
+                    count = users.Count;
+                    break;
+                }
+
+            case "OCCUPANCIES":
+                {
+                    var items = await _context.UnitOccupancies.Where(uo => createdEntityIds.Contains(uo.Id)).ToListAsync();
+                    _context.UnitOccupancies.RemoveRange(items);
+                    count = items.Count;
+                    break;
+                }
+        }
+
+        await _context.SaveChangesAsync();
+        return count;
+    }
+
+    public async Task<(byte[] FileBytes, string ContentType, string FileName)> ExportErrorsCsvAsync(
+        int batchId,
+        int currentUserId,
+        bool isAdmin)
+    {
+        var batch = await GetBatchAndCheckAccessAsync(batchId, currentUserId, isAdmin);
+
+        var errorLogs = await _context.ImportRowLogs
+            .AsNoTracking()
+            .Where(rl => rl.ImportBatchId == batch.Id && (rl.Status == "INVALID" || rl.ActionPreview == "ERROR"))
+            .OrderBy(rl => rl.RowNumber)
+            .ToListAsync();
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append('\uFEFF');
+        sb.AppendLine("RowNumber,ActionPreview,ErrorCode,ErrorMessage,MappedValues");
+
+        foreach (var log in errorLogs)
+        {
+            var errors = !string.IsNullOrWhiteSpace(log.ErrorMessagesJson)
+                ? JsonSerializer.Deserialize<List<ValidationErrorItemDto>>(log.ErrorMessagesJson) ?? new()
+                : new List<ValidationErrorItemDto>();
+
+            var rawData = !string.IsNullOrWhiteSpace(log.RawDataJson)
+                ? JsonSerializer.Deserialize<Dictionary<string, string>>(log.RawDataJson) ?? new()
+                : new Dictionary<string, string>();
+
+            var safeData = rawData
+                .Where(kvp => !kvp.Key.Contains("password", StringComparison.OrdinalIgnoreCase))
+                .Select(kvp => $"{kvp.Key}:{kvp.Value}");
+            var mappedStr = string.Join("; ", safeData);
+
+            foreach (var err in errors)
+            {
+                sb.AppendLine($"\"{log.RowNumber}\",\"{log.ActionPreview}\",\"{EscapeCsv(err.Code)}\",\"{EscapeCsv(err.Message)}\",\"{EscapeCsv(mappedStr)}\"");
+            }
+
+            if (errors.Count == 0)
+            {
+                sb.AppendLine($"\"{log.RowNumber}\",\"{log.ActionPreview}\",\"ERROR\",\"Hata detayı bulunamadı.\",\"{EscapeCsv(mappedStr)}\"");
+            }
+        }
+
+        var fileBytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var fileName = $"import_errors_batch_{batchId}.csv";
+        return (fileBytes, "text/csv; charset=utf-8", fileName);
+    }
+
+    private static string EscapeCsv(string val)
+    {
+        if (string.IsNullOrEmpty(val)) return string.Empty;
+        return val.Replace("\"", "\"\"");
     }
 
     private async Task<ImportBatch> GetBatchAndCheckAccessAsync(int batchId, int currentUserId, bool isAdmin)
