@@ -247,7 +247,7 @@ public class DataImportService : IDataImportService
                 accessiblePropertyIds,
                 accessibleBuildingIds);
 
-            var rawDataJson = JsonSerializer.Serialize(parsedRow.Values);
+            var rawDataJson = JsonSerializer.Serialize(mappedValues);
             var errorsJson = errors.Count > 0 ? JsonSerializer.Serialize(errors) : null;
 
             rowLogs.Add(new ImportRowLog
@@ -291,6 +291,7 @@ public class DataImportService : IDataImportService
                 batch.Status = "VALIDATED";
             }
 
+            _context.Update(batch);
             await _context.SaveChangesAsync();
             await tx.CommitAsync();
         });
@@ -1346,6 +1347,61 @@ public class DataImportService : IDataImportService
         return dict.TryGetValue(key, out var val) && !string.IsNullOrWhiteSpace(val)
             ? val.Trim()
             : null;
+    }
+
+    public async Task<ImportBatchListResponseDto> GetBatchesAsync(
+        string? importType,
+        string? status,
+        int page,
+        int pageSize,
+        int currentUserId,
+        bool isAdmin)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+        if (pageSize > 100) pageSize = 100;
+
+        var query = _context.ImportBatches.AsNoTracking();
+
+        if (!isAdmin)
+        {
+            query = query.Where(b => b.CreatedByUserId == currentUserId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(importType))
+        {
+            var normType = importType.Trim().ToUpperInvariant();
+            query = query.Where(b => b.ImportType == normType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var normStatus = status.Trim().ToUpperInvariant();
+            query = query.Where(b => b.Status == normStatus);
+        }
+
+        var totalCount = await query.CountAsync();
+        var batches = await query
+            .OrderByDescending(b => b.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var userIds = batches.Select(b => b.CreatedByUserId).Distinct().ToList();
+        var users = await _context.Users
+            .AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim());
+
+        var dtos = batches.Select(b => ToBatchDto(b, users.TryGetValue(b.CreatedByUserId, out var name) ? name : string.Empty)).ToList();
+
+        return new ImportBatchListResponseDto
+        {
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            Items = dtos
+        };
     }
 
     private static string NormalizeHeader(string header)

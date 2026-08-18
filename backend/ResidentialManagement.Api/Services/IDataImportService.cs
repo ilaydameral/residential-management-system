@@ -48,4 +48,12 @@ public interface IDataImportService
         int batchId,
         int currentUserId,
         bool isAdmin);
+
+    Task<ImportBatchListResponseDto> GetBatchesAsync(
+        string? importType,
+        string? status,
+        int page,
+        int pageSize,
+        int currentUserId,
+        bool isAdmin);
 }

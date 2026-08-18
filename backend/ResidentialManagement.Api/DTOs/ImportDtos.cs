@@ -107,3 +107,11 @@ public class ImportRollbackResponseDto
     public string Message { get; set; } = string.Empty;
     public int RolledBackRecordCount { get; set; }
 }
+
+public class ImportBatchListResponseDto
+{
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public List<ImportBatchDto> Items { get; set; } = new();
+}

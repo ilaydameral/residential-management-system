@@ -20,6 +20,17 @@ public class DataImportController : ControllerBase
         _importService = importService;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<ImportBatchListResponseDto>> GetBatches(
+        [FromQuery] string? importType,
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _importService.GetBatchesAsync(importType, status, page, pageSize, GetCurrentUserId(), IsAdmin());
+        return Ok(result);
+    }
+
     [HttpPost("upload")]
     public async Task<ActionResult<ImportUploadResponseDto>> Upload(
         [FromForm] string importType,
