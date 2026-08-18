@@ -62,6 +62,14 @@ import type {
   NotificationDto,
   UnreadNotificationCountDto,
   ResidentUnitCharge,
+  ImportUploadResponse,
+  ImportColumnMappingOptions,
+  ValidateImportBatchPayload,
+  ImportPreviewResponse,
+  ImportConfirmResponse,
+  ImportSummaryResponse,
+  ImportRollbackResponse,
+  ImportBatchListResponse,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -886,4 +894,99 @@ export async function cancelResidentPaymentSubmission(id: number): Promise<Payme
     headers: getAuthHeaders(),
   })
   return handleResponse<PaymentSubmission>(response)
+}
+
+// Data Import API
+export async function uploadImportFile(importType: string, file: File): Promise<ImportUploadResponse> {
+  const formData = new FormData()
+  formData.append('importType', importType)
+  formData.append('file', file)
+
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/upload`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+  })
+  return handleResponse<ImportUploadResponse>(response)
+}
+
+export async function getImportColumnOptions(batchId: number): Promise<ImportColumnMappingOptions> {
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/${batchId}/columns`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ImportColumnMappingOptions>(response)
+}
+
+export async function validateImportBatch(batchId: number, payload: ValidateImportBatchPayload): Promise<ImportPreviewResponse> {
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/${batchId}/validate`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ImportPreviewResponse>(response)
+}
+
+export async function getImportPreview(batchId: number, action?: string, page = 1, pageSize = 50): Promise<ImportPreviewResponse> {
+  const query = new URLSearchParams()
+  if (action) query.append('action', action)
+  query.append('page', page.toString())
+  query.append('pageSize', pageSize.toString())
+
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/${batchId}/preview?${query.toString()}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ImportPreviewResponse>(response)
+}
+
+export async function confirmImportBatch(batchId: number): Promise<ImportConfirmResponse> {
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/${batchId}/confirm`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ImportConfirmResponse>(response)
+}
+
+export async function getImportSummary(batchId: number): Promise<ImportSummaryResponse> {
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/${batchId}/summary`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ImportSummaryResponse>(response)
+}
+
+export async function rollbackImportBatch(batchId: number): Promise<ImportRollbackResponse> {
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/${batchId}/rollback`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ImportRollbackResponse>(response)
+}
+
+export async function exportImportErrorsCsv(batchId: number): Promise<Blob> {
+  const response = await safeFetch(`${API_BASE_URL}/api/imports/${batchId}/export-errors`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || 'Hata raporu indirilemedi.')
+  }
+  return response.blob()
+}
+
+export async function getImportBatches(params?: {
+  importType?: string
+  status?: string
+  page?: number
+  pageSize?: number
+}): Promise<ImportBatchListResponse> {
+  const query = new URLSearchParams()
+  if (params?.importType) query.append('importType', params.importType)
+  if (params?.status) query.append('status', params.status)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+
+  const response = await safeFetch(`${API_BASE_URL}/api/imports${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ImportBatchListResponse>(response)
 }

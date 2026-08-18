@@ -683,3 +683,106 @@ export interface ResidentUnitCharge {
   isCancelled: boolean
   createdAt: string
 }
+
+export interface ImportBatch {
+  id: number
+  importType: 'PROPERTIES' | 'BUILDINGS' | 'UNITS' | 'USERS' | 'OCCUPANCIES' | string
+  originalFileName: string
+  storageKey: string
+  fileHashSha256: string
+  status: 'UPLOADED' | 'VALIDATED' | 'READY' | 'IMPORTING' | 'COMPLETED' | 'FAILED' | 'ROLLED_BACK' | string
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  importedRows: number
+  skippedRows: number
+  createdByUserId: number
+  createdByFullName: string
+  createdAt: string
+  validatedAt: string | null
+  completedAt: string | null
+  rolledBackAt: string | null
+  errorMessage: string | null
+}
+
+export interface ImportUploadResponse {
+  batch: ImportBatch
+  isDuplicateUpload: boolean
+  duplicateWarning: string | null
+}
+
+export interface TargetFieldOption {
+  key: string
+  label: string
+  isRequired: boolean
+}
+
+export interface ImportColumnMappingOptions {
+  batchId: number
+  importType: string
+  sourceHeaders: string[]
+  allowedTargetFields: TargetFieldOption[]
+  suggestedMappings: Record<string, string>
+}
+
+export interface ValidateImportBatchPayload {
+  columnMappings: Record<string, string>
+}
+
+export interface ValidationErrorItem {
+  code: string
+  field: string
+  message: string
+}
+
+export interface ImportRowLog {
+  id: number
+  importBatchId: number
+  rowNumber: number
+  rawData: Record<string, string>
+  mappedValues: Record<string, string>
+  status: string
+  actionPreview: 'CREATE' | 'SKIP' | 'ERROR' | string
+  validationErrors: ValidationErrorItem[]
+  createdEntityId: number | null
+}
+
+export interface ImportPreviewResponse {
+  summary: ImportBatch
+  page: number
+  pageSize: number
+  totalFilteredRows: number
+  rows: ImportRowLog[]
+}
+
+export interface ImportReconciliation {
+  attemptedCreateRows: number
+  successfullyCreatedRows: number
+  skippedRows: number
+  failedRows: number
+}
+
+export interface ImportConfirmResponse {
+  batch: ImportBatch
+  reconciliation: ImportReconciliation
+}
+
+export interface ImportSummaryResponse {
+  batch: ImportBatch
+  reconciliation: ImportReconciliation
+  createdEntityIds: number[]
+}
+
+export interface ImportRollbackResponse {
+  batch: ImportBatch
+  isSuccess: boolean
+  message: string
+  rolledBackRecordCount: number
+}
+
+export interface ImportBatchListResponse {
+  totalCount: number
+  page: number
+  pageSize: number
+  items: ImportBatch[]
+}

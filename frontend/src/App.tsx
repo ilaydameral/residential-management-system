@@ -41,6 +41,7 @@ import { DueDefinitionsManagement } from './components/DueDefinitionsManagement'
 import { DuePeriodsManagement } from './components/DuePeriodsManagement'
 import { ExpensesManagement } from './components/ExpensesManagement'
 import { PaymentSubmissionsManagement } from './components/PaymentSubmissionsManagement'
+import { DataImportManagement } from './components/DataImportManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -140,6 +141,7 @@ type ManagementView =
   | 'duePeriods'
   | 'expenses'
   | 'paymentSubmissions'
+  | 'dataImport'
   | 'account'
   | 'settings'
 
@@ -166,6 +168,7 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'duePeriods', label: 'Aidat Dönemleri' },
   { id: 'expenses', label: 'Giderler & Borçlandırma' },
   { id: 'paymentSubmissions', label: 'Ödeme Dekont Onayları' },
+  { id: 'dataImport', label: 'Veri Aktarımı' },
   { id: 'account', label: 'Hesabım' },
   { id: 'settings', label: 'Ayarlar' },
 ]
@@ -184,6 +187,7 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   duePeriods: '/management/finance/due-periods',
   expenses: '/management/finance/expenses',
   paymentSubmissions: '/management/finance/payment-submissions',
+  dataImport: '/management/import',
   account: '/account',
   settings: '/settings',
 }
@@ -1732,7 +1736,9 @@ function App() {
                         ? 'Gider kayıtları oluşturun ve dairelere borçlandırma modlarıyla dağıtın.'
                         : activeManagementView === 'paymentSubmissions'
                           ? 'Sakinlerden gelen ödeme dekontlarını inceleyin, onaylayın veya reddedin.'
-                          : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
+                          : activeManagementView === 'dataImport'
+                            ? 'CSV ve XLSX dosyaları üzerinden toplu veri aktarımı yapın.'
+                            : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
   const isStructuresView = ['properties', 'buildings', 'units', 'managerScope'].includes(activeManagementView)
   const isPeopleView = ['users', 'residents', 'managerAssignments'].includes(activeManagementView)
   const isFinanceView = ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(activeManagementView)
@@ -1928,6 +1934,16 @@ function App() {
                 </div>
               </div>
 
+              {(hasRole('ADMIN') || hasRole('MANAGER')) && (
+                <button
+                  className={activeManagementView === 'dataImport' ? 'active' : ''}
+                  type="button"
+                  onClick={() => handleNavigationItemClick('dataImport')}
+                >
+                  Veri Aktarımı
+                </button>
+              )}
+
             </nav>
 
             <div className="management-nav-user">
@@ -2098,6 +2114,10 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'paymentSubmissions' && (
         <PaymentSubmissionsManagement />
+      )}
+
+      {isManagementPanel && activeManagementView === 'dataImport' && (
+        <DataImportManagement />
       )}
 
       {activeManagementView === 'account' && (
