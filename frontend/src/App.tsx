@@ -42,6 +42,8 @@ import { DuePeriodsManagement } from './components/DuePeriodsManagement'
 import { ExpensesManagement } from './components/ExpensesManagement'
 import { PaymentSubmissionsManagement } from './components/PaymentSubmissionsManagement'
 import { DataImportManagement } from './components/DataImportManagement'
+import { AnnouncementManagement } from './components/AnnouncementManagement'
+import { MaintenanceRequestManagement } from './components/MaintenanceRequestManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -142,10 +144,12 @@ type ManagementView =
   | 'expenses'
   | 'paymentSubmissions'
   | 'dataImport'
+  | 'announcements'
+  | 'maintenanceRequests'
   | 'account'
   | 'settings'
 
-type NavigationGroup = 'structures' | 'people' | 'finance'
+type NavigationGroup = 'structures' | 'people' | 'finance' | 'communication'
 
 interface DestructiveConfirmation {
   title: string
@@ -169,6 +173,8 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'expenses', label: 'Giderler & Borçlandırma' },
   { id: 'paymentSubmissions', label: 'Ödeme Dekont Onayları' },
   { id: 'dataImport', label: 'Veri Aktarımı' },
+  { id: 'announcements', label: 'Duyurular' },
+  { id: 'maintenanceRequests', label: 'Talepler' },
   { id: 'account', label: 'Hesabım' },
   { id: 'settings', label: 'Ayarlar' },
 ]
@@ -188,6 +194,8 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   expenses: '/management/finance/expenses',
   paymentSubmissions: '/management/finance/payment-submissions',
   dataImport: '/management/import',
+  announcements: '/management/announcements',
+  maintenanceRequests: '/management/maintenance-requests',
   account: '/account',
   settings: '/settings',
 }
@@ -386,6 +394,7 @@ function App() {
   const structuresTriggerRef = useRef<HTMLButtonElement | null>(null)
   const peopleTriggerRef = useRef<HTMLButtonElement | null>(null)
   const financeTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const communicationTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const hasUnsavedChanges =
     propertyFormDirty || buildingFormDirty || unitFormDirty || occupancyFormDirty
@@ -605,6 +614,8 @@ function App() {
 
       if (openNavigationGroup === 'structures') structuresTriggerRef.current?.focus()
       if (openNavigationGroup === 'people') peopleTriggerRef.current?.focus()
+      if (openNavigationGroup === 'finance') financeTriggerRef.current?.focus()
+      if (openNavigationGroup === 'communication') communicationTriggerRef.current?.focus()
       setOpenNavigationGroup(null)
       setIsSidebarOpen(false)
     }
@@ -1646,7 +1657,14 @@ function App() {
   const focusNavigationMenuItem = (group: NavigationGroup, position: 'first' | 'last') => {
     setOpenNavigationGroup(group)
     window.requestAnimationFrame(() => {
-      const menuId = group === 'structures' ? 'structures-navigation-menu' : 'people-navigation-menu'
+      const menuId =
+        group === 'structures'
+          ? 'structures-navigation-menu'
+          : group === 'people'
+            ? 'people-navigation-menu'
+            : group === 'finance'
+              ? 'finance-navigation-menu'
+              : 'communication-navigation-menu'
       const items = document.querySelectorAll<HTMLButtonElement>(`#${menuId} [role="menuitem"]`)
       const target = position === 'first' ? items[0] : items[items.length - 1]
       target?.focus()
@@ -1706,7 +1724,10 @@ function App() {
   }
 
   const activeViewLabel =
-    MANAGEMENT_MENU.find((item) => item.id === activeManagementView)?.label || 'Yönetim Paneli'
+    activeManagementView === 'maintenanceRequests'
+      ? 'Bakım ve Onarım Talepleri'
+      : MANAGEMENT_MENU.find((item) => item.id === activeManagementView)?.label || 'Yönetim Paneli'
+
   const activeViewDescription =
     activeManagementView === 'properties'
       ? 'Site, apartman ve diğer yapı kayıtlarını tek merkezden yönetin.'
@@ -1738,10 +1759,15 @@ function App() {
                           ? 'Sakinlerden gelen ödeme dekontlarını inceleyin, onaylayın veya reddedin.'
                           : activeManagementView === 'dataImport'
                             ? 'CSV ve XLSX dosyaları üzerinden toplu veri aktarımı yapın.'
-                            : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
+                            : activeManagementView === 'announcements'
+                              ? 'Sakinlere yönelik site ve blok duyurularını oluşturun ve yönetin.'
+                              : activeManagementView === 'maintenanceRequests'
+                                ? 'Sakinlerden gelen bakım taleplerini yönetin ve operasyon sürecini takip edin.'
+                                : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
   const isStructuresView = ['properties', 'buildings', 'units', 'managerScope'].includes(activeManagementView)
   const isPeopleView = ['users', 'residents', 'managerAssignments'].includes(activeManagementView)
   const isFinanceView = ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(activeManagementView)
+  const isCommunicationView = ['announcements', 'maintenanceRequests'].includes(activeManagementView)
 
   return (
     <div className={isManagementPanel ? 'management-layout' : ''}>
@@ -1934,6 +1960,57 @@ function App() {
                 </div>
               </div>
 
+              {/* İletişim Navigation Group */}
+              {(hasRole('ADMIN') || hasRole('MANAGER')) && (
+                <div
+                  className="management-nav-group"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setOpenNavigationGroup(null)
+                    }
+                  }}
+                >
+                  <button
+                    ref={communicationTriggerRef}
+                    className={`management-nav-trigger ${isCommunicationView ? 'active' : ''} ${
+                      openNavigationGroup === 'communication' ? 'open' : ''
+                    }`}
+                    type="button"
+                    aria-expanded={openNavigationGroup === 'communication'}
+                    aria-controls="communication-navigation-menu"
+                    onClick={() => handleNavigationGroupToggle('communication')}
+                    onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'communication')}
+                  >
+                    İletişim <span aria-hidden="true">⌄</span>
+                  </button>
+                  <div
+                    id="communication-navigation-menu"
+                    className={`management-nav-popup compact ${openNavigationGroup === 'communication' ? 'open' : ''}`}
+                    role="menu"
+                    hidden={openNavigationGroup !== 'communication'}
+                    onKeyDown={handleNavigationMenuKeyDown}
+                  >
+                    {MANAGEMENT_MENU.filter((item) =>
+                      ['announcements', 'maintenanceRequests'].includes(item.id)
+                    ).map((item) => (
+                      <button
+                        key={item.id}
+                        className={activeManagementView === item.id ? 'active' : ''}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handleNavigationItemClick(item.id)}
+                      >
+                        <strong>{item.label}</strong>
+                        <small>
+                          {item.id === 'announcements' && 'Sakinlere yönelik duyuruları yönetin.'}
+                          {item.id === 'maintenanceRequests' && 'Bakım ve onarım taleplerini takip edin.'}
+                        </small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(hasRole('ADMIN') || hasRole('MANAGER')) && (
                 <button
                   className={activeManagementView === 'dataImport' ? 'active' : ''}
@@ -2118,6 +2195,14 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'dataImport' && (
         <DataImportManagement />
+      )}
+
+      {isManagementPanel && activeManagementView === 'announcements' && (
+        <AnnouncementManagement />
+      )}
+
+      {isManagementPanel && activeManagementView === 'maintenanceRequests' && (
+        <MaintenanceRequestManagement />
       )}
 
       {activeManagementView === 'account' && (

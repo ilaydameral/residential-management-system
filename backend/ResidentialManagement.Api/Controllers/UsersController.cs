@@ -32,10 +32,11 @@ public class UsersController : ControllerBase
 
     [HttpGet("search")]
     public async Task<ActionResult<List<UserSearchResultDto>>> Search(
-        [FromQuery] string query,
+        [FromQuery] string? query,
+        [FromQuery] string? role,
         [FromQuery] bool includeInactive = false)
     {
-        var users = await _userService.SearchAsync(query, includeInactive);
+        var users = await _userService.SearchAsync(query, role, includeInactive);
         return Ok(users);
     }
 
