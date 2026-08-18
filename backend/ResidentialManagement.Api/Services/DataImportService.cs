@@ -101,6 +101,11 @@ public class DataImportService : IDataImportService
             throw new BadRequestException($"Geçersiz içe aktarım türü: '{importType}'.");
         }
 
+        if (normalizedType == "PROPERTIES" && !isAdmin)
+        {
+            throw new ForbiddenException("Siteler/Taşınmazlar aktarımı yalnızca sistem yöneticileri (ADMIN) tarafından yapılabilir.");
+        }
+
         using var stream = file.OpenReadStream();
         var (storageKey, fileHashSha256, fileSizeBytes) = await _storageService.SaveImportFileAsync(stream, file.FileName);
 

@@ -1736,7 +1736,9 @@ function App() {
                         ? 'Gider kayıtları oluşturun ve dairelere borçlandırma modlarıyla dağıtın.'
                         : activeManagementView === 'paymentSubmissions'
                           ? 'Sakinlerden gelen ödeme dekontlarını inceleyin, onaylayın veya reddedin.'
-                          : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
+                          : activeManagementView === 'dataImport'
+                            ? 'CSV ve XLSX dosyaları üzerinden toplu veri aktarımı yapın.'
+                            : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
   const isStructuresView = ['properties', 'buildings', 'units', 'managerScope'].includes(activeManagementView)
   const isPeopleView = ['users', 'residents', 'managerAssignments'].includes(activeManagementView)
   const isFinanceView = ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(activeManagementView)

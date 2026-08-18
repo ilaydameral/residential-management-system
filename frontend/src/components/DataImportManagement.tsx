@@ -332,21 +332,8 @@ export function DataImportManagement() {
 
   return (
     <div className="section-container entity-management-view">
-      <div className="page-header" style={{ marginBottom: '1.5rem' }}>
-        <div>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            Veri Aktarımı
-          </h1>
-          <p className="page-description">
-            CSV ve XLSX dosyaları üzerinden toplu taşınmaz, blok, daire, kullanıcı ve ikamet kaydı aktarın.
-          </p>
-        </div>
-
+      {/* Navigation Tabs */}
+      <div className="entity-page-actions" style={{ marginBottom: '1.25rem', justifyContent: 'flex-start' }}>
         <div className="management-tabs" style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             type="button"
@@ -834,11 +821,24 @@ export function DataImportManagement() {
 
       {/* HISTORY TAB */}
       {activeTab === 'history' && (
-        <div>
-          {/* Filters */}
-          <div className="panel entity-toolbar" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div className="form-field">
-              <label htmlFor="history-type-filter">Veri Türü</label>
+        <div className="history-section">
+          {/* Compact Filters Toolbar */}
+          <section
+            className="panel entity-toolbar"
+            aria-label="Aktarım geçmişi filtreleri"
+            style={{
+              marginBottom: '1rem',
+              padding: '14px 18px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-end',
+              gap: '1rem',
+            }}
+          >
+            <div className="form-field" style={{ margin: 0, flex: '1 1 220px', maxWidth: '280px' }}>
+              <label htmlFor="history-type-filter" style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                Veri Türü
+              </label>
               <select
                 id="history-type-filter"
                 value={historyTypeFilter}
@@ -856,8 +856,10 @@ export function DataImportManagement() {
               </select>
             </div>
 
-            <div className="form-field">
-              <label htmlFor="history-status-filter">Durum</label>
+            <div className="form-field" style={{ margin: 0, flex: '1 1 180px', maxWidth: '240px' }}>
+              <label htmlFor="history-status-filter" style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                Durum
+              </label>
               <select
                 id="history-status-filter"
                 value={historyStatusFilter}
@@ -875,9 +877,26 @@ export function DataImportManagement() {
                 <option value="ROLLED_BACK">Geri Alındı</option>
               </select>
             </div>
-          </div>
 
-          {/* Table */}
+            {(historyTypeFilter !== 'all' || historyStatusFilter !== 'all') && (
+              <div style={{ margin: 0 }}>
+                <button
+                  type="button"
+                  className="secondary-button entity-filter-clear has-active-filters"
+                  onClick={() => {
+                    setHistoryTypeFilter('all')
+                    setHistoryStatusFilter('all')
+                    setHistoryPage(1)
+                  }}
+                  style={{ alignSelf: 'flex-end', height: '42px' }}
+                >
+                  Filtreleri Temizle
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* History Table Panel */}
           {isLoadingHistory ? (
             <LoadingSkeleton variant="table" />
           ) : (
@@ -907,10 +926,14 @@ export function DataImportManagement() {
                       const badgeInfo = STATUS_BADGE_MAP[b.status] || { label: b.status, className: 'status-badge' }
                       return (
                         <tr key={b.id}>
-                          <td>#{b.id}</td>
-                          <td>{new Date(b.createdAt).toLocaleString('tr-TR')}</td>
                           <td>
-                            <strong>{b.originalFileName}</strong>
+                            <strong>#{b.id}</strong>
+                          </td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            {new Date(b.createdAt).toLocaleString('tr-TR')}
+                          </td>
+                          <td>
+                            <span style={{ fontWeight: 600 }}>{b.originalFileName}</span>
                           </td>
                           <td>{IMPORT_TYPE_OPTIONS.find((t) => t.key === b.importType)?.label || b.importType}</td>
                           <td>
@@ -918,14 +941,17 @@ export function DataImportManagement() {
                           </td>
                           <td>
                             <span style={{ fontSize: '0.85rem' }}>
-                              {b.totalRows} / <span style={{ color: '#16a34a' }}>{b.importedRows}</span> / <span style={{ color: '#d97706' }}>{b.skippedRows}</span> / <span style={{ color: '#dc2626' }}>{b.invalidRows}</span>
+                              {b.totalRows} / <span style={{ color: '#16a34a', fontWeight: 600 }}>{b.importedRows}</span> /{' '}
+                              <span style={{ color: '#d97706', fontWeight: 600 }}>{b.skippedRows}</span> /{' '}
+                              <span style={{ color: '#dc2626', fontWeight: 600 }}>{b.invalidRows}</span>
                             </span>
                           </td>
-                          <td>{b.createdByFullName || `Kullanıcı #${b.createdByUserId}`}</td>
+                          <td style={{ fontSize: '0.85rem' }}>{b.createdByFullName || `Kullanıcı #${b.createdByUserId}`}</td>
                           <td>
                             <button
                               type="button"
                               className="secondary-button"
+                              style={{ padding: '4px 12px', fontSize: '0.85rem' }}
                               onClick={() => void handleOpenHistoryDrawer(b)}
                             >
                               Detaylar
@@ -937,6 +963,47 @@ export function DataImportManagement() {
                   )}
                 </tbody>
               </table>
+
+              {/* Pagination Bar */}
+              {historyTotal > 15 && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: '1rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid var(--border-color)',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  <div>Toplam {historyTotal} kayıt</div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={historyPage === 1}
+                      onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                      style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                    >
+                      ← Önceki
+                    </button>
+                    <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+                      Sayfa {historyPage} / {Math.ceil(historyTotal / 15)}
+                    </span>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={historyPage * 15 >= historyTotal}
+                      onClick={() => setHistoryPage((p) => p + 1)}
+                      style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                    >
+                      Sonraki →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
