@@ -18,5 +18,6 @@ public interface INotificationService
         string message,
         string notificationType,
         string? relatedEntityName = null,
-        int? relatedEntityId = null);
+        int? relatedEntityId = null,
+        string? eventKey = null);
 }

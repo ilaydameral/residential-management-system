@@ -302,7 +302,8 @@ public class AnnouncementService : IAnnouncementService
                     notificationMessage,
                     "ANNOUNCEMENT",
                     "Announcement",
-                    announcement.Id);
+                    announcement.Id,
+                    "ANNOUNCEMENT_PUBLISHED");
             }
 
             await _context.SaveChangesAsync();

@@ -23,6 +23,9 @@ public class Notification
 
     public int? RelatedEntityId { get; set; }
 
+    [MaxLength(50)]
+    public string? EventKey { get; set; }
+
     public bool IsRead { get; set; } = false;
 
     public DateTime? ReadAt { get; set; }

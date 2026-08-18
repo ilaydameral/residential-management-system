@@ -118,7 +118,8 @@ public class NotificationService : INotificationService
         string message,
         string notificationType,
         string? relatedEntityName = null,
-        int? relatedEntityId = null)
+        int? relatedEntityId = null,
+        string? eventKey = null)
     {
         var distinctUserIds = userIds.Distinct().ToList();
         if (distinctUserIds.Count == 0)
@@ -132,11 +133,18 @@ public class NotificationService : INotificationService
         List<int> existingUserIdsWithNotification = new();
         if (!string.IsNullOrWhiteSpace(relatedEntityName) && relatedEntityId.HasValue)
         {
-            existingUserIdsWithNotification = await _context.Notifications
+            var query = _context.Notifications.AsNoTracking()
                 .Where(n => distinctUserIds.Contains(n.UserId) &&
                             n.NotificationType == notificationType &&
                             n.RelatedEntityName == relatedEntityName &&
-                            n.RelatedEntityId == relatedEntityId.Value)
+                            n.RelatedEntityId == relatedEntityId.Value);
+
+            if (!string.IsNullOrWhiteSpace(eventKey))
+            {
+                query = query.Where(n => n.EventKey == eventKey);
+            }
+
+            existingUserIdsWithNotification = await query
                 .Select(n => n.UserId)
                 .ToListAsync();
         }
@@ -156,6 +164,7 @@ public class NotificationService : INotificationService
                 NotificationType = notificationType,
                 RelatedEntityName = relatedEntityName,
                 RelatedEntityId = relatedEntityId,
+                EventKey = eventKey,
                 IsRead = false,
                 IsDismissed = false,
                 CreatedAt = utcNow
@@ -176,6 +185,7 @@ public class NotificationService : INotificationService
             NotificationType = n.NotificationType,
             RelatedEntityName = n.RelatedEntityName,
             RelatedEntityId = n.RelatedEntityId,
+            EventKey = n.EventKey,
             IsRead = n.IsRead,
             ReadAt = n.ReadAt,
             IsDismissed = n.IsDismissed,
@@ -195,6 +205,7 @@ public class NotificationService : INotificationService
             NotificationType = n.NotificationType,
             RelatedEntityName = n.RelatedEntityName,
             RelatedEntityId = n.RelatedEntityId,
+            EventKey = n.EventKey,
             IsRead = n.IsRead,
             ReadAt = n.ReadAt,
             IsDismissed = n.IsDismissed,
