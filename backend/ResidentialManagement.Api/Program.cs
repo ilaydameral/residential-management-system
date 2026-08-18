@@ -65,6 +65,7 @@ builder.Services.AddScoped<IFinancialReportingService, FinancialReportingService
 builder.Services.AddScoped<IImportFileStorageService, ImportFileStorageService>();
 builder.Services.AddScoped<IImportFileParser, ImportFileParser>();
 builder.Services.AddScoped<IDataImportService, DataImportService>();
+builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
