@@ -3,6 +3,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 interface DrawerAccessibilityOptions {
   isOpen: boolean
   onClose: () => void
+  onRequestClose?: () => void
   enableSaveShortcut?: boolean
   isSaving?: boolean
 }
@@ -10,31 +11,42 @@ interface DrawerAccessibilityOptions {
 export function useDrawerAccessibility({
   isOpen,
   onClose,
+  onRequestClose,
   enableSaveShortcut = true,
   isSaving = false,
 }: DrawerAccessibilityOptions): RefObject<HTMLElement | null> {
   const drawerRef = useRef<HTMLElement>(null)
   const openerRef = useRef<HTMLElement | null>(null)
   const onCloseRef = useRef(onClose)
+  const onRequestCloseRef = useRef(onRequestClose)
   const isSavingRef = useRef(isSaving)
   const enableSaveShortcutRef = useRef(enableSaveShortcut)
+
   onCloseRef.current = onClose
+  onRequestCloseRef.current = onRequestClose
   isSavingRef.current = isSaving
   enableSaveShortcutRef.current = enableSaveShortcut
 
   useEffect(() => {
     if (!isOpen) return
+
+    // Save active element for focus restoration
     openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+    // Lock background page scroll
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
     const focusInitialElement = () => {
       const drawer = drawerRef.current
       if (!drawer) return
       const target = drawer.querySelector<HTMLElement>(
-        '[data-drawer-initial-focus], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'
+        '[data-drawer-initial-focus], .btn-close, input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'
       )
       ;(target ?? drawer).focus()
     }
     const frameId = window.requestAnimationFrame(focusInitialElement)
+
     const drawerForm = drawerRef.current?.querySelector<HTMLFormElement>('form')
     const handleInvalid = (event: Event) => {
       if (event.target instanceof HTMLElement) {
@@ -47,7 +59,7 @@ export function useDrawerAccessibility({
       const drawer = drawerRef.current
       if (!drawer || document.querySelector('.confirmation-overlay')) return
       const openDrawers = Array.from(document.querySelectorAll<HTMLElement>('.management-drawer'))
-      if (openDrawers.at(-1) !== drawer) return
+      if (openDrawers.length > 0 && openDrawers.at(-1) !== drawer) return
 
       if (event.key === 'Escape') {
         const searchableSelect = event.target instanceof HTMLElement
@@ -55,7 +67,12 @@ export function useDrawerAccessibility({
           : null
         if (searchableSelect?.querySelector('[aria-expanded="true"]')) return
         event.preventDefault()
-        onCloseRef.current()
+
+        if (onRequestCloseRef.current) {
+          onRequestCloseRef.current()
+        } else {
+          onCloseRef.current()
+        }
         return
       }
 
@@ -72,6 +89,7 @@ export function useDrawerAccessibility({
       const focusable = Array.from(drawer.querySelectorAll<HTMLElement>(
         'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
       )).filter((element) => !element.hasAttribute('hidden'))
+
       if (focusable.length === 0) {
         event.preventDefault()
         drawer.focus()
@@ -93,6 +111,7 @@ export function useDrawerAccessibility({
       window.cancelAnimationFrame(frameId)
       document.removeEventListener('keydown', handleKeyDown)
       drawerForm?.removeEventListener('invalid', handleInvalid, true)
+      document.body.style.overflow = previousOverflow
       openerRef.current?.focus()
     }
   }, [isOpen])

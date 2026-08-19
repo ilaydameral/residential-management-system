@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConfirmationDialog } from '../components/ConfirmationDialog'
 
 const UNSAVED_CHANGES_MESSAGE =
-  'Kaydedilmemiş değişiklikleriniz var. Devam ederseniz değişiklikler kaybolacak.'
+  'Kaydedilmemiş değişiklikler var. Çıkmak istediğinize emin misiniz?'
 
 export function useUnsavedChangesGuard(isDirty: boolean) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -49,7 +49,8 @@ export function useUnsavedChangesGuard(isDirty: boolean) {
     <ConfirmationDialog
       title="Kaydedilmemiş Değişiklikler"
       message={UNSAVED_CHANGES_MESSAGE}
-      confirmLabel="Değişiklikleri Sil ve Devam Et"
+      confirmLabel="Çık / Değişiklikleri Sil"
+      cancelLabel="Vazgeç"
       danger
       onCancel={() => resolveDialog(false)}
       onConfirm={() => resolveDialog(true)}

@@ -11,6 +11,8 @@ import {
 } from '../api'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
+import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { MaintenanceRequestDetailDto, MaintenanceRequestListItemDto } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
@@ -118,6 +120,34 @@ export function ResidentMaintenanceRequests() {
 
   const { shouldRender: shouldRenderCreate, phase: createPhase } = useAnimatedDrawer(isCreateOpen)
   const { shouldRender: shouldRenderDetail, phase: detailPhase } = useAnimatedDrawer(isDetailOpen)
+
+  const isCreateDirty = formTitle.trim() !== '' || formDescription.trim() !== '' || selectedFile !== null
+  const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isCreateDirty)
+
+  const closeCreate = useCallback(() => {
+    setIsCreateOpen(false)
+    setFormTitle('')
+    setFormDescription('')
+    setSelectedFile(null)
+    setFormCategory('PLUMBING')
+  }, [])
+
+  const handleCloseCreateWithGuard = useCallback(async () => {
+    if (await requestDiscard()) {
+      closeCreate()
+    }
+  }, [closeCreate, requestDiscard])
+
+  const createDrawerRef = useDrawerAccessibility({
+    isOpen: isCreateOpen,
+    onClose: closeCreate,
+    onRequestClose: () => { void handleCloseCreateWithGuard() },
+  })
+
+  const detailDrawerRef = useDrawerAccessibility({
+    isOpen: isDetailOpen,
+    onClose: () => setIsDetailOpen(false),
+  })
 
   const loadRequests = useCallback(async () => {
     setIsLoading(true)
@@ -420,14 +450,17 @@ export function ResidentMaintenanceRequests() {
             className={`drawer-backdrop drawer-${createPhase}`}
             type="button"
             aria-label="Yeni talep oluşturmayı kapat"
-            onClick={() => setIsCreateOpen(false)}
+            onClick={() => void handleCloseCreateWithGuard()}
           />
           <aside
+            ref={createDrawerRef as any}
+            tabIndex={-1}
             className={`management-drawer drawer-container drawer-${createPhase}`}
             role="dialog"
             aria-modal="true"
             aria-label="Yeni Bakım Talebi"
             style={{ width: 'min(560px, 94vw)' }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
@@ -435,7 +468,7 @@ export function ResidentMaintenanceRequests() {
                 <h2>Yeni Bakım Talebi</h2>
                 <p className="drawer-description">Sorununuzu bildirin, teknik ekibimiz en kısa sürede ilgilensin.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsCreateOpen(false)}>
+              <button className="drawer-close-button" type="button" onClick={() => void handleCloseCreateWithGuard()}>
                 ✕
               </button>
             </div>
@@ -569,11 +602,14 @@ export function ResidentMaintenanceRequests() {
             onClick={() => setIsDetailOpen(false)}
           />
           <aside
+            ref={detailDrawerRef as any}
+            tabIndex={-1}
             className={`management-drawer request-drawer drawer-container drawer-${detailPhase}`}
             role="dialog"
             aria-modal="true"
             aria-label="Talep Detayı"
             style={{ width: 'min(580px, 94vw)' }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
@@ -810,6 +846,8 @@ export function ResidentMaintenanceRequests() {
           onCancel={() => setReopenConfirmId(null)}
         />
       )}
+
+      {unsavedChangesDialog}
     </section>
   )
 }

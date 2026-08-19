@@ -195,7 +195,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false)
+      if (e.key === 'Escape' && isOpen) {
+        if (document.querySelector('.confirmation-overlay, .management-drawer')) return
+        setIsOpen(false)
+      }
     }
 
     if (isOpen) {

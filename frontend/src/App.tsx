@@ -2517,7 +2517,7 @@ function App() {
       {propertyDrawerAnimation.shouldRender && (
         <>
           <button className={`drawer-backdrop drawer-${propertyDrawerAnimation.phase}`} type="button" aria-label="Yapı formunu kapat" disabled={propertyDrawerAnimation.isClosing} onClick={() => void handleCancelPropertyEdit()} />
-          <aside ref={propertyDrawerRef} tabIndex={-1} className={`management-drawer drawer-${propertyDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="property-drawer-title">
+          <aside ref={propertyDrawerRef} tabIndex={-1} className={`management-drawer drawer-${propertyDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="property-drawer-title" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Yapı Yönetimi</p>
@@ -2573,7 +2573,7 @@ function App() {
       {buildingDrawerAnimation.shouldRender && (
         <>
           <button className={`drawer-backdrop drawer-${buildingDrawerAnimation.phase}`} type="button" aria-label="Blok formunu kapat" disabled={buildingDrawerAnimation.isClosing} onClick={() => void handleCancelBuildingEdit()} />
-          <aside ref={buildingDrawerRef} tabIndex={-1} className={`management-drawer drawer-${buildingDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="building-drawer-title">
+          <aside ref={buildingDrawerRef} tabIndex={-1} className={`management-drawer drawer-${buildingDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="building-drawer-title" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Blok Yönetimi</p>
@@ -2803,7 +2803,7 @@ function App() {
       {unitDrawerAnimation.shouldRender && (
         <>
           <button className={`drawer-backdrop drawer-${unitDrawerAnimation.phase}`} type="button" aria-label="Daire formunu kapat" disabled={unitDrawerAnimation.isClosing} onClick={() => void handleCancelUnitEdit()} />
-          <aside ref={unitDrawerRef} tabIndex={-1} className={`management-drawer drawer-${unitDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="unit-drawer-title">
+          <aside ref={unitDrawerRef} tabIndex={-1} className={`management-drawer drawer-${unitDrawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="unit-drawer-title" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header"><div><p className="eyebrow">Daire Yönetimi</p><h2 id="unit-drawer-title" tabIndex={-1} data-drawer-initial-focus>{editingUnitId ? 'Daireyi Düzenle' : 'Yeni Daire'}</h2><p className="drawer-description">Dairenin bağlı yapısını ve fiziksel bilgilerini düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCancelUnitEdit()}>×</button></div>
             {unitError && <p className="status-message error-message">{unitError}</p>}
             <form className="property-form drawer-form" onSubmit={handleUnitSubmit}>

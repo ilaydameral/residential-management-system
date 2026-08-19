@@ -505,6 +505,7 @@ export function DuePeriodsManagement() {
             className={`management-drawer drawer-${draftDrawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
@@ -737,6 +738,7 @@ export function DuePeriodsManagement() {
             role="dialog"
             aria-modal="true"
             style={{ width: '880px', maxWidth: '95vw' }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>

@@ -504,6 +504,7 @@ export function PaymentSubmissionsManagement() {
             role="dialog"
             aria-modal="true"
             style={{ width: 'min(580px, 100%)' }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>

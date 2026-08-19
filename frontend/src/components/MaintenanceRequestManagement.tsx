@@ -1090,8 +1090,10 @@ export function MaintenanceRequestManagement() {
       {/* Shared Detail Drawer */}
       {shouldRender && selectedRequest !== null && (
         <>
-          <div
-            className={`management-drawer-overlay ${phase === 'open' ? 'drawer-open' : ''}`}
+          <button
+            className={`drawer-backdrop drawer-${phase}`}
+            type="button"
+            aria-label="Bakım talebi detayını kapat"
             onClick={closeDrawer}
           />
 
@@ -1101,7 +1103,8 @@ export function MaintenanceRequestManagement() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="req-drawer-title"
-            className={`management-drawer request-detail-drawer ${phase === 'open' ? 'drawer-open' : ''}`}
+            className={`management-drawer request-detail-drawer drawer-${phase}`}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Drawer Header */}
             <div className="drawer-header">

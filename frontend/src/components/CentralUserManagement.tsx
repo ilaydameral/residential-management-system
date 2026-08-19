@@ -381,7 +381,7 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
       {drawerAnimation.shouldRender && drawerMode !== 'none' && (
         <>
           <button className={`drawer-backdrop drawer-${drawerAnimation.phase}`} type="button" aria-label="Kullanıcı formunu kapat" disabled={drawerAnimation.isClosing} onClick={() => void closeDrawer()} />
-          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer user-management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="user-drawer-title">
+          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer user-management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="user-drawer-title" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header"><div><p className="eyebrow">Kullanıcı Yönetimi</p><h2 id="user-drawer-title" tabIndex={-1} data-drawer-initial-focus>{drawerMode === 'create' ? 'Yeni Kullanıcı' : drawerMode === 'edit' ? 'Kullanıcıyı Düzenle' : 'Rolleri Yönet'}</h2><p className="drawer-description">Kullanıcı bilgilerini ve yetkili olduğunuz hesap ayarlarını düzenleyin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {actionError && <p className="status-message error-message" role="alert">{actionError}</p>}
             {isDetailLoading ? <LoadingSkeleton variant="detail" /> : (

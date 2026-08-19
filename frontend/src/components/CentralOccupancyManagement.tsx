@@ -491,7 +491,7 @@ export function CentralOccupancyManagement({
       {drawerAnimation.shouldRender && drawerMode !== 'none' && (
         <>
           <button className={`drawer-backdrop drawer-${drawerAnimation.phase}`} type="button" aria-label="Sakin formunu kapat" disabled={drawerAnimation.isClosing} onClick={() => void closeDrawer()} />
-          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer occupancy-management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="occupancy-drawer-title">
+          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer occupancy-management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="occupancy-drawer-title" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header"><div><p className="eyebrow">Sakin Yönetimi</p><h2 id="occupancy-drawer-title" tabIndex={-1} data-drawer-initial-focus>{drawerMode === 'create' ? 'Yeni Sakin Ata' : drawerMode === 'edit' ? 'Sakin Kaydını Düzenle' : 'Sakin Kaydını Sonlandır'}</h2><p className="drawer-description">Daire ile sakin arasındaki ikamet ilişkisini güvenli biçimde yönetin.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {error && <p className="status-message error-message" role="alert">{error}</p>}
 

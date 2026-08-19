@@ -721,6 +721,7 @@ export function ExpensesManagement() {
             className={`management-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useId } from 'react'
+import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import type { Property, Building } from '../types'
 import {
   getProperties,
@@ -35,6 +36,16 @@ export const BuildingFloorMapManagement: React.FC<BuildingFloorMapManagementProp
   // Drawer state for selected unit
   const [selectedUnit, setSelectedUnit] = useState<FloorMapUnitDto | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false)
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false)
+    setSelectedUnit(null)
+  }
+
+  const drawerRef = useDrawerAccessibility({
+    isOpen: isDrawerOpen,
+    onClose: handleCloseDrawer,
+  })
 
   // Load properties on mount
   useEffect(() => {
@@ -133,11 +144,6 @@ export const BuildingFloorMapManagement: React.FC<BuildingFloorMapManagementProp
   const handleUnitClick = (unit: FloorMapUnitDto) => {
     setSelectedUnit(unit)
     setIsDrawerOpen(true)
-  }
-
-  const handleCloseDrawer = () => {
-    setIsDrawerOpen(false)
-    setSelectedUnit(null)
   }
 
   const formatCurrency = (val: number) => {
@@ -401,10 +407,13 @@ export const BuildingFloorMapManagement: React.FC<BuildingFloorMapManagementProp
             onClick={handleCloseDrawer}
           />
           <aside
+            ref={drawerRef}
+            tabIndex={-1}
             className="management-drawer unit-detail-drawer drawer-open"
             role="dialog"
             aria-modal="true"
             aria-labelledby="unit-drawer-title"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div className="drawer-title-group">
