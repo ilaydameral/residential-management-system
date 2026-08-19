@@ -36,6 +36,7 @@ import { CentralOccupancyManagement } from './components/CentralOccupancyManagem
 import { CentralUserManagement } from './components/CentralUserManagement'
 import { ManagerAssignmentManagement } from './components/ManagerAssignmentManagement'
 import { ManagerScopeOverview } from './components/ManagerScopeOverview'
+import { BuildingFloorMapManagement } from './components/BuildingFloorMapManagement'
 import { FinanceOverview } from './components/FinanceOverview'
 import { DueDefinitionsManagement } from './components/DueDefinitionsManagement'
 import { DuePeriodsManagement } from './components/DuePeriodsManagement'
@@ -135,6 +136,7 @@ type ManagementView =
   | 'properties'
   | 'buildings'
   | 'units'
+  | 'floorMap'
   | 'managerScope'
   | 'users'
   | 'residents'
@@ -164,6 +166,7 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'properties', label: 'Yapılar' },
   { id: 'buildings', label: 'Bloklar' },
   { id: 'units', label: 'Daireler' },
+  { id: 'floorMap', label: 'Kat Planı' },
   { id: 'managerScope', label: 'Sorumlu Olduğum Alanlar' },
   { id: 'users', label: 'Kullanıcılar' },
   { id: 'residents', label: 'Site Sakinleri' },
@@ -185,6 +188,7 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   properties: '/properties',
   buildings: '/buildings',
   units: '/units',
+  floorMap: '/management/floor-map',
   managerScope: '/manager/my-scope',
   users: '/users',
   residents: '/residents',
@@ -1790,7 +1794,7 @@ function App() {
                               : activeManagementView === 'maintenanceRequests'
                                 ? 'Sakinlerden gelen bakım taleplerini yönetin ve operasyon sürecini takip edin.'
                                 : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
-  const isStructuresView = ['properties', 'buildings', 'units', 'managerScope'].includes(activeManagementView)
+  const isStructuresView = ['properties', 'buildings', 'units', 'floorMap', 'managerScope'].includes(activeManagementView)
   const isPeopleView = ['users', 'residents', 'managerAssignments'].includes(activeManagementView)
   const isFinanceView = ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(activeManagementView)
   const isCommunicationView = ['announcements', 'maintenanceRequests'].includes(activeManagementView)
@@ -1857,7 +1861,7 @@ function App() {
                   onKeyDown={handleNavigationMenuKeyDown}
                 >
                   {MANAGEMENT_MENU.filter((item) =>
-                    ['properties', 'buildings', 'units'].includes(item.id) ||
+                    ['properties', 'buildings', 'units', 'floorMap'].includes(item.id) ||
                     (item.id === 'managerScope' && hasRole('MANAGER') && !hasRole('ADMIN'))
                   ).map((item) => (
                     <button
@@ -1872,6 +1876,7 @@ function App() {
                         {item.id === 'properties' && 'Site ve apartman kayıtlarını yönetin.'}
                         {item.id === 'buildings' && 'Blok ve bina kayıtlarına ulaşın.'}
                         {item.id === 'units' && 'Daire ve bağımsız bölümleri yönetin.'}
+                        {item.id === 'floorMap' && 'Bina ve dairelerin kat planı durumunu inceleyin.'}
                         {item.id === 'managerScope' && 'Aktif sorumluluk alanlarınızı görüntüleyin.'}
                       </small>
                     </button>
@@ -2237,6 +2242,13 @@ function App() {
 
       {activeManagementView === 'settings' && (
         <Settings onDirtyChange={handleOccupancyDirtyChange} requestDiscard={requestDiscard} />
+      )}
+
+      {isManagementPanel && (hasRole('ADMIN') || hasRole('MANAGER')) && activeManagementView === 'floorMap' && (
+        <BuildingFloorMapManagement
+          onNavigateToUnit={(unitId) => navigate(`/units?unitId=${unitId}`)}
+          onNavigateToMaintenance={(unitId) => navigate(`/management/maintenance-requests?unitId=${unitId}`)}
+        />
       )}
 
       {isManagementPanel && activeManagementView === 'properties' && (
