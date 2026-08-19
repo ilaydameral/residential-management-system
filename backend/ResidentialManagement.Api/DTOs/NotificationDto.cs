@@ -9,6 +9,7 @@ public class NotificationDto
     public string NotificationType { get; set; } = string.Empty;
     public string? RelatedEntityName { get; set; }
     public int? RelatedEntityId { get; set; }
+    public string? EventKey { get; set; }
     public bool IsRead { get; set; }
     public DateTime? ReadAt { get; set; }
     public bool IsDismissed { get; set; }

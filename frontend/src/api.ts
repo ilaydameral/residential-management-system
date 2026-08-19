@@ -70,6 +70,13 @@ import type {
   ImportSummaryResponse,
   ImportRollbackResponse,
   ImportBatchListResponse,
+  AnnouncementDto,
+  AnnouncementListResponseDto,
+  CreateAnnouncementPayload,
+  UpdateAnnouncementPayload,
+  MaintenanceRequestAttachmentDto,
+  MaintenanceRequestDetailDto,
+  MaintenanceRequestListResponseDto,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -403,8 +410,14 @@ export async function closeUnitOccupancy(
 }
 
 // Safe User Search API
-export async function getUsers(): Promise<ManagedUser[]> {
-  const response = await safeFetch(`${API_BASE_URL}/api/users`, {
+export async function getUsers(params?: { search?: string; role?: string; isActive?: boolean }): Promise<ManagedUser[]> {
+  const query = new URLSearchParams()
+  if (params?.search) query.append('search', params.search)
+  if (params?.role) query.append('role', params.role)
+  if (params?.isActive !== undefined) query.append('isActive', params.isActive.toString())
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+
+  const response = await safeFetch(`${API_BASE_URL}/api/users${queryString}`, {
     headers: getAuthHeaders(),
   })
   return handleResponse<ManagedUser[]>(response)
@@ -460,9 +473,22 @@ export async function getRoles(): Promise<Role[]> {
   return handleResponse<Role[]>(response)
 }
 
-export async function searchUsers(query: string): Promise<UserSearchResult[]> {
-  const params = new URLSearchParams({ query: query.trim() })
-  const response = await safeFetch(`${API_BASE_URL}/api/users/search?${params.toString()}`, {
+export async function searchUsers(
+  paramsOrQuery: string | { query?: string; role?: string; includeInactive?: boolean }
+): Promise<UserSearchResult[]> {
+  const queryParams = new URLSearchParams()
+  if (typeof paramsOrQuery === 'string') {
+    queryParams.append('query', paramsOrQuery.trim())
+  } else {
+    if (paramsOrQuery.query) queryParams.append('query', paramsOrQuery.query.trim())
+    if (paramsOrQuery.role) queryParams.append('role', paramsOrQuery.role.trim())
+    if (paramsOrQuery.includeInactive !== undefined) {
+      queryParams.append('includeInactive', paramsOrQuery.includeInactive.toString())
+    }
+  }
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/users/search${queryString}`, {
     headers: getAuthHeaders(),
   })
   return handleResponse<UserSearchResult[]>(response)
@@ -989,4 +1015,357 @@ export async function getImportBatches(params?: {
     headers: getAuthHeaders(),
   })
   return handleResponse<ImportBatchListResponse>(response)
+}
+
+// Announcements Management API
+export async function getAnnouncements(params?: {
+  propertyId?: number
+  buildingId?: number
+  status?: string
+  priority?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<AnnouncementListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.status) query.append('status', params.status)
+  if (params?.priority) query.append('priority', params.priority)
+  if (params?.search) query.append('search', params.search)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/announcements${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementListResponseDto>(response)
+}
+
+export async function getAnnouncement(id: number): Promise<AnnouncementDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/announcements/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementDto>(response)
+}
+
+export async function createAnnouncement(payload: CreateAnnouncementPayload): Promise<AnnouncementDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/announcements`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<AnnouncementDto>(response)
+}
+
+export async function updateAnnouncement(id: number, payload: UpdateAnnouncementPayload): Promise<AnnouncementDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/announcements/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<AnnouncementDto>(response)
+}
+
+export async function publishAnnouncement(id: number): Promise<AnnouncementDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/announcements/${id}/publish`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementDto>(response)
+}
+
+export async function cancelAnnouncement(id: number): Promise<AnnouncementDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/announcements/${id}/cancel`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementDto>(response)
+}
+
+// Maintenance Requests Management API
+export async function getMaintenanceRequests(params?: {
+  propertyId?: number
+  buildingId?: number
+  unitId?: number
+  status?: string
+  priority?: string
+  category?: string
+  assignedToUserId?: number
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<MaintenanceRequestListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.unitId) query.append('unitId', params.unitId.toString())
+  if (params?.status) query.append('status', params.status)
+  if (params?.priority) query.append('priority', params.priority)
+  if (params?.category) query.append('category', params.category)
+  if (params?.assignedToUserId) query.append('assignedToUserId', params.assignedToUserId.toString())
+  if (params?.search) query.append('search', params.search)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestListResponseDto>(response)
+}
+
+export async function getMaintenanceRequest(id: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function assignMaintenanceRequest(id: number, assignedToUserId: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests/${id}/assign`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ assignedToUserId }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function updateMaintenanceRequestPriority(id: number, priority: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests/${id}/priority`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ priority }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function updateMaintenanceRequestStatus(id: number, newStatus: string, note?: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests/${id}/status`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ newStatus, note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function addMaintenanceRequestNote(id: number, note: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests/${id}/notes`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function getMaintenanceRequestAttachmentFile(requestId: number, attachmentId: number): Promise<{ blob: Blob; fileName: string; contentType: string }> {
+  const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests/${requestId}/attachments/${attachmentId}`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    await handleResponse(response)
+  }
+  const blob = await response.blob()
+  const contentType = response.headers.get('Content-Type') || blob.type || 'application/octet-stream'
+  const contentDisposition = response.headers.get('Content-Disposition')
+  let fileName = `attachment_${attachmentId}`
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;'"\n]+)['"]?/)
+    if (match && match[1]) {
+      fileName = decodeURIComponent(match[1])
+    }
+  }
+  return { blob, fileName, contentType }
+}
+
+// ==========================================
+// RESIDENT ANNOUNCEMENTS API
+// ==========================================
+export async function getResidentAnnouncements(params?: {
+  priority?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<AnnouncementListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.priority) query.append('priority', params.priority)
+  if (params?.search) query.append('search', params.search)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/announcements${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementListResponseDto>(response)
+}
+
+export async function getResidentAnnouncement(id: number): Promise<AnnouncementDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/announcements/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementDto>(response)
+}
+
+// ==========================================
+// RESIDENT MAINTENANCE REQUESTS API
+// ==========================================
+export async function createResidentMaintenanceRequest(payload: {
+  category: string
+  title: string
+  description: string
+}): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function getResidentMaintenanceRequests(params?: {
+  status?: string
+  category?: string
+  page?: number
+  pageSize?: number
+}): Promise<MaintenanceRequestListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.status) query.append('status', params.status)
+  if (params?.category) query.append('category', params.category)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestListResponseDto>(response)
+}
+
+export async function getResidentMaintenanceRequest(id: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function cancelResidentMaintenanceRequest(id: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}/cancel`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function resolveActionResidentMaintenanceRequest(id: number, newStatus: string, note?: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}/resolve-action`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ newStatus, note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function uploadResidentMaintenanceRequestAttachment(id: number, file: File): Promise<MaintenanceRequestAttachmentDto> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}/attachments`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+  })
+  return handleResponse<MaintenanceRequestAttachmentDto>(response)
+}
+
+export async function getResidentMaintenanceRequestAttachmentFile(requestId: number, attachmentId: number): Promise<{ blob: Blob; fileName: string; contentType: string }> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${requestId}/attachments/${attachmentId}`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    await handleResponse(response)
+  }
+  const blob = await response.blob()
+  const contentType = response.headers.get('Content-Type') || blob.type || 'application/octet-stream'
+  const contentDisposition = response.headers.get('Content-Disposition')
+  let fileName = `attachment_${attachmentId}`
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;'"\n]+)['"]?/)
+    if (match && match[1]) {
+      fileName = decodeURIComponent(match[1])
+    }
+  }
+  return { blob, fileName, contentType }
+}
+
+// ==========================================
+// TECHNICAL STAFF MAINTENANCE REQUESTS API
+// ==========================================
+export async function getTechnicalMaintenanceRequests(params?: {
+  status?: string
+  priority?: string
+  category?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<MaintenanceRequestListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.status) query.append('status', params.status)
+  if (params?.priority) query.append('priority', params.priority)
+  if (params?.category) query.append('category', params.category)
+  if (params?.search) query.append('search', params.search)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestListResponseDto>(response)
+}
+
+export async function getTechnicalMaintenanceRequest(id: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function updateTechnicalMaintenanceRequestStatus(id: number, newStatus: string, note?: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${id}/status`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ newStatus, note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function addTechnicalMaintenanceRequestNote(id: number, note: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${id}/notes`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function getTechnicalMaintenanceRequestAttachmentFile(requestId: number, attachmentId: number): Promise<{ blob: Blob; fileName: string; contentType: string }> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${requestId}/attachments/${attachmentId}`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    await handleResponse(response)
+  }
+  const blob = await response.blob()
+  const contentType = response.headers.get('Content-Type') || blob.type || 'application/octet-stream'
+  const contentDisposition = response.headers.get('Content-Disposition')
+  let fileName = `attachment_${attachmentId}`
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;'"\n]+)['"]?/)
+    if (match && match[1]) {
+      fileName = decodeURIComponent(match[1])
+    }
+  }
+  return { blob, fileName, contentType }
 }

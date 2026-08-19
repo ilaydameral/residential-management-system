@@ -786,3 +786,123 @@ export interface ImportBatchListResponse {
   pageSize: number
   items: ImportBatch[]
 }
+
+// Announcement Types
+export interface AnnouncementDto {
+  id: number
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  title: string
+  content: string
+  priority: 'NORMAL' | 'IMPORTANT' | 'URGENT' | string
+  status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | string
+  createdByUserId: number
+  createdByName: string
+  createdAt: string
+  updatedAt: string | null
+  publishedAt: string | null
+  cancelledAt: string | null
+}
+
+export interface AnnouncementListResponseDto {
+  totalCount: number
+  page: number
+  pageSize: number
+  items: AnnouncementDto[]
+}
+
+export interface CreateAnnouncementPayload {
+  propertyId: number
+  buildingId?: number | null
+  title: string
+  content: string
+  priority: string
+}
+
+export interface UpdateAnnouncementPayload {
+  title: string
+  content: string
+  priority: string
+}
+
+// Maintenance Request Types
+export interface MaintenanceRequestHistoryDto {
+  id: number
+  actionType: string
+  oldStatus: string | null
+  newStatus: string | null
+  oldAssignedToUserId: number | null
+  oldAssignedToName: string | null
+  newAssignedToUserId: number | null
+  newAssignedToName: string | null
+  note: string | null
+  changedByUserId: number
+  changedByName: string
+  createdAt: string
+}
+
+export interface MaintenanceRequestAttachmentDto {
+  id: number
+  originalFileName: string
+  contentType: string
+  fileSizeBytes: number
+  uploadedByUserId: number
+  uploadedByName: string
+  createdAt: string
+}
+
+export interface MaintenanceRequestListItemDto {
+  id: number
+  requestNumber: string
+  unitId: number
+  propertyId: number
+  propertyName: string
+  buildingId: number
+  buildingName: string
+  unitNumber: string
+  category: string
+  title: string
+  priority: string
+  status: string
+  createdByUserId: number
+  createdByName: string
+  assignedToUserId: number | null
+  assignedToName: string | null
+  createdAt: string
+  updatedAt: string | null
+  resolvedAt: string | null
+  closedAt: string | null
+  cancelledAt: string | null
+}
+
+export interface MaintenanceRequestDetailDto extends MaintenanceRequestListItemDto {
+  description: string
+  histories: MaintenanceRequestHistoryDto[]
+  attachments: MaintenanceRequestAttachmentDto[]
+}
+
+export interface MaintenanceRequestListResponseDto {
+  totalCount: number
+  page: number
+  pageSize: number
+  items: MaintenanceRequestListItemDto[]
+}
+
+export interface MaintenanceRequestAssignPayload {
+  assignedToUserId: number
+}
+
+export interface MaintenanceRequestPriorityUpdatePayload {
+  priority: string
+}
+
+export interface MaintenanceRequestStatusUpdatePayload {
+  newStatus: string
+  note?: string | null
+}
+
+export interface MaintenanceRequestNotePayload {
+  note: string
+}

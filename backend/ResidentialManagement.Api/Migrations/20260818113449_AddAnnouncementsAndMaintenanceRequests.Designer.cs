@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ResidentialManagement.Api.Data;
 
@@ -11,9 +12,11 @@ using ResidentialManagement.Api.Data;
 namespace ResidentialManagement.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260818113449_AddAnnouncementsAndMaintenanceRequests")]
+    partial class AddAnnouncementsAndMaintenanceRequests
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -802,10 +805,6 @@ namespace ResidentialManagement.Api.Migrations
                     b.Property<DateTime?>("DismissedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("EventKey")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<bool>("IsDismissed")
                         .HasColumnType("bit");
 
@@ -850,11 +849,7 @@ namespace ResidentialManagement.Api.Migrations
 
                     b.HasIndex("UserId", "NotificationType", "RelatedEntityName", "RelatedEntityId")
                         .IsUnique()
-                        .HasFilter("[RelatedEntityName] IS NOT NULL AND [RelatedEntityId] IS NOT NULL AND [EventKey] IS NULL");
-
-                    b.HasIndex("UserId", "NotificationType", "RelatedEntityName", "RelatedEntityId", "EventKey")
-                        .IsUnique()
-                        .HasFilter("[RelatedEntityName] IS NOT NULL AND [RelatedEntityId] IS NOT NULL AND [EventKey] IS NOT NULL");
+                        .HasFilter("[RelatedEntityName] IS NOT NULL AND [RelatedEntityId] IS NOT NULL");
 
                     b.ToTable("Notifications", (string)null);
                 });

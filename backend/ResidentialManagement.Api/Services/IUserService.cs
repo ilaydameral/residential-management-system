@@ -9,7 +9,7 @@ public interface IUserService
     Task<AccountProfileDto?> GetCurrentProfileAsync(int id);
     Task<AccountProfileDto?> UpdateCurrentProfileAsync(int id, UpdateAccountProfileDto updateDto);
     Task ChangeCurrentPasswordAsync(int id, ChangeAccountPasswordDto changeDto);
-    Task<List<UserSearchResultDto>> SearchAsync(string query, bool includeInactive = false);
+    Task<List<UserSearchResultDto>> SearchAsync(string? query, string? role = null, bool includeInactive = false);
     Task<UserManagementDto> CreateAsync(CreateManagedUserDto createDto);
     Task<UserManagementDto?> UpdateAsync(int id, UpdateManagedUserDto updateDto);
     Task<UserManagementDto?> SetActiveAsync(int id, bool isActive, int currentUserId);

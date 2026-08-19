@@ -32,6 +32,10 @@ public class AppDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<ImportBatch> ImportBatches { get; set; }
     public DbSet<ImportRowLog> ImportRowLogs { get; set; }
+    public DbSet<Announcement> Announcements { get; set; }
+    public DbSet<MaintenanceRequest> MaintenanceRequests { get; set; }
+    public DbSet<MaintenanceRequestHistory> MaintenanceRequestHistories { get; set; }
+    public DbSet<MaintenanceRequestAttachment> MaintenanceRequestAttachments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +51,10 @@ public class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new NotificationConfiguration());
         modelBuilder.ApplyConfiguration(new ImportBatchConfiguration());
         modelBuilder.ApplyConfiguration(new ImportRowLogConfiguration());
+        modelBuilder.ApplyConfiguration(new AnnouncementConfiguration());
+        modelBuilder.ApplyConfiguration(new MaintenanceRequestConfiguration());
+        modelBuilder.ApplyConfiguration(new MaintenanceRequestHistoryConfiguration());
+        modelBuilder.ApplyConfiguration(new MaintenanceRequestAttachmentConfiguration());
 
         modelBuilder.Entity<OccupancyType>(entity =>
         {

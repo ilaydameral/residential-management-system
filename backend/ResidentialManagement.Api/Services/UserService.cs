@@ -81,21 +81,37 @@ public class UserService : IUserService
     }
 
     public async Task<List<UserSearchResultDto>> SearchAsync(
-        string query,
+        string? query,
+        string? role = null,
         bool includeInactive = false)
     {
         var normalizedQuery = query?.Trim() ?? string.Empty;
-        if (normalizedQuery.Length < 2)
+        var normalizedRole = role?.Trim().ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(normalizedQuery) && string.IsNullOrWhiteSpace(normalizedRole))
+        {
+            throw new BadRequestException("Kullanıcı araması için arama terimi veya rol filtresi girilmelidir.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedQuery) && normalizedQuery.Length < 2)
         {
             throw new BadRequestException("Kullanıcı araması için en az 2 karakter girilmelidir.");
         }
 
-        var users = _context.Users
-            .AsNoTracking()
-            .Where(u =>
+        var users = _context.Users.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(normalizedQuery))
+        {
+            users = users.Where(u =>
                 u.FirstName.Contains(normalizedQuery) ||
                 u.LastName.Contains(normalizedQuery) ||
                 u.Email.Contains(normalizedQuery));
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedRole))
+        {
+            users = users.Where(u => u.UserRoles.Any(ur => ur.Role.IsActive && ur.Role.Code == normalizedRole));
+        }
 
         if (!includeInactive)
         {
