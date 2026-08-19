@@ -100,6 +100,26 @@ function formatNotificationDate(dateString: string): string {
   }
 }
 
+const CATEGORY_LABEL_MAP: Record<string, string> = {
+  PLUMBING: 'Tesisat',
+  ELECTRICAL: 'Elektrik',
+  HEATING_COOLING: 'Isıtma / Soğutma',
+  ELEVATOR: 'Asansör',
+  CLEANING: 'Temizlik',
+  SECURITY: 'Güvenlik',
+  STRUCTURAL: 'Yapısal',
+  OTHER: 'Diğer',
+}
+
+function formatNotificationText(text: string): string {
+  if (!text) return text
+  let result = text
+  for (const [code, label] of Object.entries(CATEGORY_LABEL_MAP)) {
+    result = result.replace(`(${code})`, `(${label})`).replace(` ${code}`, ` ${label}`)
+  }
+  return result
+}
+
 function getTypeBadge(type: string) {
   switch (type?.toUpperCase()) {
     case 'FINANCE':
@@ -214,8 +234,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         if (onNavigateToUrl) onNavigateToUrl('/resident/finance')
       } else if (entity === 'Announcement') {
         if (onNavigateToView) onNavigateToView('announcements')
+        if (onNavigateToUrl) onNavigateToUrl('/resident/announcements')
       } else if (entity === 'MaintenanceRequest') {
         if (onNavigateToView) onNavigateToView('maintenanceRequests')
+        if (onNavigateToUrl) {
+          const isTech = window.location.pathname.startsWith('/technical')
+          const targetUrl = isTech
+            ? (item.relatedEntityId ? `/technical/requests/${item.relatedEntityId}` : '/technical/requests')
+            : (item.relatedEntityId ? `/resident/requests?requestId=${item.relatedEntityId}` : '/resident/requests')
+          onNavigateToUrl(targetUrl)
+        }
       }
       setIsOpen(false)
     }
@@ -348,7 +376,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           {item.title}
                         </h4>
 
-                        <p className="notification-message">{item.message}</p>
+                        <p className="notification-message">{formatNotificationText(item.message)}</p>
                       </div>
 
                       <button

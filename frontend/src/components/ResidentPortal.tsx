@@ -12,8 +12,10 @@ import { HeaderAccountButton } from './HeaderAccountButton'
 import { HeaderLogoutButton } from './HeaderLogoutButton'
 import { HeaderSettingsButton } from './HeaderSettingsButton'
 import { NotificationCenter } from './NotificationCenter'
+import { ResidentAnnouncements } from './ResidentAnnouncements'
 import { ResidentFinance } from './ResidentFinance'
 import { ResidentHome } from './ResidentHome'
+import { ResidentMaintenanceRequests } from './ResidentMaintenanceRequests'
 import { ResidentUnitDetail } from './ResidentUnitDetail'
 import { ResidentUnits } from './ResidentUnits'
 import { Settings } from './Settings'
@@ -23,6 +25,8 @@ const RESIDENT_NAVIGATION = [
   { path: '/resident/home', label: 'Ana Sayfa' },
   { path: '/resident/my-units', label: 'Dairelerim' },
   { path: '/resident/finance', label: 'Finans' },
+  { path: '/resident/announcements', label: 'Duyurular' },
+  { path: '/resident/requests', label: 'Taleplerim' },
 ]
 
 export function ResidentPortal() {
@@ -76,8 +80,15 @@ export function ResidentPortal() {
   const isNavigationActive = (path: string) => (
     path === '/resident/my-units'
       ? location.pathname.startsWith('/resident/my-units')
-      : location.pathname === path
+      : location.pathname === path || (path === '/resident/requests' && location.pathname === '/resident/maintenance-requests')
   )
+
+  const isMyUnits = location.pathname === '/resident/my-units'
+  const isFinance = location.pathname === '/resident/finance'
+  const isAnnouncements = location.pathname === '/resident/announcements'
+  const isRequests = location.pathname === '/resident/requests' || location.pathname === '/resident/maintenance-requests'
+  const isAccount = location.pathname === '/account' || location.pathname === '/resident/account'
+  const isSettings = location.pathname === '/settings'
 
   return (
     <div className="resident-portal">
@@ -122,17 +133,7 @@ export function ResidentPortal() {
         className="resident-portal-main"
         aria-busy={!['/account', '/resident/account', '/settings'].includes(location.pathname) && isLoadingUnits}
       >
-        {location.pathname === '/resident/home' && (
-          <ResidentHome
-            firstName={user?.firstName || 'Merhaba'}
-            units={units}
-            isLoading={isLoadingUnits}
-            error={unitsError}
-            onRetry={() => void loadUnits()}
-            onNavigate={navigate}
-          />
-        )}
-        {location.pathname === '/resident/my-units' && (
+        {isMyUnits ? (
           <ResidentUnits
             units={units}
             isLoading={isLoadingUnits}
@@ -140,11 +141,13 @@ export function ResidentPortal() {
             onRetry={() => void loadUnits()}
             onOpenDetail={(unitId) => navigate(`/resident/my-units/${unitId}`)}
           />
-        )}
-        {location.pathname === '/resident/finance' && (
+        ) : isFinance ? (
           <ResidentFinance />
-        )}
-        {detailMatch && (
+        ) : isAnnouncements ? (
+          <ResidentAnnouncements />
+        ) : isRequests ? (
+          <ResidentMaintenanceRequests />
+        ) : detailMatch ? (
           <ResidentUnitDetail
             unit={detailUnit}
             isLoading={isLoadingUnits}
@@ -152,11 +155,9 @@ export function ResidentPortal() {
             onRetry={() => void loadUnits()}
             onBack={() => navigate('/resident/my-units')}
           />
-        )}
-        {(location.pathname === '/account' || location.pathname === '/resident/account') && (
+        ) : isAccount ? (
           <Account onOpenSettings={() => { void navigateWithGuard('/settings') }} />
-        )}
-        {location.pathname === '/settings' && (
+        ) : isSettings ? (
           <section className="resident-view-content">
             <header className="resident-view-header">
               <p className="eyebrow">Sakin Portalı</p>
@@ -165,6 +166,15 @@ export function ResidentPortal() {
             </header>
             <Settings onDirtyChange={setSettingsDirty} requestDiscard={requestDiscard} />
           </section>
+        ) : (
+          <ResidentHome
+            firstName={user?.firstName || 'Merhaba'}
+            units={units}
+            isLoading={isLoadingUnits}
+            error={unitsError}
+            onRetry={() => void loadUnits()}
+            onNavigate={navigate}
+          />
         )}
       </main>
 

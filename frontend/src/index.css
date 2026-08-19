@@ -510,7 +510,6 @@ textarea::placeholder {
 }
 
 .form-field input:not([type="checkbox"]),
-.form-field select,
 .form-field textarea {
   width: 100%;
   border: 1px solid var(--color-border-strong);
@@ -519,6 +518,24 @@ textarea::placeholder {
   background: var(--color-surface);
   color: var(--color-text-primary);
   outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.form-field select {
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  padding: 11px 36px 11px 14px;
+  background-color: var(--color-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  color: var(--color-text-primary);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -1038,6 +1055,12 @@ textarea::placeholder {
   width: min(100% - 40px, 1220px);
   margin: 0 auto;
   padding: 44px 0 64px;
+}
+
+.technical-portal .resident-portal-main {
+  width: min(1380px, 100% - 64px);
+  margin: 0 auto;
+  padding: 36px 0 56px;
 }
 
 .resident-view-content {
@@ -5683,9 +5706,21 @@ textarea:focus-visible,
 }
 
 .request-toolbar {
-  grid-template-columns: repeat(6, minmax(110px, 1fr)) minmax(180px, 1.4fr);
-  align-items: center;
-  padding: 14px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.request-toolbar .form-field {
+  flex: 1 1 140px;
+  min-width: 130px;
+}
+
+.request-toolbar .form-field:last-child {
+  flex: 2 1 240px;
+  min-width: 200px;
 }
 
 @media (max-width: 1200px) {

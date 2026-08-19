@@ -52,6 +52,7 @@ import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { NotificationCenter } from './components/NotificationCenter'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentPortal } from './components/ResidentPortal'
+import { TechnicalStaffPortal } from './components/TechnicalStaffPortal'
 import { RowActionsMenu } from './components/RowActionsMenu'
 import { SearchableSelect } from './components/SearchableSelect'
 import { Settings } from './components/Settings'
@@ -304,6 +305,8 @@ function App() {
   const isManagementPanel = hasAnyRole(['ADMIN', 'MANAGER'])
   const isResidentView = hasRole('RESIDENT') &&
     !hasAnyRole(['ADMIN', 'MANAGER', 'TECHNICAL_STAFF'])
+  const isTechnicalStaffView = hasRole('TECHNICAL_STAFF') &&
+    !hasAnyRole(['ADMIN', 'MANAGER'])
 
   // Lookups
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([])
@@ -563,12 +566,30 @@ function App() {
         location.pathname === '/resident/my-units' ||
         Boolean(matchPath('/resident/my-units/:unitId', location.pathname)) ||
         location.pathname === '/resident/finance' ||
+        location.pathname === '/resident/announcements' ||
+        location.pathname === '/resident/requests' ||
+        location.pathname === '/resident/maintenance-requests' ||
         location.pathname === '/resident/account' ||
         location.pathname === '/account' ||
         location.pathname === '/settings'
 
       if (!isKnownResidentRoute) {
         navigate('/resident/home', { replace: true })
+      }
+      return
+    }
+
+    if (isTechnicalStaffView) {
+      const isKnownTechnicalRoute =
+        location.pathname === '/technical/requests' ||
+        location.pathname.startsWith('/technical/requests/') ||
+        location.pathname === '/technical/maintenance-requests' ||
+        location.pathname === '/technical/account' ||
+        location.pathname === '/account' ||
+        location.pathname === '/settings'
+
+      if (!isKnownTechnicalRoute) {
+        navigate('/technical/requests', { replace: true })
       }
       return
     }
@@ -580,6 +601,7 @@ function App() {
     isAuthenticated,
     isManagementPanel,
     isResidentView,
+    isTechnicalStaffView,
     hasRole,
     loading,
     location.pathname,
@@ -952,6 +974,10 @@ function App() {
 
   if (isResidentView) {
     return <ResidentPortal />
+  }
+
+  if (isTechnicalStaffView) {
+    return <TechnicalStaffPortal />
   }
 
   // ==========================================

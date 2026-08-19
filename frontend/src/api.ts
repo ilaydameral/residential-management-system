@@ -74,6 +74,7 @@ import type {
   AnnouncementListResponseDto,
   CreateAnnouncementPayload,
   UpdateAnnouncementPayload,
+  MaintenanceRequestAttachmentDto,
   MaintenanceRequestDetailDto,
   MaintenanceRequestListResponseDto,
 } from './types'
@@ -1160,6 +1161,197 @@ export async function addMaintenanceRequestNote(id: number, note: string): Promi
 
 export async function getMaintenanceRequestAttachmentFile(requestId: number, attachmentId: number): Promise<{ blob: Blob; fileName: string; contentType: string }> {
   const response = await safeFetch(`${API_BASE_URL}/api/maintenance-requests/${requestId}/attachments/${attachmentId}`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    await handleResponse(response)
+  }
+  const blob = await response.blob()
+  const contentType = response.headers.get('Content-Type') || blob.type || 'application/octet-stream'
+  const contentDisposition = response.headers.get('Content-Disposition')
+  let fileName = `attachment_${attachmentId}`
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;'"\n]+)['"]?/)
+    if (match && match[1]) {
+      fileName = decodeURIComponent(match[1])
+    }
+  }
+  return { blob, fileName, contentType }
+}
+
+// ==========================================
+// RESIDENT ANNOUNCEMENTS API
+// ==========================================
+export async function getResidentAnnouncements(params?: {
+  priority?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<AnnouncementListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.priority) query.append('priority', params.priority)
+  if (params?.search) query.append('search', params.search)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/announcements${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementListResponseDto>(response)
+}
+
+export async function getResidentAnnouncement(id: number): Promise<AnnouncementDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/announcements/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<AnnouncementDto>(response)
+}
+
+// ==========================================
+// RESIDENT MAINTENANCE REQUESTS API
+// ==========================================
+export async function createResidentMaintenanceRequest(payload: {
+  category: string
+  title: string
+  description: string
+}): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function getResidentMaintenanceRequests(params?: {
+  status?: string
+  category?: string
+  page?: number
+  pageSize?: number
+}): Promise<MaintenanceRequestListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.status) query.append('status', params.status)
+  if (params?.category) query.append('category', params.category)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestListResponseDto>(response)
+}
+
+export async function getResidentMaintenanceRequest(id: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function cancelResidentMaintenanceRequest(id: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}/cancel`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function resolveActionResidentMaintenanceRequest(id: number, newStatus: string, note?: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}/resolve-action`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ newStatus, note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function uploadResidentMaintenanceRequestAttachment(id: number, file: File): Promise<MaintenanceRequestAttachmentDto> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${id}/attachments`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+  })
+  return handleResponse<MaintenanceRequestAttachmentDto>(response)
+}
+
+export async function getResidentMaintenanceRequestAttachmentFile(requestId: number, attachmentId: number): Promise<{ blob: Blob; fileName: string; contentType: string }> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/maintenance-requests/${requestId}/attachments/${attachmentId}`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    await handleResponse(response)
+  }
+  const blob = await response.blob()
+  const contentType = response.headers.get('Content-Type') || blob.type || 'application/octet-stream'
+  const contentDisposition = response.headers.get('Content-Disposition')
+  let fileName = `attachment_${attachmentId}`
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename\*?=['"]?(?:UTF-8'')?([^;'"\n]+)['"]?/)
+    if (match && match[1]) {
+      fileName = decodeURIComponent(match[1])
+    }
+  }
+  return { blob, fileName, contentType }
+}
+
+// ==========================================
+// TECHNICAL STAFF MAINTENANCE REQUESTS API
+// ==========================================
+export async function getTechnicalMaintenanceRequests(params?: {
+  status?: string
+  priority?: string
+  category?: string
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<MaintenanceRequestListResponseDto> {
+  const query = new URLSearchParams()
+  if (params?.status) query.append('status', params.status)
+  if (params?.priority) query.append('priority', params.priority)
+  if (params?.category) query.append('category', params.category)
+  if (params?.search) query.append('search', params.search)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestListResponseDto>(response)
+}
+
+export async function getTechnicalMaintenanceRequest(id: number): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function updateTechnicalMaintenanceRequestStatus(id: number, newStatus: string, note?: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${id}/status`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ newStatus, note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function addTechnicalMaintenanceRequestNote(id: number, note: string): Promise<MaintenanceRequestDetailDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${id}/notes`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ note }),
+  })
+  return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function getTechnicalMaintenanceRequestAttachmentFile(requestId: number, attachmentId: number): Promise<{ blob: Blob; fileName: string; contentType: string }> {
+  const response = await safeFetch(`${API_BASE_URL}/api/technical/maintenance-requests/${requestId}/attachments/${attachmentId}`, {
     headers: getAuthHeaders(),
   })
   if (!response.ok) {
