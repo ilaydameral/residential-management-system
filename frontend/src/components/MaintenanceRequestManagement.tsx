@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   getMaintenanceRequests,
   getMaintenanceRequest,
@@ -309,6 +310,27 @@ export function MaintenanceRequestManagement() {
   useEffect(() => {
     fetchRequests()
   }, [fetchRequests])
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const reqId = params.get('requestId')
+    if (reqId) {
+      const id = Number(reqId)
+      if (!isNaN(id) && id > 0) {
+        getMaintenanceRequest(id)
+          .then((full) => {
+            setSelectedRequest(full)
+            setSelectedTechUserId(full.assignedToUserId || 0)
+            setSelectedPriority(full.priority)
+            setWorkNoteText('')
+            setIsDrawerOpen(true)
+            window.history.replaceState({}, '', window.location.pathname)
+          })
+          .catch(() => {})
+      }
+    }
+  }, [location.search])
 
   // Open Detail Drawer
   const handleViewDetail = async (item: MaintenanceRequestListItemDto) => {

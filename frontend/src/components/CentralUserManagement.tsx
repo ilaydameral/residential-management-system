@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   createManagedUser,
   getManagedUserDetail,
@@ -137,6 +138,20 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
   }, [isDirty, onDirtyChange])
 
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const uId = params.get('userId')
+    if (uId && users.length > 0) {
+      const id = Number(uId)
+      const targetUser = users.find((u) => u.id === id)
+      if (targetUser && selectedUser?.id !== id) {
+        void openEdit(targetUser)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    }
+  }, [location.search, users])
 
   const availableRoleCodes = useMemo(() => {
     if (roles.length > 0) return roles.map((role) => role.code)

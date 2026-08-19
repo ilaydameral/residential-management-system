@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   getAnnouncements,
   getAnnouncement,
@@ -194,6 +195,24 @@ export function AnnouncementManagement() {
   useEffect(() => {
     fetchAnnouncements()
   }, [fetchAnnouncements])
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const annId = params.get('announcementId')
+    if (annId) {
+      const id = Number(annId)
+      if (!isNaN(id) && id > 0) {
+        getAnnouncement(id)
+          .then((ann) => {
+            setSelectedAnnouncement(ann)
+            setIsDetailDrawerOpen(true)
+            window.history.replaceState({}, '', window.location.pathname)
+          })
+          .catch(() => {})
+      }
+    }
+  }, [location.search])
 
   // Open Create Drawer
   const handleOpenCreate = () => {

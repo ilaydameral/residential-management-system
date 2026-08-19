@@ -49,6 +49,9 @@ import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
 import { HeaderSettingsButton } from './components/HeaderSettingsButton'
+import { HeaderGlobalSearchButton } from './components/HeaderGlobalSearchButton'
+import { GlobalSearchPalette } from './components/GlobalSearchPalette'
+import type { GlobalSearchItem } from './types'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { NotificationCenter } from './components/NotificationCenter'
 import { OccupancyManagement } from './components/OccupancyManagement'
@@ -315,6 +318,74 @@ function App() {
   // Lookups
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([])
   const [unitTypes, setUnitTypes] = useState<UnitType[]>([])
+
+  // Global Search Palette State & Shortcut
+  const [isSearchPaletteOpen, setIsSearchPaletteOpen] = useState(false)
+
+  useEffect(() => {
+    if (!user || (!hasRole('ADMIN') && !hasRole('MANAGER'))) return
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setIsSearchPaletteOpen((prev) => !prev)
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [user, hasRole])
+
+  const handleSelectSearchResult = (item: GlobalSearchItem) => {
+    setIsSearchPaletteOpen(false)
+
+    switch (item.targetView) {
+      case 'properties':
+        if (item.routeParams?.propertyId) {
+          void navigateWithGuard(`/properties?propertyId=${item.routeParams.propertyId}`)
+        } else {
+          void navigateWithGuard('/properties')
+        }
+        break
+      case 'buildings':
+        if (item.routeParams?.buildingId) {
+          void navigateWithGuard(`/buildings?buildingId=${item.routeParams.buildingId}`)
+        } else {
+          void navigateWithGuard('/buildings')
+        }
+        break
+      case 'units':
+        if (item.routeParams?.unitId) {
+          void navigateWithGuard(`/units?unitId=${item.routeParams.unitId}`)
+        } else {
+          void navigateWithGuard('/units')
+        }
+        break
+      case 'users':
+        if (item.routeParams?.userId) {
+          void navigateWithGuard(`/users?userId=${item.routeParams.userId}`)
+        } else {
+          void navigateWithGuard('/users')
+        }
+        break
+      case 'maintenance-requests':
+        if (item.routeParams?.requestId) {
+          void navigateWithGuard(`/management/maintenance-requests?requestId=${item.routeParams.requestId}`)
+        } else {
+          void navigateWithGuard('/management/maintenance-requests')
+        }
+        break
+      case 'announcements':
+        if (item.routeParams?.announcementId) {
+          void navigateWithGuard(`/management/announcements?announcementId=${item.routeParams.announcementId}`)
+        } else {
+          void navigateWithGuard('/management/announcements')
+        }
+        break
+      default:
+        break
+    }
+  }
 
   // Main lists
   const [properties, setProperties] = useState<Property[]>([])
@@ -2065,6 +2136,9 @@ function App() {
                   </span>
                 ))}
               </div>
+              {(hasRole('ADMIN') || hasRole('MANAGER')) && (
+                <HeaderGlobalSearchButton onActivate={() => setIsSearchPaletteOpen(true)} />
+              )}
               <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
               <ThemeToggle />
               <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
@@ -3581,6 +3655,13 @@ function App() {
         />
       )}
       {unsavedChangesDialog}
+      {(hasRole('ADMIN') || hasRole('MANAGER')) && (
+        <GlobalSearchPalette
+          isOpen={isSearchPaletteOpen}
+          onClose={() => setIsSearchPaletteOpen(false)}
+          onSelectResult={handleSelectSearchResult}
+        />
+      )}
       </main>
       </div>
     </div>

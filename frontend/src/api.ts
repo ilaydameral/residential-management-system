@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config'
 import type {
   ApiErrorResponse,
+  GlobalSearchResponse,
   AccountProfile,
   AuthenticatedUser,
   Building,
@@ -1409,4 +1410,15 @@ export async function getBuildingFloorMap(buildingId: number): Promise<BuildingF
     headers: getAuthHeaders(),
   })
   return handleResponse<BuildingFloorMapDto>(response)
+}
+
+export async function globalSearch(query: string, limit = 5, signal?: AbortSignal): Promise<GlobalSearchResponse> {
+  const response = await safeFetch(
+    `${API_BASE_URL}/api/global-search?q=${encodeURIComponent(query)}&limit=${limit}`,
+    {
+      headers: getAuthHeaders(),
+      signal,
+    }
+  )
+  return handleResponse<GlobalSearchResponse>(response)
 }
