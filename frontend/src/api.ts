@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config'
+import type { ActivityFeedItemDto } from './realtime/types'
 import type {
   ApiErrorResponse,
   GlobalSearchResponse,
@@ -501,6 +502,13 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     headers: getAuthHeaders(),
   })
   return handleResponse<DashboardSummary>(response)
+}
+
+export async function getActivityFeed(limit: number = 10): Promise<ActivityFeedItemDto[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/dashboard/activity-feed?limit=${limit}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ActivityFeedItemDto[]>(response)
 }
 
 // Manager Assignments API

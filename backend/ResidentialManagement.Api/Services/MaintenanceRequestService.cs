@@ -13,6 +13,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
     private readonly IManagerScopeService _managerScopeService;
     private readonly INotificationService _notificationService;
     private readonly IRequestFileStorageService _fileStorageService;
+    private readonly IRealtimePublisher _realtimePublisher;
 
     private static readonly HashSet<string> AllowedCategories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -33,12 +34,14 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         AppDbContext context,
         IManagerScopeService managerScopeService,
         INotificationService notificationService,
-        IRequestFileStorageService fileStorageService)
+        IRequestFileStorageService fileStorageService,
+        IRealtimePublisher realtimePublisher)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _notificationService = notificationService;
         _fileStorageService = fileStorageService;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<MaintenanceRequestDetailDto> CreateRequestAsync(MaintenanceRequestCreateDto dto, int residentUserId)
@@ -107,6 +110,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
             _context.MaintenanceRequestHistories.Add(history);
 
             // Notify scoped managers
+            List<Notification> createdNotifications = new();
             var propertyManagers = await _context.ManagerAssignments
                 .AsNoTracking()
                 .Where(ma => ma.IsActive &&
@@ -122,7 +126,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
                 var notificationTitle = $"Yeni Talep: #{request.RequestNumber}";
                 var notificationMessage = $"{request.Title} ({request.Category})";
 
-                await _notificationService.AddNotificationEntitiesForUsersAsync(
+                createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                     propertyManagers,
                     notificationTitle,
                     notificationMessage,
@@ -134,6 +138,24 @@ public class MaintenanceRequestService : IMaintenanceRequestService
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            if (createdNotifications.Count > 0)
+            {
+                var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+                await _realtimePublisher.PublishNotificationsAsync(dtos);
+            }
+
+            var recipients = await ResolveMaintenanceEventRecipientsAsync(propertyId, buildingId, residentUserId, null);
+            await _realtimePublisher.PublishMaintenanceRequestUpdatedAsync(new MaintenanceRequestUpdatedEvent
+            {
+                RequestId = request.Id,
+                PropertyId = propertyId,
+                BuildingId = buildingId,
+                EventType = "CREATED",
+                UpdatedAt = request.CreatedAt.ToString("o"),
+                NewStatus = "OPEN",
+                UpdatedByUserId = residentUserId
+            }, recipients);
 
             var created = await FetchRequestDetailByIdAsync(request.Id);
             return ToDetailDto(created!);
@@ -237,9 +259,10 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         _context.MaintenanceRequestHistories.Add(history);
 
         // Notify assigned staff if present
+        List<Notification> createdNotifications = new();
         if (request.AssignedToUserId.HasValue)
         {
-            await _notificationService.AddNotificationEntitiesForUsersAsync(
+            createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                 new[] { request.AssignedToUserId.Value },
                 $"Talep İptal Edildi: #{request.RequestNumber}",
                 $"Sakin {request.Title} talebini iptal etti.",
@@ -250,6 +273,26 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         }
 
         await _context.SaveChangesAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
+
+        var recipients = await ResolveMaintenanceEventRecipientsAsync(request.PropertyId, request.BuildingId, request.CreatedByUserId, request.AssignedToUserId);
+        await _realtimePublisher.PublishMaintenanceRequestUpdatedAsync(new MaintenanceRequestUpdatedEvent
+        {
+            RequestId = request.Id,
+            PropertyId = request.PropertyId,
+            BuildingId = request.BuildingId,
+            EventType = "CANCELLED",
+            UpdatedAt = now.ToString("o"),
+            OldStatus = oldStatus,
+            NewStatus = "CANCELLED",
+            AssignedToUserId = request.AssignedToUserId,
+            UpdatedByUserId = residentUserId
+        }, recipients);
 
         var updated = await FetchRequestDetailByIdAsync(id);
         return ToDetailDto(updated!);
@@ -278,6 +321,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         var targetStatus = newStatus.Trim().ToUpperInvariant();
         var now = DateTime.UtcNow;
         var oldStatus = request.Status;
+        List<Notification> createdNotifications = new();
 
         if (targetStatus == "CLOSED")
         {
@@ -316,7 +360,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
             // Notify assigned technician if present
             if (request.AssignedToUserId.HasValue)
             {
-                await _notificationService.AddNotificationEntitiesForUsersAsync(
+                createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                     new[] { request.AssignedToUserId.Value },
                     $"Talep Yeniden Açıldı: #{request.RequestNumber}",
                     $"Sakin #{request.RequestNumber} talebini yeniden açtı.",
@@ -332,6 +376,27 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         }
 
         await _context.SaveChangesAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
+
+        var eventType = targetStatus == "CLOSED" ? "CLOSED" : "REOPENED";
+        var recipients = await ResolveMaintenanceEventRecipientsAsync(request.PropertyId, request.BuildingId, request.CreatedByUserId, request.AssignedToUserId);
+        await _realtimePublisher.PublishMaintenanceRequestUpdatedAsync(new MaintenanceRequestUpdatedEvent
+        {
+            RequestId = request.Id,
+            PropertyId = request.PropertyId,
+            BuildingId = request.BuildingId,
+            EventType = eventType,
+            UpdatedAt = now.ToString("o"),
+            OldStatus = oldStatus,
+            NewStatus = targetStatus,
+            AssignedToUserId = request.AssignedToUserId,
+            UpdatedByUserId = residentUserId
+        }, recipients);
 
         var updated = await FetchRequestDetailByIdAsync(id);
         return ToDetailDto(updated!);
@@ -583,7 +648,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         _context.MaintenanceRequestHistories.Add(history);
 
         // Notify technician
-        await _notificationService.AddNotificationEntitiesForUsersAsync(
+        var createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
             new[] { assignedToUserId },
             $"Size Yeni Talep Atandı: #{request.RequestNumber}",
             $"{request.Title} ({request.Category})",
@@ -593,6 +658,25 @@ public class MaintenanceRequestService : IMaintenanceRequestService
             "REQUEST_ASSIGNED");
 
         await _context.SaveChangesAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
+
+        var recipients = await ResolveMaintenanceEventRecipientsAsync(request.PropertyId, request.BuildingId, request.CreatedByUserId, assignedToUserId, oldAssignedId);
+        await _realtimePublisher.PublishMaintenanceRequestUpdatedAsync(new MaintenanceRequestUpdatedEvent
+        {
+            RequestId = request.Id,
+            PropertyId = request.PropertyId,
+            BuildingId = request.BuildingId,
+            EventType = "ASSIGNED",
+            UpdatedAt = now.ToString("o"),
+            AssignedToUserId = assignedToUserId,
+            OldAssignedToUserId = oldAssignedId,
+            UpdatedByUserId = userId
+        }, recipients);
 
         var updated = await FetchRequestDetailByIdAsync(requestId);
         return ToDetailDto(updated!);
@@ -644,6 +728,18 @@ public class MaintenanceRequestService : IMaintenanceRequestService
 
         _context.MaintenanceRequestHistories.Add(history);
         await _context.SaveChangesAsync();
+
+        var recipients = await ResolveMaintenanceEventRecipientsAsync(request.PropertyId, request.BuildingId, request.CreatedByUserId, request.AssignedToUserId);
+        await _realtimePublisher.PublishMaintenanceRequestUpdatedAsync(new MaintenanceRequestUpdatedEvent
+        {
+            RequestId = request.Id,
+            PropertyId = request.PropertyId,
+            BuildingId = request.BuildingId,
+            EventType = "PRIORITY_CHANGED",
+            UpdatedAt = now.ToString("o"),
+            AssignedToUserId = request.AssignedToUserId,
+            UpdatedByUserId = userId
+        }, recipients);
 
         var updated = await FetchRequestDetailByIdAsync(requestId);
         return ToDetailDto(updated!);
@@ -740,12 +836,13 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         _context.MaintenanceRequestHistories.Add(history);
 
         // Notify creator resident
+        List<Notification> createdNotifications = new();
         if (request.CreatedByUserId != userId)
         {
             var notificationTitle = $"Talep Durumu Güncellendi: #{request.RequestNumber}";
             var notificationMessage = $"Talebap durumunuz '{targetStatus}' olarak güncellendi.";
 
-            await _notificationService.AddNotificationEntitiesForUsersAsync(
+            createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                 new[] { request.CreatedByUserId },
                 notificationTitle,
                 notificationMessage,
@@ -756,6 +853,27 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         }
 
         await _context.SaveChangesAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
+
+        var eventType = targetStatus == "CLOSED" ? "CLOSED" : targetStatus == "CANCELLED" ? "CANCELLED" : "STATUS_CHANGED";
+        var recipients = await ResolveMaintenanceEventRecipientsAsync(request.PropertyId, request.BuildingId, request.CreatedByUserId, request.AssignedToUserId);
+        await _realtimePublisher.PublishMaintenanceRequestUpdatedAsync(new MaintenanceRequestUpdatedEvent
+        {
+            RequestId = request.Id,
+            PropertyId = request.PropertyId,
+            BuildingId = request.BuildingId,
+            EventType = eventType,
+            UpdatedAt = now.ToString("o"),
+            OldStatus = currentStatus,
+            NewStatus = targetStatus,
+            AssignedToUserId = request.AssignedToUserId,
+            UpdatedByUserId = userId
+        }, recipients);
 
         var updated = await FetchRequestDetailByIdAsync(requestId);
         return ToDetailDto(updated!);
@@ -812,6 +930,18 @@ public class MaintenanceRequestService : IMaintenanceRequestService
 
         _context.MaintenanceRequestHistories.Add(history);
         await _context.SaveChangesAsync();
+
+        var recipients = await ResolveMaintenanceEventRecipientsAsync(request.PropertyId, request.BuildingId, request.CreatedByUserId, request.AssignedToUserId);
+        await _realtimePublisher.PublishMaintenanceRequestUpdatedAsync(new MaintenanceRequestUpdatedEvent
+        {
+            RequestId = request.Id,
+            PropertyId = request.PropertyId,
+            BuildingId = request.BuildingId,
+            EventType = "COMMENT_ADDED",
+            UpdatedAt = now.ToString("o"),
+            AssignedToUserId = request.AssignedToUserId,
+            UpdatedByUserId = userId
+        }, recipients);
 
         var updated = await FetchRequestDetailByIdAsync(requestId);
         return ToDetailDto(updated!);
@@ -1035,5 +1165,44 @@ public class MaintenanceRequestService : IMaintenanceRequestService
                     .ToList()
                 : new List<MaintenanceRequestAttachmentDto>()
         };
+    }
+
+    private async Task<List<int>> ResolveMaintenanceEventRecipientsAsync(
+        int propertyId,
+        int buildingId,
+        int createdByUserId,
+        int? assignedToUserId,
+        int? oldAssignedToUserId = null)
+    {
+        var recipients = new List<int>();
+
+        if (createdByUserId > 0)
+        {
+            recipients.Add(createdByUserId);
+        }
+
+        if (assignedToUserId.HasValue && assignedToUserId.Value > 0)
+        {
+            recipients.Add(assignedToUserId.Value);
+        }
+
+        if (oldAssignedToUserId.HasValue && oldAssignedToUserId.Value > 0)
+        {
+            recipients.Add(oldAssignedToUserId.Value);
+        }
+
+        var managerUserIds = await _context.ManagerAssignments
+            .AsNoTracking()
+            .Where(ma => ma.IsActive &&
+                         ma.ManagerUser.IsActive &&
+                         ma.PropertyId == propertyId &&
+                         (ma.BuildingId == null || ma.BuildingId == buildingId))
+            .Select(ma => ma.ManagerUserId)
+            .Distinct()
+            .ToListAsync();
+
+        recipients.AddRange(managerUserIds);
+
+        return recipients.Distinct().ToList();
     }
 }

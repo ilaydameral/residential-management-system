@@ -6,6 +6,8 @@ import {
   updateTechnicalMaintenanceRequestStatus,
 } from '../api'
 import { useToast } from '../context/ToastContext'
+import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
+import type { MaintenanceRequestUpdatedEvent } from '../realtime/types'
 import type { MaintenanceRequestDetailDto, MaintenanceRequestHistoryDto } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
@@ -173,6 +175,20 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
   useEffect(() => {
     void loadDetail()
   }, [loadDetail])
+
+  useRealtimeMaintenance(
+    useCallback(
+      (evt: MaintenanceRequestUpdatedEvent) => {
+        if (evt.requestId === requestId) {
+          void loadDetail()
+        }
+      },
+      [requestId, loadDetail]
+    ),
+    () => {
+      void loadDetail()
+    }
+  )
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault()

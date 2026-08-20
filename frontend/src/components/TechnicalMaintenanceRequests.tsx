@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTechnicalMaintenanceRequests } from '../api'
+import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
 import type { MaintenanceRequestListItemDto } from '../types'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
@@ -109,6 +110,15 @@ export function TechnicalMaintenanceRequests() {
   useEffect(() => {
     void loadRequests()
   }, [loadRequests])
+
+  useRealtimeMaintenance(
+    useCallback(() => {
+      void loadRequests()
+    }, [loadRequests]),
+    () => {
+      void loadRequests()
+    }
+  )
 
   const handleOpenDetail = (id: number) => {
     navigate(`/technical/requests/${id}`)

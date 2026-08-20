@@ -12,15 +12,18 @@ public class ExpenseService : IExpenseService
     private readonly AppDbContext _context;
     private readonly IManagerScopeService _managerScopeService;
     private readonly INotificationService _notificationService;
+    private readonly IRealtimePublisher _realtimePublisher;
 
     public ExpenseService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IRealtimePublisher realtimePublisher)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _notificationService = notificationService;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<List<ExpenseDto>> GetAllAsync(
@@ -377,9 +380,10 @@ public class ExpenseService : IExpenseService
             .Distinct()
             .ToListAsync();
 
+        List<Notification> createdNotifications = new();
         if (residentUserIds.Count > 0)
         {
-            await _notificationService.AddNotificationEntitiesForUsersAsync(
+            createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                 residentUserIds,
                 $"Gider Payı Yansıtıldı: {expense.Title}",
                 $"{expense.Title} gideri dairenize yansıtılmıştır. Son ödeme tarihi: {apportionDto.DueDate:dd.MM.yyyy}.",
@@ -390,6 +394,12 @@ public class ExpenseService : IExpenseService
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
 
         return new ApportionExpenseResultDto
         {

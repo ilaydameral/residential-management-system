@@ -6,6 +6,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '../api'
+import { useRealtime } from '../realtime/useRealtime'
 import type { NotificationDto } from '../types'
 
 interface NotificationCenterProps {
@@ -146,6 +147,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [isMarkingAll, setIsMarkingAll] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const { onNotificationCreated, onReconnected } = useRealtime()
 
   // Initial fetch and low-frequency poll for unread count
   const fetchUnreadCount = async () => {
@@ -162,6 +164,35 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     const timer = setInterval(() => { void fetchUnreadCount() }, 60000)
     return () => clearInterval(timer)
   }, [])
+
+  // Subscribe to Realtime NotificationCreated & OnReconnected events
+  useEffect(() => {
+    const unsubNotification = onNotificationCreated((evt) => {
+      if (!evt?.notification) return
+      const newNotif = evt.notification
+
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === newNotif.id)) {
+          return prev
+        }
+        return [newNotif, ...prev]
+      })
+
+      void fetchUnreadCount()
+    })
+
+    const unsubReconnected = onReconnected(() => {
+      void fetchUnreadCount()
+      if (isOpen) {
+        void fetchNotifications()
+      }
+    })
+
+    return () => {
+      unsubNotification()
+      unsubReconnected()
+    }
+  }, [onNotificationCreated, onReconnected, isOpen])
 
   // Fetch full notifications list when panel opens
   const fetchNotifications = async () => {

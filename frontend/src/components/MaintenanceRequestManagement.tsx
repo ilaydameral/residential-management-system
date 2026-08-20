@@ -17,6 +17,8 @@ import { LoadingSkeleton } from './LoadingSkeleton'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
+import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
+import type { MaintenanceRequestUpdatedEvent } from '../realtime/types'
 import type {
   Building,
   MaintenanceRequestDetailDto,
@@ -310,6 +312,47 @@ export function MaintenanceRequestManagement() {
   useEffect(() => {
     fetchRequests()
   }, [fetchRequests])
+
+  // Real-Time Maintenance Event Subscription & Reconnect Re-sync
+  const isDraggingRef = useRef<number | null>(null)
+  useEffect(() => {
+    isDraggingRef.current = draggedCardId
+  }, [draggedCardId])
+
+  const selectedRequestIdRef = useRef<number | null>(null)
+  useEffect(() => {
+    selectedRequestIdRef.current = selectedRequest?.id || null
+  }, [selectedRequest])
+
+  const isDrawerOpenRef = useRef<boolean>(false)
+  useEffect(() => {
+    isDrawerOpenRef.current = isDrawerOpen
+  }, [isDrawerOpen])
+
+  const handleRealtimeUpdate = useCallback(
+    (evt: MaintenanceRequestUpdatedEvent) => {
+      if (isDraggingRef.current === evt.requestId) {
+        // Active drag operation in progress; do not interrupt drag mid-flight
+      } else {
+        fetchRequests()
+      }
+
+      if (isDrawerOpenRef.current && selectedRequestIdRef.current === evt.requestId) {
+        getMaintenanceRequest(evt.requestId)
+          .then((freshDetail) => {
+            setSelectedRequest(freshDetail)
+            setSelectedTechUserId(freshDetail.assignedToUserId || 0)
+            setSelectedPriority(freshDetail.priority)
+          })
+          .catch((err) => {
+            console.error('Error refetching request detail on realtime event:', err)
+          })
+      }
+    },
+    [fetchRequests]
+  )
+
+  useRealtimeMaintenance(handleRealtimeUpdate, fetchRequests)
 
   const location = useLocation()
   useEffect(() => {
