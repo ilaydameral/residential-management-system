@@ -62,4 +62,20 @@ public class RealtimePublisher : IRealtimePublisher
         await _hubContext.Clients.Group("role:ADMIN").SendAsync("ActivityFeedInvalidated", evt);
         await _hubContext.Clients.Group("role:MANAGER").SendAsync("ActivityFeedInvalidated", evt);
     }
+
+    public async Task PublishFacilityReservationUpdatedAsync(FacilityReservationUpdatedEvent evt, IEnumerable<int> targetUserIds)
+    {
+        await _hubContext.Clients.Group("role:ADMIN").SendAsync("FacilityReservationUpdated", evt);
+        var distinctUserIds = targetUserIds.Distinct().Where(id => id > 0).ToList();
+        foreach (var userId in distinctUserIds)
+        {
+            await _hubContext.Clients.Group($"user:{userId}").SendAsync("FacilityReservationUpdated", evt);
+        }
+    }
+
+    public async Task PublishFacilityAvailabilityInvalidatedAsync(int facilityId, string date)
+    {
+        var evt = new FacilityAvailabilityInvalidatedEvent { FacilityId = facilityId, Date = date };
+        await _hubContext.Clients.All.SendAsync("FacilityAvailabilityInvalidated", evt);
+    }
 }

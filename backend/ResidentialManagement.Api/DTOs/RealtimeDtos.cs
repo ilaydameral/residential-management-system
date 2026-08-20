@@ -30,3 +30,17 @@ public class ActivityFeedInvalidatedEvent
     public string Category { get; set; } = string.Empty;
     public string OccurredAt { get; set; } = DateTime.UtcNow.ToString("o");
 }
+
+public class FacilityReservationUpdatedEvent
+{
+    public long ReservationId { get; set; }
+    public int FacilityId { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string UpdatedAt { get; set; } = DateTime.UtcNow.ToString("o");
+}
+
+public class FacilityAvailabilityInvalidatedEvent
+{
+    public int FacilityId { get; set; }
+    public string Date { get; set; } = string.Empty;
+}

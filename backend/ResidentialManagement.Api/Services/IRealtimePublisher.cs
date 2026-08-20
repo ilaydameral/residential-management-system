@@ -11,4 +11,6 @@ public interface IRealtimePublisher
     Task PublishUserScopeInvalidatedAsync(int userId, string reason = "SCOPE_CHANGED");
     Task PublishMaintenanceRequestUpdatedAsync(MaintenanceRequestUpdatedEvent evt, IEnumerable<int> targetUserIds);
     Task PublishActivityFeedInvalidatedAsync(string category);
+    Task PublishFacilityReservationUpdatedAsync(FacilityReservationUpdatedEvent evt, IEnumerable<int> targetUserIds);
+    Task PublishFacilityAvailabilityInvalidatedAsync(int facilityId, string date);
 }
