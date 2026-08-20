@@ -6,7 +6,6 @@ import {
   useState,
   type ErrorInfo,
   type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
@@ -49,8 +48,7 @@ import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
 import { HeaderSettingsButton } from './components/HeaderSettingsButton'
-import { HeaderGlobalSearchButton } from './components/HeaderGlobalSearchButton'
-import { GlobalSearchPalette } from './components/GlobalSearchPalette'
+import { ManagementShell } from './components/nav/ManagementShell'
 import type { GlobalSearchItem } from './types'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { NotificationCenter } from './components/NotificationCenter'
@@ -134,7 +132,7 @@ const ROLE_LABEL_MAP: Record<string, string> = {
   TECHNICAL_STAFF: 'Teknik Personel',
 }
 
-type ManagementView =
+export type ManagementView =
   | 'overview'
   | 'properties'
   | 'buildings'
@@ -154,8 +152,6 @@ type ManagementView =
   | 'maintenanceRequests'
   | 'account'
   | 'settings'
-
-type NavigationGroup = 'structures' | 'people' | 'finance' | 'communication'
 
 interface DestructiveConfirmation {
   title: string
@@ -398,8 +394,6 @@ function App() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null)
   const [selectedOccupancyUnit, setSelectedOccupancyUnit] = useState<Unit | null>(null)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [openNavigationGroup, setOpenNavigationGroup] = useState<NavigationGroup | null>(null)
   const [isPropertyDrawerOpen, setIsPropertyDrawerOpen] = useState(false)
   const [isBuildingDrawerOpen, setIsBuildingDrawerOpen] = useState(false)
   const [isUnitDrawerOpen, setIsUnitDrawerOpen] = useState(false)
@@ -467,12 +461,7 @@ function App() {
   const buildingSectionRef = useRef<HTMLElement | null>(null)
   const unitSectionRef = useRef<HTMLElement | null>(null)
   const occupancySectionRef = useRef<HTMLDivElement | null>(null)
-  const managementNavigationRef = useRef<HTMLElement | null>(null)
   const mainContentRef = useRef<HTMLElement | null>(null)
-  const structuresTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const peopleTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const financeTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const communicationTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const hasUnsavedChanges =
     propertyFormDirty || buildingFormDirty || unitFormDirty || occupancyFormDirty
@@ -505,8 +494,6 @@ function App() {
     setOccupancyFormDirty(false)
     setIsBlockCodeUserEdited(false)
     setSingleApartmentFloorCount(1)
-    setIsSidebarOpen(false)
-    setOpenNavigationGroup(null)
     setIsPropertyDrawerOpen(false)
     setIsBuildingDrawerOpen(false)
     setIsUnitDrawerOpen(false)
@@ -532,8 +519,6 @@ function App() {
   }, [])
 
   const clearRouteTransitionState = useCallback(() => {
-    setIsSidebarOpen(false)
-    setOpenNavigationGroup(null)
     setSelectedProperty(null)
     setSelectedBuilding(null)
     setSelectedOccupancyUnit(null)
@@ -691,40 +676,6 @@ function App() {
     })
     return () => window.cancelAnimationFrame(frameId)
   }, [isAuthenticated, isResidentView, location.pathname, location.search])
-
-  useEffect(() => {
-    if (!isManagementPanel) return
-
-    const handleOutsidePointerDown = (event: PointerEvent) => {
-      if (
-        managementNavigationRef.current &&
-        !managementNavigationRef.current.contains(event.target as Node)
-      ) {
-        setOpenNavigationGroup(null)
-        setIsSidebarOpen(false)
-      }
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (document.querySelector('.confirmation-overlay, .management-drawer')) return
-
-      if (openNavigationGroup === 'structures') structuresTriggerRef.current?.focus()
-      if (openNavigationGroup === 'people') peopleTriggerRef.current?.focus()
-      if (openNavigationGroup === 'finance') financeTriggerRef.current?.focus()
-      if (openNavigationGroup === 'communication') communicationTriggerRef.current?.focus()
-      setOpenNavigationGroup(null)
-      setIsSidebarOpen(false)
-    }
-
-    document.addEventListener('pointerdown', handleOutsidePointerDown)
-    document.addEventListener('keydown', handleEscape)
-
-    return () => {
-      document.removeEventListener('pointerdown', handleOutsidePointerDown)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isManagementPanel, openNavigationGroup])
 
   // Computed Values
   const selectedPropertyTypeObj = propertyTypes.find(
@@ -1676,8 +1627,6 @@ function App() {
     setSelectedUnitDetail(unit)
     setUnitDetailTab('general')
     setOccupancyFormDirty(false)
-    setOpenNavigationGroup(null)
-    setIsSidebarOpen(false)
   }
 
   const handleCloseUnitDetail = async () => {
@@ -1746,59 +1695,7 @@ function App() {
   }
 
   const handleNavigationItemClick = (view: ManagementView) => {
-    setOpenNavigationGroup(null)
-    setIsSidebarOpen(false)
     void handleManagementNavigation(view)
-  }
-
-  const handleNavigationGroupToggle = (group: NavigationGroup) => {
-    setOpenNavigationGroup((current) => (current === group ? null : group))
-  }
-
-  const focusNavigationMenuItem = (group: NavigationGroup, position: 'first' | 'last') => {
-    setOpenNavigationGroup(group)
-    window.requestAnimationFrame(() => {
-      const menuId =
-        group === 'structures'
-          ? 'structures-navigation-menu'
-          : group === 'people'
-            ? 'people-navigation-menu'
-            : group === 'finance'
-              ? 'finance-navigation-menu'
-              : 'communication-navigation-menu'
-      const items = document.querySelectorAll<HTMLButtonElement>(`#${menuId} [role="menuitem"]`)
-      const target = position === 'first' ? items[0] : items[items.length - 1]
-      target?.focus()
-    })
-  }
-
-  const handleNavigationTriggerKeyDown = (
-    event: ReactKeyboardEvent<HTMLButtonElement>,
-    group: NavigationGroup,
-  ) => {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      focusNavigationMenuItem(group, event.key === 'ArrowDown' ? 'first' : 'last')
-    }
-  }
-
-  const handleNavigationMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
-    if (items.length === 0) return
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement)
-    let nextIndex = currentIndex
-    if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length
-    else if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length
-    else if (event.key === 'Home') nextIndex = 0
-    else if (event.key === 'End') nextIndex = items.length - 1
-    else return
-    event.preventDefault()
-    items[nextIndex]?.focus()
-  }
-
-  const handleMobileMenuToggle = () => {
-    if (isSidebarOpen) setOpenNavigationGroup(null)
-    setIsSidebarOpen(!isSidebarOpen)
   }
 
   const handleLogout = () => {
@@ -1865,321 +1762,23 @@ function App() {
                               : activeManagementView === 'maintenanceRequests'
                                 ? 'Sakinlerden gelen bakım taleplerini yönetin ve operasyon sürecini takip edin.'
                                 : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
-  const isStructuresView = ['properties', 'buildings', 'units', 'floorMap', 'managerScope'].includes(activeManagementView)
-  const isPeopleView = ['users', 'residents', 'managerAssignments'].includes(activeManagementView)
-  const isFinanceView = ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(activeManagementView)
-  const isCommunicationView = ['announcements', 'maintenanceRequests'].includes(activeManagementView)
 
-  return (
-    <div className={isManagementPanel ? 'management-layout' : ''}>
-      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
-      {isManagementPanel && (
-        <>
-          <header className="management-navigation" ref={managementNavigationRef}>
-            <div className="sidebar-brand">
-              <span className="sidebar-brand-mark">SY</span>
-              <div>
-                <strong>Site Yönetimi</strong>
-                <small>Yönetim Paneli</small>
-              </div>
-            </div>
-
-            <button
-              className="mobile-menu-button"
-              type="button"
-              aria-label={isSidebarOpen ? 'Menüyü kapat' : 'Menüyü aç'}
-              aria-expanded={isSidebarOpen}
-              onClick={handleMobileMenuToggle}
-            >
-              ☰
-            </button>
-
-            <nav className={`management-nav-menu ${isSidebarOpen ? 'open' : ''}`} aria-label="Yönetim menüsü">
-              <button
-                className={activeManagementView === 'overview' ? 'active' : ''}
-                type="button"
-                onClick={() => handleNavigationItemClick('overview')}
-              >
-                Genel Bakış
-              </button>
-
-              <div
-                className="management-nav-group"
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setOpenNavigationGroup(null)
-                  }
-                }}
-              >
-                <button
-                  ref={structuresTriggerRef}
-                  className={`management-nav-trigger ${isStructuresView ? 'active' : ''} ${
-                    openNavigationGroup === 'structures' ? 'open' : ''
-                  }`}
-                  type="button"
-                  aria-expanded={openNavigationGroup === 'structures'}
-                  aria-controls="structures-navigation-menu"
-                  onClick={() => handleNavigationGroupToggle('structures')}
-                  onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'structures')}
-                >
-                  Yapı Yönetimi <span aria-hidden="true">⌄</span>
-                </button>
-                <div
-                  id="structures-navigation-menu"
-                  className={`management-nav-popup ${openNavigationGroup === 'structures' ? 'open' : ''}`}
-                  role="menu"
-                  hidden={openNavigationGroup !== 'structures'}
-                  onKeyDown={handleNavigationMenuKeyDown}
-                >
-                  {MANAGEMENT_MENU.filter((item) =>
-                    ['properties', 'buildings', 'units', 'floorMap'].includes(item.id) ||
-                    (item.id === 'managerScope' && hasRole('MANAGER') && !hasRole('ADMIN'))
-                  ).map((item) => (
-                    <button
-                      key={item.id}
-                      className={activeManagementView === item.id ? 'active' : ''}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleNavigationItemClick(item.id)}
-                    >
-                      <strong>{item.label}</strong>
-                      <small>
-                        {item.id === 'properties' && 'Site ve apartman kayıtlarını yönetin.'}
-                        {item.id === 'buildings' && 'Blok ve bina kayıtlarına ulaşın.'}
-                        {item.id === 'units' && 'Daire ve bağımsız bölümleri yönetin.'}
-                        {item.id === 'floorMap' && 'Bina ve dairelerin kat planı durumunu inceleyin.'}
-                        {item.id === 'managerScope' && 'Aktif sorumluluk alanlarınızı görüntüleyin.'}
-                      </small>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div
-                className="management-nav-group"
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setOpenNavigationGroup(null)
-                  }
-                }}
-              >
-                <button
-                  ref={peopleTriggerRef}
-                  className={`management-nav-trigger ${isPeopleView ? 'active' : ''} ${
-                    openNavigationGroup === 'people' ? 'open' : ''
-                  }`}
-                  type="button"
-                  aria-expanded={openNavigationGroup === 'people'}
-                  aria-controls="people-navigation-menu"
-                  onClick={() => handleNavigationGroupToggle('people')}
-                  onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'people')}
-                >
-                  Kişiler <span aria-hidden="true">⌄</span>
-                </button>
-                <div
-                  id="people-navigation-menu"
-                  className={`management-nav-popup compact ${hasRole('MANAGER') && !hasRole('ADMIN') ? 'single-item' : ''} ${
-                    openNavigationGroup === 'people' ? 'open' : ''
-                  }`}
-                  role="menu"
-                  hidden={openNavigationGroup !== 'people'}
-                  onKeyDown={handleNavigationMenuKeyDown}
-                >
-                  {MANAGEMENT_MENU.filter((item) =>
-                    item.id === 'residents' ||
-                    (item.id === 'users' && hasRole('ADMIN')) ||
-                    (item.id === 'managerAssignments' && hasRole('ADMIN'))
-                  ).map((item) => (
-                    <button
-                      key={item.id}
-                      className={activeManagementView === item.id ? 'active' : ''}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleNavigationItemClick(item.id)}
-                    >
-                      <strong>{item.label}</strong>
-                      <small>
-                        {item.id === 'users'
-                          ? 'Sistemdeki kullanıcıları bulun.'
-                          : item.id === 'residents'
-                            ? 'Daire sakinlerini yönetin.'
-                            : 'Yönetici sorumluluklarını yönetin.'}
-                      </small>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Finans Yönetimi Navigation Group */}
-              <div
-                className="management-nav-group"
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setOpenNavigationGroup(null)
-                  }
-                }}
-              >
-                <button
-                  ref={financeTriggerRef}
-                  className={`management-nav-trigger ${isFinanceView ? 'active' : ''} ${
-                    openNavigationGroup === 'finance' ? 'open' : ''
-                  }`}
-                  type="button"
-                  aria-expanded={openNavigationGroup === 'finance'}
-                  aria-controls="finance-navigation-menu"
-                  onClick={() => handleNavigationGroupToggle('finance')}
-                  onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'finance')}
-                >
-                  Finans Yönetimi <span aria-hidden="true">⌄</span>
-                </button>
-                <div
-                  id="finance-navigation-menu"
-                  className={`management-nav-popup ${openNavigationGroup === 'finance' ? 'open' : ''}`}
-                  role="menu"
-                  hidden={openNavigationGroup !== 'finance'}
-                  onKeyDown={handleNavigationMenuKeyDown}
-                >
-                  {MANAGEMENT_MENU.filter((item) =>
-                    ['financeOverview', 'dueDefinitions', 'duePeriods', 'expenses', 'paymentSubmissions'].includes(item.id)
-                  ).map((item) => (
-                    <button
-                      key={item.id}
-                      className={activeManagementView === item.id ? 'active' : ''}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleNavigationItemClick(item.id)}
-                    >
-                      <strong>{item.label}</strong>
-                      <small>
-                        {item.id === 'financeOverview' && 'Finansal genel durumu ve grafikleri takip edin.'}
-                        {item.id === 'dueDefinitions' && 'Düzenli aidat tanımlarını yönetin.'}
-                        {item.id === 'duePeriods' && 'Aidat dönemlerini oluşturun ve borçlandırın.'}
-                        {item.id === 'expenses' && 'Gider kayıtları oluşturun ve borçlandırın.'}
-                        {item.id === 'paymentSubmissions' && 'Ödeme dekontlarını inceleyin ve onaylayın.'}
-                      </small>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* İletişim Navigation Group */}
-              {(hasRole('ADMIN') || hasRole('MANAGER')) && (
-                <div
-                  className="management-nav-group"
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                      setOpenNavigationGroup(null)
-                    }
-                  }}
-                >
-                  <button
-                    ref={communicationTriggerRef}
-                    className={`management-nav-trigger ${isCommunicationView ? 'active' : ''} ${
-                      openNavigationGroup === 'communication' ? 'open' : ''
-                    }`}
-                    type="button"
-                    aria-expanded={openNavigationGroup === 'communication'}
-                    aria-controls="communication-navigation-menu"
-                    onClick={() => handleNavigationGroupToggle('communication')}
-                    onKeyDown={(event) => handleNavigationTriggerKeyDown(event, 'communication')}
-                  >
-                    İletişim <span aria-hidden="true">⌄</span>
-                  </button>
-                  <div
-                    id="communication-navigation-menu"
-                    className={`management-nav-popup compact ${openNavigationGroup === 'communication' ? 'open' : ''}`}
-                    role="menu"
-                    hidden={openNavigationGroup !== 'communication'}
-                    onKeyDown={handleNavigationMenuKeyDown}
-                  >
-                    {MANAGEMENT_MENU.filter((item) =>
-                      ['announcements', 'maintenanceRequests'].includes(item.id)
-                    ).map((item) => (
-                      <button
-                        key={item.id}
-                        className={activeManagementView === item.id ? 'active' : ''}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handleNavigationItemClick(item.id)}
-                      >
-                        <strong>{item.label}</strong>
-                        <small>
-                          {item.id === 'announcements' && 'Sakinlere yönelik duyuruları yönetin.'}
-                          {item.id === 'maintenanceRequests' && 'Bakım ve onarım taleplerini takip edin.'}
-                        </small>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(hasRole('ADMIN') || hasRole('MANAGER')) && (
-                <button
-                  className={activeManagementView === 'dataImport' ? 'active' : ''}
-                  type="button"
-                  onClick={() => handleNavigationItemClick('dataImport')}
-                >
-                  Veri Aktarımı
-                </button>
-              )}
-
-            </nav>
-
-            <div className="management-nav-user">
-              <div className="user-info">
-                <span className="user-name">
-                  {user?.firstName} {user?.lastName}
-                </span>
-                {user?.roles?.map((role) => (
-                  <span key={role} className={`role-badge ${role.toLowerCase()}`}>
-                    {ROLE_LABEL_MAP[role] || role}
-                  </span>
-                ))}
-              </div>
-              {(hasRole('ADMIN') || hasRole('MANAGER')) && (
-                <HeaderGlobalSearchButton onActivate={() => setIsSearchPaletteOpen(true)} />
-              )}
-              <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
-              <ThemeToggle />
-              <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
-              <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
-              <HeaderLogoutButton onActivate={handleLogout} />
-            </div>
-          </header>
-          {isSidebarOpen && (
-            <button
-              className="sidebar-overlay"
-              type="button"
-              aria-label="Menüyü kapat"
-              onClick={() => {
-                setIsSidebarOpen(false)
-                setOpenNavigationGroup(null)
-              }}
-            />
-          )}
-        </>
-      )}
-
-      <div className={isManagementPanel ? 'management-workspace' : ''}>
-      {!isManagementPanel && <div className="auth-bar">
-        <div className="user-info">
-          <span className="user-name">
-            {user?.firstName} {user?.lastName}
-          </span>
-          {user?.roles?.map((role) => (
-            <span key={role} className={`role-badge ${role.toLowerCase()}`}>
-              {ROLE_LABEL_MAP[role] || role}
-            </span>
-          ))}
-        </div>
-        <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
-        <ThemeToggle />
-        <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
-        <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
-        <HeaderLogoutButton onActivate={handleLogout} />
-      </div>}
-
-      <main id="main-content" ref={mainContentRef} tabIndex={-1} className={isManagementPanel ? 'management-content' : 'page-shell'}>
+  if (isManagementPanel) {
+    return (
+      <ManagementShell
+        user={user}
+        userRoles={user?.roles || []}
+        activeView={activeManagementView}
+        onNavigateToView={(viewId) => handleNavigationItemClick(viewId as ManagementView)}
+        onOpenSearch={() => setIsSearchPaletteOpen(true)}
+        onCloseSearch={() => setIsSearchPaletteOpen(false)}
+        onSelectSearchResult={handleSelectSearchResult}
+        isSearchOpen={isSearchPaletteOpen}
+        onLogout={handleLogout}
+      >
+        <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
+        <div className="management-workspace">
+          <main id="main-content" ref={mainContentRef} tabIndex={-1} className="management-content">
       {activeManagementView !== 'account' && <header className="page-header">
         <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
         <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
@@ -3631,7 +3230,10 @@ function App() {
           )}
         </section>
       )}
-      {destructiveConfirmation && (
+          </main>
+        </div>
+
+        {destructiveConfirmation && (
         <ConfirmationDialog
           title={destructiveConfirmation.title}
           message={destructiveConfirmation.message}
@@ -3654,16 +3256,73 @@ function App() {
           onConfirm={confirmLogout}
         />
       )}
-      {unsavedChangesDialog}
-      {(hasRole('ADMIN') || hasRole('MANAGER')) && (
-        <GlobalSearchPalette
-          isOpen={isSearchPaletteOpen}
-          onClose={() => setIsSearchPaletteOpen(false)}
-          onSelectResult={handleSelectSearchResult}
-        />
-      )}
-      </main>
+        {unsavedChangesDialog}
+      </ManagementShell>
+    )
+  }
+
+  return (
+    <div>
+      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
+      <div className="auth-bar">
+        <div className="user-info">
+          <span className="user-name">
+            {user?.firstName} {user?.lastName}
+          </span>
+          {user?.roles?.map((role) => (
+            <span key={role} className={`role-badge ${role.toLowerCase()}`}>
+              {ROLE_LABEL_MAP[role] || role}
+            </span>
+          ))}
+        </div>
+        <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
+        <ThemeToggle />
+        <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
+        <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
+        <HeaderLogoutButton onActivate={handleLogout} />
       </div>
+
+      <main id="main-content" ref={mainContentRef} tabIndex={-1} className="page-shell">
+        {activeManagementView !== 'account' && (
+          <header className="page-header">
+            <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
+            <h1>{isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
+            <p className="page-description">
+              {isStandaloneSettingsView
+                ? 'Görünüm ve hesap tercihlerinizi yönetin.'
+                : 'Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.'}
+            </p>
+          </header>
+        )}
+
+        {hasRole('RESIDENT') && <ResidentPortal />}
+        {hasRole('TECHNICAL_STAFF') && <TechnicalStaffPortal />}
+
+        {destructiveConfirmation && (
+          <ConfirmationDialog
+            title={destructiveConfirmation.title}
+            message={destructiveConfirmation.message}
+            confirmLabel={destructiveConfirmation.confirmLabel}
+            danger
+            isLoading={isDestructiveActionRunning}
+            onCancel={() => setDestructiveConfirmation(null)}
+            onConfirm={() => { void confirmDestructiveAction() }}
+          />
+        )}
+        {isLogoutDialogOpen && !destructiveConfirmation && (
+          <ConfirmationDialog
+            title="Çıkış Yap"
+            message={hasUnsavedChanges
+              ? 'Kaydedilmemiş değişiklikleriniz var. Çıkış yaparsanız bu değişiklikler kaybolacak.'
+              : 'Çıkış yapmak istediğinizden emin misiniz?'}
+            confirmLabel="Çıkış Yap"
+            danger
+            onCancel={() => setIsLogoutDialogOpen(false)}
+            onConfirm={confirmLogout}
+          />
+        )}
+        {unsavedChangesDialog}
+      </main>
     </div>
   )
 }

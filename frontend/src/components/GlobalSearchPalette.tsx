@@ -311,7 +311,7 @@ export function GlobalSearchPalette({ isOpen, onClose, onSelectResult }: GlobalS
             <kbd>↑↓</kbd> Gezin
           </span>
           <span>
-            <kbd>↵</kbd> Aç
+            <kbd>Enter</kbd> Aç
           </span>
           <span>
             <kbd>Esc</kbd> Kapat
