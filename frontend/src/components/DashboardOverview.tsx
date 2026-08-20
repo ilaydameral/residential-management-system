@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { getDashboardSummary } from '../api'
 import type { DashboardSummary } from '../types'
 import { LoadingSkeleton } from './LoadingSkeleton'
-
-type DashboardTargetView = 'properties' | 'units' | 'residents' | 'users'
+import { ActivityFeedWidget } from './ActivityFeedWidget'
 
 interface DashboardOverviewProps {
-  onNavigate: (view: DashboardTargetView) => void
+  onNavigate: (view: string, params?: Record<string, string>) => void
 }
 
 const SUMMARY_CARDS: Array<{
@@ -25,7 +24,7 @@ const SUMMARY_CARDS: Array<{
 const QUICK_ACTIONS: Array<{
   label: string
   description: string
-  view: DashboardTargetView
+  view: string
 }> = [
   { label: 'Yeni Yapı', description: 'Yapı yönetimine git', view: 'properties' },
   { label: 'Yeni Daire', description: 'Daire yönetimine git', view: 'units' },
@@ -58,11 +57,11 @@ export default function DashboardOverview({ onNavigate }: DashboardOverviewProps
   }, [loadSummary])
 
   return (
-    <section className="dashboard-overview" aria-live="polite">
+    <section className="dashboard-overview space-y-6" aria-live="polite">
       <section className="panel overview-welcome-panel">
         <p className="eyebrow">Hoş Geldiniz</p>
         <h2>Yönetim özetiniz</h2>
-        <p>Aktif yapıların, dairelerin ve sakin kayıtlarının güncel durumunu buradan izleyebilirsiniz.</p>
+        <p>Aktif yapıların, dairelerin ve sakin kayıtlarının güncel durumunu ve canlı son hareketleri buradan izleyebilirsiniz.</p>
       </section>
 
       {isLoading && (
@@ -89,20 +88,29 @@ export default function DashboardOverview({ onNavigate }: DashboardOverviewProps
         </div>
       )}
 
-      <section className="panel dashboard-actions-panel">
-        <div className="section-heading">
-          <h2>Hızlı İşlemler</h2>
-          <p>Sık kullanılan yönetim ekranlarına doğrudan geçin.</p>
+      {/* Main Grid: Quick Actions + Activity Feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <section className="panel dashboard-actions-panel h-full">
+            <div className="section-heading">
+              <h2>Hızlı İşlemler</h2>
+              <p>Sık kullanılan yönetim ekranlarına doğrudan geçin.</p>
+            </div>
+            <div className="dashboard-actions-grid">
+              {QUICK_ACTIONS.map((action) => (
+                <button key={action.label} type="button" onClick={() => onNavigate(action.view)}>
+                  <strong>{action.label}</strong>
+                  <span>{action.description} →</span>
+                </button>
+              ))}
+            </div>
+          </section>
         </div>
-        <div className="dashboard-actions-grid">
-          {QUICK_ACTIONS.map((action) => (
-            <button key={action.label} type="button" onClick={() => onNavigate(action.view)}>
-              <strong>{action.label}</strong>
-              <span>{action.description} →</span>
-            </button>
-          ))}
+
+        <div className="lg:col-span-2">
+          <ActivityFeedWidget onNavigate={onNavigate} limit={10} />
         </div>
-      </section>
+      </div>
     </section>
   )
 }

@@ -10,10 +10,12 @@ namespace ResidentialManagement.Api.Services;
 public class UnitOccupancyService : IUnitOccupancyService
 {
     private readonly AppDbContext _context;
+    private readonly IRealtimePublisher _realtimePublisher;
 
-    public UnitOccupancyService(AppDbContext context)
+    public UnitOccupancyService(AppDbContext context, IRealtimePublisher realtimePublisher)
     {
         _context = context;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<List<UnitOccupancyDto>> GetAllAsync(
@@ -181,6 +183,8 @@ public class UnitOccupancyService : IUnitOccupancyService
         _context.UnitOccupancies.Add(occupancy);
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        await _realtimePublisher.PublishActivityFeedInvalidatedAsync("OCCUPANCY");
 
         return MapToDto(occupancy);
     }

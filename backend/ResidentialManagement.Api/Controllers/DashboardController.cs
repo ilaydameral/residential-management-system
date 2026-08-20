@@ -46,6 +46,15 @@ public class DashboardController : ControllerBase
             accessibleBuildingIds));
     }
 
+    [HttpGet("activity-feed")]
+    public async Task<ActionResult<List<ActivityFeedItemDto>>> GetActivityFeed([FromQuery] int limit = 10)
+    {
+        var userId = GetCurrentUserId();
+        var isAdmin = User.IsInRole(AppRoles.Admin);
+        var result = await _dashboardService.GetActivityFeedAsync(limit, userId, isAdmin);
+        return Ok(result);
+    }
+
     private int GetCurrentUserId()
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);

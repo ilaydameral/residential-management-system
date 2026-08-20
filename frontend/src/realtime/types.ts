@@ -22,4 +22,25 @@ export interface MaintenanceRequestUpdatedEvent {
   updatedByUserId: number
 }
 
+export interface ActivityFeedInvalidatedEvent {
+  category: string
+  occurredAt: string
+}
+
+export interface ActivityFeedItemDto {
+  id: string
+  category: 'MAINTENANCE' | 'ANNOUNCEMENT' | 'FINANCE' | 'OCCUPANCY' | 'MANAGEMENT'
+  activityType: string
+  title: string
+  description: string
+  actorName: string
+  occurredAt: string
+  propertyId?: number
+  buildingId?: number
+  unitId?: number
+  relatedEntityId?: number
+  targetView?: string
+  routeParams?: string
+}
+
 export type RealtimeConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'

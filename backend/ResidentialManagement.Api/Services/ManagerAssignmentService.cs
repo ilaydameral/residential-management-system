@@ -15,10 +15,12 @@ public class ManagerAssignmentService : IManagerAssignmentService
     private const string PropertyReplacementReason = "Replaced by property-level assignment";
 
     private readonly AppDbContext _context;
+    private readonly IRealtimePublisher _realtimePublisher;
 
-    public ManagerAssignmentService(AppDbContext context)
+    public ManagerAssignmentService(AppDbContext context, IRealtimePublisher realtimePublisher)
     {
         _context = context;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<List<ManagerAssignmentDto>> GetAllAsync(
@@ -185,6 +187,8 @@ public class ManagerAssignmentService : IManagerAssignmentService
         _context.ManagerAssignments.Add(managerAssignment);
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        await _realtimePublisher.PublishActivityFeedInvalidatedAsync("MANAGEMENT");
 
         return await GetByIdAsync(managerAssignment.Id)
             ?? throw new InvalidOperationException("Yönetici ataması oluşturuldu ancak bilgileri alınamadı.");

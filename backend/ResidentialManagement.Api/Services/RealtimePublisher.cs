@@ -55,4 +55,11 @@ public class RealtimePublisher : IRealtimePublisher
             await _hubContext.Clients.Group($"user:{userId}").SendAsync("MaintenanceRequestUpdated", evt);
         }
     }
+
+    public async Task PublishActivityFeedInvalidatedAsync(string category)
+    {
+        var evt = new ActivityFeedInvalidatedEvent { Category = category };
+        await _hubContext.Clients.Group("role:ADMIN").SendAsync("ActivityFeedInvalidated", evt);
+        await _hubContext.Clients.Group("role:MANAGER").SendAsync("ActivityFeedInvalidated", evt);
+    }
 }

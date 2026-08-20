@@ -1687,8 +1687,13 @@ function App() {
     }, 100)
   }
 
-  const handleManagementNavigation = async (view: ManagementView) => {
-    await navigateWithGuard(MANAGEMENT_VIEW_PATHS[view])
+  const handleManagementNavigation = async (view: ManagementView | string, params?: Record<string, string>) => {
+    let path = MANAGEMENT_VIEW_PATHS[view as ManagementView] || `/${view}`
+    if (params && Object.keys(params).length > 0) {
+      const search = new URLSearchParams(params).toString()
+      path += (path.includes('?') ? '&' : '?') + search
+    }
+    await navigateWithGuard(path)
   }
 
   const handleViewUserUnits = async (email: string) => {
@@ -1836,7 +1841,7 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'overview' && (
         <section className="section-container">
-          <DashboardOverview onNavigate={(view) => void handleManagementNavigation(view)} />
+          <DashboardOverview onNavigate={(view, params) => void handleManagementNavigation(view, params)} />
         </section>
       )}
 

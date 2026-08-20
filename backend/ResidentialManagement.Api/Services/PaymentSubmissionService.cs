@@ -148,6 +148,8 @@ public class PaymentSubmissionService : IPaymentSubmissionService
             _context.PaymentSubmissions.Add(submission);
             await _context.SaveChangesAsync();
 
+            await _realtimePublisher.PublishActivityFeedInvalidatedAsync("FINANCE");
+
             return await GetMySubmissionByIdAsync(submission.Id, residentUserId)
                 ?? throw new InvalidOperationException("Ödeme başvurusu oluşturuldu ancak detayları alınamadı.");
         }
@@ -360,6 +362,8 @@ public class PaymentSubmissionService : IPaymentSubmissionService
             await _realtimePublisher.PublishNotificationsAsync(dtos);
         }
 
+        await _realtimePublisher.PublishActivityFeedInvalidatedAsync("FINANCE");
+
         return await GetManagementSubmissionByIdAsync(submission.Id, reviewerUserId, isAdmin)
             ?? throw new InvalidOperationException("Başvuru onaylandı ancak detayları alınamadı.");
     }
@@ -413,6 +417,8 @@ public class PaymentSubmissionService : IPaymentSubmissionService
             var dtos = rejectedNotifications.Select(n => _notificationService.ToDto(n)).ToList();
             await _realtimePublisher.PublishNotificationsAsync(dtos);
         }
+
+        await _realtimePublisher.PublishActivityFeedInvalidatedAsync("FINANCE");
 
         return await GetManagementSubmissionByIdAsync(submission.Id, reviewerUserId, isAdmin)
             ?? throw new InvalidOperationException("Başvuru reddedildi ancak detayları alınamadı.");

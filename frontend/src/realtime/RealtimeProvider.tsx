@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { RealtimeContext } from './RealtimeContext'
-import type { MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
+import type { ActivityFeedInvalidatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
 
 interface RealtimeProviderProps {
   user: any
@@ -17,6 +17,7 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
   const notificationHandlersRef = useRef<Set<(evt: NotificationCreatedEvent) => void>>(new Set())
   const scopeInvalidatedHandlersRef = useRef<Set<(evt: UserScopeInvalidatedEvent) => void>>(new Set())
   const maintenanceHandlersRef = useRef<Set<(evt: MaintenanceRequestUpdatedEvent) => void>>(new Set())
+  const activityFeedHandlersRef = useRef<Set<(evt: ActivityFeedInvalidatedEvent) => void>>(new Set())
   const reconnectedHandlersRef = useRef<Set<() => void>>(new Set())
 
   useEffect(() => {
@@ -102,6 +103,16 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
       })
     })
 
+    conn.on('ActivityFeedInvalidated', (evt: ActivityFeedInvalidatedEvent) => {
+      activityFeedHandlersRef.current.forEach((handler) => {
+        try {
+          handler(evt)
+        } catch (err) {
+          console.error('Error handling ActivityFeedInvalidated event:', err)
+        }
+      })
+    })
+
     connectionRef.current = conn
     setConnectionState('connecting')
 
@@ -149,6 +160,13 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
     }
   }, [])
 
+  const onActivityFeedInvalidated = useCallback((handler: (evt: ActivityFeedInvalidatedEvent) => void) => {
+    activityFeedHandlersRef.current.add(handler)
+    return () => {
+      activityFeedHandlersRef.current.delete(handler)
+    }
+  }, [])
+
   const onReconnected = useCallback((handler: () => void) => {
     reconnectedHandlersRef.current.add(handler)
     return () => {
@@ -179,6 +197,7 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
         onNotificationCreated,
         onUserScopeInvalidated,
         onMaintenanceRequestUpdated,
+        onActivityFeedInvalidated,
         onReconnected,
         reconnect,
       }}

@@ -319,6 +319,8 @@ public class AnnouncementService : IAnnouncementService
                 await _realtimePublisher.PublishNotificationsAsync(dtos);
             }
 
+            await _realtimePublisher.PublishActivityFeedInvalidatedAsync("ANNOUNCEMENT");
+
             return ToDetailDto(announcement);
         });
     }

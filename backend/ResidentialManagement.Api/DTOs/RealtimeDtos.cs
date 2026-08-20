@@ -24,3 +24,9 @@ public class MaintenanceRequestUpdatedEvent
     public int? OldAssignedToUserId { get; set; }
     public int UpdatedByUserId { get; set; }
 }
+
+public class ActivityFeedInvalidatedEvent
+{
+    public string Category { get; set; } = string.Empty;
+    public string OccurredAt { get; set; } = DateTime.UtcNow.ToString("o");
+}
