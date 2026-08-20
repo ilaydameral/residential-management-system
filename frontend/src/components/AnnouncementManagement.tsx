@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   getAnnouncements,
   getAnnouncement,
@@ -14,6 +15,7 @@ import { LoadingSkeleton } from './LoadingSkeleton'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type {
   AnnouncementDto,
   Building,
@@ -111,6 +113,15 @@ export function AnnouncementManagement() {
     setFormBuildingId(null)
   }, [])
 
+  const isCreateDirty = formTitle.trim() !== '' || formContent.trim() !== ''
+  const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isCreateDirty)
+
+  const handleCloseCreateWithGuard = useCallback(async () => {
+    if (await requestDiscard()) {
+      closeCreateDrawer()
+    }
+  }, [closeCreateDrawer, requestDiscard])
+
   const detailDrawerRef = useDrawerAccessibility({
     isOpen: isDetailDrawerOpen,
     onClose: closeDetailDrawer,
@@ -119,6 +130,7 @@ export function AnnouncementManagement() {
   const createDrawerRef = useDrawerAccessibility({
     isOpen: isCreateDrawerOpen,
     onClose: closeCreateDrawer,
+    onRequestClose: () => { void handleCloseCreateWithGuard() },
   })
 
   // Reset drawer body scrollTop to 0 upon open
@@ -183,6 +195,24 @@ export function AnnouncementManagement() {
   useEffect(() => {
     fetchAnnouncements()
   }, [fetchAnnouncements])
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const annId = params.get('announcementId')
+    if (annId) {
+      const id = Number(annId)
+      if (!isNaN(id) && id > 0) {
+        getAnnouncement(id)
+          .then((ann) => {
+            setSelectedAnnouncement(ann)
+            setIsDetailDrawerOpen(true)
+            window.history.replaceState({}, '', window.location.pathname)
+          })
+          .catch(() => {})
+      }
+    }
+  }, [location.search])
 
   // Open Create Drawer
   const handleOpenCreate = () => {
@@ -517,7 +547,7 @@ export function AnnouncementManagement() {
             className={`drawer-backdrop drawer-${createPhase}`}
             type="button"
             aria-label="Yeni duyuru formunu kapat"
-            onClick={closeCreateDrawer}
+            onClick={() => void handleCloseCreateWithGuard()}
           />
           <aside
             ref={createDrawerRef as any}
@@ -525,13 +555,14 @@ export function AnnouncementManagement() {
             role="dialog"
             aria-modal="true"
             aria-label="Yeni Duyuru Oluştur"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Duyuru Yönetimi</p>
                 <h3>Yeni Duyuru Oluştur</h3>
               </div>
-              <button className="drawer-close-button" type="button" onClick={closeCreateDrawer}>
+              <button className="drawer-close-button" type="button" onClick={() => void handleCloseCreateWithGuard()}>
                 ✕
               </button>
             </div>
@@ -893,6 +924,8 @@ export function AnnouncementManagement() {
           onCancel={() => setCancelConfirmId(null)}
         />
       )}
+
+      {unsavedChangesDialog}
     </div>
   )
 }

@@ -68,6 +68,7 @@ builder.Services.AddScoped<IDataImportService, DataImportService>();
 builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 builder.Services.AddScoped<IRequestFileStorageService, RequestFileStorageService>();
 builder.Services.AddScoped<IMaintenanceRequestService, MaintenanceRequestService>();
+builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");

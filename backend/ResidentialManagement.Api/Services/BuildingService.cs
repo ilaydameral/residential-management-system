@@ -288,4 +288,178 @@ public class BuildingService : IBuildingService
             UpdatedAt = building.UpdatedAt
         };
     }
+
+    public async Task<BuildingFloorMapDto?> GetBuildingFloorMapAsync(int buildingId)
+    {
+        var building = await _context.Buildings
+            .AsNoTracking()
+            .Include(b => b.Property)
+            .FirstOrDefaultAsync(b => b.Id == buildingId);
+
+        if (building is null)
+        {
+            return null;
+        }
+
+        var units = await _context.Units
+            .AsNoTracking()
+            .Include(u => u.UnitType)
+            .Where(u => u.BuildingId == buildingId)
+            .OrderBy(u => u.FloorNumber)
+            .ThenBy(u => u.UnitNumber)
+            .ToListAsync();
+
+        var unitIds = units.Select(u => u.Id).ToList();
+        var now = DateTime.UtcNow;
+
+        var activeOccupancies = unitIds.Count > 0
+            ? await _context.UnitOccupancies
+                .AsNoTracking()
+                .Include(uo => uo.User)
+                .Include(uo => uo.OccupancyType)
+                .Where(uo => unitIds.Contains(uo.UnitId) &&
+                            uo.IsActive &&
+                            (uo.EndDate == null || uo.EndDate > now))
+                .ToListAsync()
+            : new List<UnitOccupancy>();
+
+        var unitCharges = unitIds.Count > 0
+            ? await _context.UnitCharges
+                .AsNoTracking()
+                .Include(uc => uc.Payments)
+                .Where(uc => unitIds.Contains(uc.UnitId) && !uc.IsCancelled)
+                .ToListAsync()
+            : new List<UnitCharge>();
+
+        var activeMaintenanceRequests = unitIds.Count > 0
+            ? await _context.MaintenanceRequests
+                .AsNoTracking()
+                .Where(mr => unitIds.Contains(mr.UnitId) &&
+                            (mr.Status == "OPEN" || mr.Status == "IN_PROGRESS"))
+                .ToListAsync()
+            : new List<MaintenanceRequest>();
+
+        var occupanciesByUnit = activeOccupancies.GroupBy(o => o.UnitId).ToDictionary(g => g.Key, g => g.ToList());
+        var chargesByUnit = unitCharges.GroupBy(c => c.UnitId).ToDictionary(g => g.Key, g => g.ToList());
+        var requestsByUnit = activeMaintenanceRequests.GroupBy(r => r.UnitId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var unitDtos = new List<FloorMapUnitDto>();
+
+        foreach (var unit in units)
+        {
+            var unitOccs = occupanciesByUnit.GetValueOrDefault(unit.Id) ?? new List<UnitOccupancy>();
+            var unitChgs = chargesByUnit.GetValueOrDefault(unit.Id) ?? new List<UnitCharge>();
+            var unitReqs = requestsByUnit.GetValueOrDefault(unit.Id) ?? new List<MaintenanceRequest>();
+
+            string occStatus = "VACANT";
+            string? primaryResidentName = null;
+            int activeResidentCount = unitOccs.Count;
+
+            if (activeResidentCount > 0)
+            {
+                var primaryOcc = unitOccs.FirstOrDefault(o => o.IsPrimary) ?? unitOccs.First();
+                primaryResidentName = $"{primaryOcc.User.FirstName} {primaryOcc.User.LastName}".Trim();
+
+                var codeUpper = primaryOcc.OccupancyType.Code.ToUpperInvariant();
+                if (codeUpper == "TENANT")
+                {
+                    occStatus = "OCCUPIED_TENANT";
+                }
+                else
+                {
+                    occStatus = "OCCUPIED_OWNER";
+                }
+            }
+
+            decimal totalOutstanding = 0;
+            bool hasOverdue = false;
+
+            foreach (var chg in unitChgs)
+            {
+                var paid = chg.Payments.Where(p => !p.IsCancelled).Sum(p => p.Amount);
+                var remaining = chg.Amount - paid;
+                if (remaining > 0)
+                {
+                    totalOutstanding += remaining;
+                    if (chg.DueDate < now)
+                    {
+                        hasOverdue = true;
+                    }
+                }
+            }
+
+            int openReqCount = unitReqs.Count;
+            bool hasEmergency = unitReqs.Any(r => r.Priority == "EMERGENCY");
+            string maintStatus = "NONE";
+
+            if (openReqCount > 0)
+            {
+                if (unitReqs.Any(r => r.Priority == "EMERGENCY"))
+                    maintStatus = "EMERGENCY";
+                else if (unitReqs.Any(r => r.Priority == "HIGH"))
+                    maintStatus = "HIGH";
+                else if (unitReqs.Any(r => r.Priority == "NORMAL"))
+                    maintStatus = "NORMAL";
+                else if (unitReqs.Any(r => r.Priority == "LOW"))
+                    maintStatus = "LOW";
+                else
+                    maintStatus = "NORMAL";
+            }
+
+            unitDtos.Add(new FloorMapUnitDto
+            {
+                UnitId = unit.Id,
+                UnitNumber = unit.UnitNumber,
+                FloorNumber = unit.FloorNumber,
+                UnitTypeName = unit.UnitType.Name,
+                IsActive = unit.IsActive,
+                OccupancyStatus = occStatus,
+                PrimaryResidentName = primaryResidentName,
+                ActiveResidentCount = activeResidentCount,
+                OutstandingBalance = Math.Max(0, totalOutstanding),
+                HasOverdueDebt = hasOverdue,
+                OpenMaintenanceRequestCount = openReqCount,
+                HasEmergencyMaintenanceRequest = hasEmergency,
+                MaintenanceStatus = maintStatus
+            });
+        }
+
+        var floorGroups = unitDtos
+            .GroupBy(u => u.FloorNumber)
+            .OrderByDescending(g => g.Key)
+            .Select(g =>
+            {
+                int floorNum = g.Key;
+                string label;
+                if (floorNum == 0)
+                {
+                    label = "Zemin Kat";
+                }
+                else
+                {
+                    label = $"{floorNum}. Kat";
+                }
+
+                return new FloorMapFloorDto
+                {
+                    FloorNumber = floorNum,
+                    FloorLabel = label,
+                    UnitCount = g.Count(),
+                    Units = g.OrderBy(u => u.UnitNumber, StringComparer.OrdinalIgnoreCase).ToList()
+                };
+            })
+            .ToList();
+
+        return new BuildingFloorMapDto
+        {
+            BuildingId = building.Id,
+            BuildingName = building.Name,
+            BuildingCode = building.Code,
+            PropertyId = building.PropertyId,
+            PropertyName = building.Property.Name,
+            TotalFloors = building.FloorCount,
+            TotalUnits = unitDtos.Count,
+            Floors = floorGroups
+        };
+    }
 }

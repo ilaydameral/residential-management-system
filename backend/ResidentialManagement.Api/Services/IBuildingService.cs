@@ -15,4 +15,5 @@ public interface IBuildingService
     Task<BuildingDto> CreateBuildingAsync(CreateBuildingDto createDto);
     Task<BuildingDto?> UpdateBuildingAsync(int id, UpdateBuildingDto updateDto);
     Task<bool> DeleteBuildingAsync(int id);
+    Task<BuildingFloorMapDto?> GetBuildingFloorMapAsync(int buildingId);
 }

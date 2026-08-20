@@ -906,3 +906,22 @@ export interface MaintenanceRequestStatusUpdatePayload {
 export interface MaintenanceRequestNotePayload {
   note: string
 }
+
+export interface GlobalSearchItem {
+  id: number
+  title: string
+  subtitle: string
+  entityType: 'PROPERTY' | 'BUILDING' | 'UNIT' | 'USER' | 'MAINTENANCE' | 'ANNOUNCEMENT'
+  targetView: 'properties' | 'buildings' | 'units' | 'users' | 'maintenance-requests' | 'announcements'
+  routeParams: Record<string, string>
+}
+
+export interface GlobalSearchResponse {
+  query: string
+  properties: GlobalSearchItem[]
+  buildings: GlobalSearchItem[]
+  units: GlobalSearchItem[]
+  users: GlobalSearchItem[]
+  maintenanceRequests: GlobalSearchItem[]
+  announcements: GlobalSearchItem[]
+}

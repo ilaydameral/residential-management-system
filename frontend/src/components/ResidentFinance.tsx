@@ -849,6 +849,7 @@ export function ResidentFinance() {
             role="dialog"
             aria-modal="true"
             style={{ width: 'min(520px, 100%)' }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>

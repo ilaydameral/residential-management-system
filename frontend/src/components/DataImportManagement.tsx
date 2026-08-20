@@ -1051,6 +1051,7 @@ export function DataImportManagement() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="history-drawer-title"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>

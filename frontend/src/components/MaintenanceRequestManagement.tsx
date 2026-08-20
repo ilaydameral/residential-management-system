@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   getMaintenanceRequests,
   getMaintenanceRequest,
@@ -62,6 +63,21 @@ const ACTION_TYPE_LABEL_MAP: Record<string, { title: string; color: string }> = 
   CANCELLED: { title: 'Talep iptal edildi', color: '#dc2626' },
 }
 
+const KANBAN_COLUMNS = [
+  { key: 'OPEN', label: 'Açık', color: '#f59e0b', bgSoft: 'rgba(245, 158, 11, 0.06)' },
+  { key: 'IN_PROGRESS', label: 'İşlemde', color: '#3b82f6', bgSoft: 'rgba(59, 130, 246, 0.06)' },
+  { key: 'RESOLVED', label: 'Çözüldü', color: '#10b981', bgSoft: 'rgba(16, 185, 129, 0.06)' },
+  { key: 'CLOSED', label: 'Kapandı', color: '#64748b', bgSoft: 'rgba(100, 116, 139, 0.06)' },
+]
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  OPEN: ['IN_PROGRESS', 'RESOLVED'],
+  IN_PROGRESS: ['RESOLVED'],
+  RESOLVED: ['IN_PROGRESS', 'CLOSED'],
+  CLOSED: [],
+  CANCELLED: [],
+}
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('tr-TR', {
@@ -93,7 +109,6 @@ function getSanitizedUserNote(note: string | null): string | null {
   const trimmed = note.trim()
   if (!trimmed) return null
 
-  // Suppress auto-generated system audit logs (both Turkish & English)
   if (trimmed.startsWith('Durum ') && trimmed.includes('->')) return null
   if (trimmed.startsWith('Status changed')) return null
   if (trimmed.startsWith('Öncelik ') && trimmed.includes('değiştirildi')) return null
@@ -113,7 +128,28 @@ function WrenchIcon({ width = 18, height = 18 }: { width?: number; height?: numb
   )
 }
 
+function ListIcon({ width = 16, height = 16 }: { width?: number; height?: number }) {
+  return (
+    <svg width={width} height={height} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  )
+}
 
+function KanbanIcon({ width = 16, height = 16 }: { width?: number; height?: number }) {
+  return (
+    <svg width={width} height={height} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="5" height="18" rx="1" />
+      <rect x="12" y="3" width="5" height="12" rx="1" />
+      <rect x="21" y="3" width="5" height="15" rx="1" />
+    </svg>
+  )
+}
 
 function NoteIcon({ width = 16, height = 16 }: { width?: number; height?: number }) {
   return (
@@ -124,23 +160,16 @@ function NoteIcon({ width = 16, height = 16 }: { width?: number; height?: number
   )
 }
 
-function HistoryIcon({ width = 16, height = 16 }: { width?: number; height?: number }) {
-  return (
-    <svg width={width} height={height} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  )
-}
-
 export function MaintenanceRequestManagement() {
   const { showToast } = useToast()
+
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
 
   const [properties, setProperties] = useState<Property[]>([])
   const [buildings, setBuildings] = useState<Building[]>([])
   const [techStaffList, setTechStaffList] = useState<UserSearchResult[]>([])
 
-  // Filters
+  // Shared Filters
   const [propertyFilter, setPropertyFilter] = useState<number | 'all'>('all')
   const [buildingFilter, setBuildingFilter] = useState<number | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -149,11 +178,18 @@ export function MaintenanceRequestManagement() {
   const [assignedStaffFilter, setAssignedStaffFilter] = useState<number | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
 
+  // Data State
   const [requests, setRequests] = useState<MaintenanceRequestListItemDto[]>([])
+  const [kanbanRequests, setKanbanRequests] = useState<MaintenanceRequestListItemDto[]>([])
   const [totalCount, setTotalCount] = useState<number>(0)
   const [page, setPage] = useState<number>(1)
   const pageSize = 15
   const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  // Drag & Drop State
+  const [draggedCardId, setDraggedCardId] = useState<number | null>(null)
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+  const [pendingTransitionId, setPendingTransitionId] = useState<number | null>(null)
 
   // Selection & Drawer state
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequestDetailDto | null>(null)
@@ -165,7 +201,7 @@ export function MaintenanceRequestManagement() {
   const [workNoteText, setWorkNoteText] = useState<string>('')
   const [isSubmittingAction, setIsSubmittingAction] = useState<boolean>(false)
 
-  // Status Action Confirmation
+  // Status Action Confirmation (Drawer)
   const [pendingStatusAction, setPendingStatusAction] = useState<{ newStatus: string; label: string; isDestructive?: boolean } | null>(null)
   const [statusActionNote, setStatusActionNote] = useState<string>('')
 
@@ -209,33 +245,92 @@ export function MaintenanceRequestManagement() {
     }
   }, [propertyFilter])
 
-  // Fetch Requests
+  // Fetch Requests (Supports single page for Table View and multi-page aggregation for Kanban View)
   const fetchRequests = useCallback(async () => {
     setIsLoading(true)
     try {
-      const res = await getMaintenanceRequests({
-        propertyId: typeof propertyFilter === 'number' ? propertyFilter : undefined,
-        buildingId: typeof buildingFilter === 'number' ? buildingFilter : undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        priority: priorityFilter !== 'all' ? priorityFilter : undefined,
-        category: categoryFilter !== 'all' ? categoryFilter : undefined,
-        assignedToUserId: typeof assignedStaffFilter === 'number' ? assignedStaffFilter : undefined,
-        search: searchQuery ? searchQuery.trim() : undefined,
-        page,
-        pageSize,
-      })
-      setRequests(res.items)
-      setTotalCount(res.totalCount)
+      if (viewMode === 'table') {
+        const res = await getMaintenanceRequests({
+          propertyId: typeof propertyFilter === 'number' ? propertyFilter : undefined,
+          buildingId: typeof buildingFilter === 'number' ? buildingFilter : undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+          category: categoryFilter !== 'all' ? categoryFilter : undefined,
+          assignedToUserId: typeof assignedStaffFilter === 'number' ? assignedStaffFilter : undefined,
+          search: searchQuery ? searchQuery.trim() : undefined,
+          page,
+          pageSize,
+        })
+        setRequests(res.items)
+        setTotalCount(res.totalCount)
+      } else {
+        // Kanban Mode: aggregate ALL pages matching active filters (pageSize capped at 100 by backend)
+        const params = {
+          propertyId: typeof propertyFilter === 'number' ? propertyFilter : undefined,
+          buildingId: typeof buildingFilter === 'number' ? buildingFilter : undefined,
+          priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+          category: categoryFilter !== 'all' ? categoryFilter : undefined,
+          assignedToUserId: typeof assignedStaffFilter === 'number' ? assignedStaffFilter : undefined,
+          search: searchQuery ? searchQuery.trim() : undefined,
+          page: 1,
+          pageSize: 100,
+        }
+
+        const firstPage = await getMaintenanceRequests(params)
+        let allItems = [...firstPage.items]
+        const totalCount = firstPage.totalCount
+        const totalPages = Math.ceil(totalCount / 100)
+
+        if (totalPages > 1) {
+          const pagePromises = []
+          for (let p = 2; p <= totalPages; p++) {
+            pagePromises.push(getMaintenanceRequests({ ...params, page: p }))
+          }
+          const restPages = await Promise.all(pagePromises)
+          restPages.forEach((res) => {
+            allItems.push(...res.items)
+          })
+        }
+
+        // Deduplicate items by ID
+        const uniqueMap = new Map<number, MaintenanceRequestListItemDto>()
+        allItems.forEach((item) => uniqueMap.set(item.id, item))
+        const finalItems = Array.from(uniqueMap.values())
+
+        setKanbanRequests(finalItems)
+        setTotalCount(totalCount)
+      }
     } catch (err: any) {
       showToast(err.message || 'Talepler yüklenirken hata oluştu.')
     } finally {
       setIsLoading(false)
     }
-  }, [propertyFilter, buildingFilter, statusFilter, priorityFilter, categoryFilter, assignedStaffFilter, searchQuery, page, showToast])
+  }, [viewMode, propertyFilter, buildingFilter, statusFilter, priorityFilter, categoryFilter, assignedStaffFilter, searchQuery, page, showToast])
 
   useEffect(() => {
     fetchRequests()
   }, [fetchRequests])
+
+  const location = useLocation()
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const reqId = params.get('requestId')
+    if (reqId) {
+      const id = Number(reqId)
+      if (!isNaN(id) && id > 0) {
+        getMaintenanceRequest(id)
+          .then((full) => {
+            setSelectedRequest(full)
+            setSelectedTechUserId(full.assignedToUserId || 0)
+            setSelectedPriority(full.priority)
+            setWorkNoteText('')
+            setIsDrawerOpen(true)
+            window.history.replaceState({}, '', window.location.pathname)
+          })
+          .catch(() => {})
+      }
+    }
+  }, [location.search])
 
   // Open Detail Drawer
   const handleViewDetail = async (item: MaintenanceRequestListItemDto) => {
@@ -309,7 +404,7 @@ export function MaintenanceRequestManagement() {
     }
   }
 
-  // Handle Confirm Status Action
+  // Handle Confirm Status Action (Drawer)
   const handleConfirmStatusAction = async () => {
     if (!selectedRequest || !pendingStatusAction) return
 
@@ -350,15 +445,101 @@ export function MaintenanceRequestManagement() {
     }
   }
 
+  // Drag and Drop Event Handlers
+  const handleDragStart = (e: React.DragEvent, card: MaintenanceRequestListItemDto) => {
+    if (card.status === 'CLOSED' || card.status === 'CANCELLED') {
+      e.preventDefault()
+      return
+    }
+    e.dataTransfer.setData('text/plain', String(card.id))
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggedCardId(card.id)
+  }
+
+  const handleDragOver = (e: React.DragEvent, columnStatus: string) => {
+    e.preventDefault()
+    if (!draggedCardId) return
+
+    const card = kanbanRequests.find((r) => r.id === draggedCardId)
+    if (!card) return
+
+    const allowed = VALID_TRANSITIONS[card.status] || []
+    if (allowed.includes(columnStatus)) {
+      e.dataTransfer.dropEffect = 'move'
+      if (dragOverColumn !== columnStatus) {
+        setDragOverColumn(columnStatus)
+      }
+    } else {
+      e.dataTransfer.dropEffect = 'none'
+    }
+  }
+
+  const handleDragLeave = () => {
+    setDragOverColumn(null)
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault()
+    setDragOverColumn(null)
+
+    const cardIdStr = e.dataTransfer.getData('text/plain')
+    const cardId = Number(cardIdStr) || draggedCardId
+    setDraggedCardId(null)
+
+    if (!cardId) return
+    if (pendingTransitionId === cardId) return
+
+    const card = kanbanRequests.find((r) => r.id === cardId)
+    if (!card) return
+
+    if (card.status === targetStatus) return
+
+    const allowed = VALID_TRANSITIONS[card.status] || []
+    if (!allowed.includes(targetStatus)) {
+      showToast('Bu durum geçişine izin verilmiyor.')
+      return
+    }
+
+    const originalStatus = card.status
+    const nowIso = new Date().toISOString()
+
+    // 1. Optimistic UI update
+    setKanbanRequests((prev) =>
+      prev.map((item) =>
+        item.id === cardId ? { ...item, status: targetStatus, updatedAt: nowIso } : item
+      )
+    )
+    setPendingTransitionId(cardId)
+
+    // 2. Call API
+    try {
+      await updateMaintenanceRequestStatus(cardId, targetStatus)
+      const targetLabel = STATUS_LABEL_MAP[targetStatus]?.label || targetStatus
+      showToast(`Talep durumu '${targetLabel}' olarak güncellendi.`)
+    } catch (err: any) {
+      // Rollback on failure
+      setKanbanRequests((prev) =>
+        prev.map((item) =>
+          item.id === cardId ? { ...item, status: originalStatus } : item
+        )
+      )
+      showToast(err.message || 'Durum güncellenirken bir hata oluştu.')
+    } finally {
+      setPendingTransitionId(null)
+    }
+  }
+
   return (
     <div className="management-page">
-      {/* Compact Operational Intro Strip */}
+      {/* Compact Operational Intro Strip with View Mode Toggle */}
       <div
         className="entity-action-strip"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
           marginBottom: '16px',
           background: 'var(--color-surface)',
           padding: '14px 20px',
@@ -388,6 +569,64 @@ export function MaintenanceRequestManagement() {
               Gelen talepleri teknik personele atayın, önceliklendirin ve çözüm sürecini takip edin.
             </span>
           </div>
+        </div>
+
+        {/* View Mode Switcher */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: 'var(--color-surface-secondary)',
+            padding: '4px',
+            borderRadius: '8px',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              background: viewMode === 'table' ? 'var(--color-surface)' : 'transparent',
+              color: viewMode === 'table' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <ListIcon width={16} height={16} />
+            Liste
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('kanban')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              background: viewMode === 'kanban' ? 'var(--color-surface)' : 'transparent',
+              color: viewMode === 'kanban' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              boxShadow: viewMode === 'kanban' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <KanbanIcon width={16} height={16} />
+            Kanban
+          </button>
         </div>
       </div>
 
@@ -439,6 +678,8 @@ export function MaintenanceRequestManagement() {
           <select
             id="req-status-filter"
             value={statusFilter}
+            disabled={viewMode === 'kanban'}
+            title={viewMode === 'kanban' ? 'Kanban modunda durumlar kolonlar halinde gösterilmektedir.' : undefined}
             onChange={(e) => {
               setStatusFilter(e.target.value)
               setPage(1)
@@ -525,459 +766,613 @@ export function MaintenanceRequestManagement() {
         </div>
       </section>
 
-      {/* Requests Table */}
-      {isLoading ? (
-        <LoadingSkeleton variant="table" rows={5} />
-      ) : requests.length === 0 ? (
-        <section className="panel entity-state-panel actionable-empty-state">
-          <h2>Kriterlere uygun bakım talebi bulunamadı</h2>
-          <p>Arama veya filtre kriterlerinizi değiştirerek tekrar deneyebilirsiniz.</p>
-        </section>
-      ) : (
-        <section className="panel entity-table-panel">
-          <div className="responsive-table-wrapper">
-            <table className="management-table">
-              <thead>
-                <tr>
-                  <th>Talep No</th>
-                  <th>Başlık</th>
-                  <th>Site / Blok / Daire</th>
-                  <th>Kategori</th>
-                  <th>Öncelik</th>
-                  <th>Durum</th>
-                  <th>Atanan Personel</th>
-                  <th>Tarih</th>
-                  <th className="text-right">İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((r) => {
-                  const prio = PRIORITY_LABEL_MAP[r.priority] || { label: r.priority, className: 'status-badge secondary' }
-                  const status = STATUS_LABEL_MAP[r.status] || { label: r.status, className: 'status-badge secondary' }
-                  const categoryLabel = CATEGORY_LABEL_MAP[r.category] || r.category
+      {/* Main Content Area: Table View vs. Kanban View */}
+      {viewMode === 'table' ? (
+        isLoading ? (
+          <LoadingSkeleton variant="table" rows={5} />
+        ) : requests.length === 0 ? (
+          <section className="panel entity-state-panel actionable-empty-state">
+            <h2>Kriterlere uygun bakım talebi bulunamadı</h2>
+            <p>Arama veya filtre kriterlerinizi değiştirerek tekrar deneyebilirsiniz.</p>
+          </section>
+        ) : (
+          <section className="panel entity-table-panel">
+            <div className="responsive-table-wrapper">
+              <table className="management-table">
+                <thead>
+                  <tr>
+                    <th>Talep No</th>
+                    <th>Başlık</th>
+                    <th>Site / Blok / Daire</th>
+                    <th>Kategori</th>
+                    <th>Öncelik</th>
+                    <th>Durum</th>
+                    <th>Atanan Personel</th>
+                    <th>Tarih</th>
+                    <th className="text-right">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((r) => {
+                    const prio = PRIORITY_LABEL_MAP[r.priority] || { label: r.priority, className: 'status-badge secondary' }
+                    const status = STATUS_LABEL_MAP[r.status] || { label: r.status, className: 'status-badge secondary' }
+                    const categoryLabel = CATEGORY_LABEL_MAP[r.category] || r.category
 
-                  return (
-                    <tr key={r.id} className="clickable-row" onClick={() => handleViewDetail(r)}>
-                      <td>
-                        <code
+                    return (
+                      <tr key={r.id} className="clickable-row" onClick={() => handleViewDetail(r)}>
+                        <td>
+                          <code
+                            style={{
+                              background: 'var(--color-surface-secondary)',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              fontFamily: 'monospace',
+                              fontWeight: 600,
+                              fontSize: '0.85rem',
+                              color: 'var(--color-text-secondary)',
+                            }}
+                          >
+                            {r.requestNumber}
+                          </code>
+                        </td>
+                        <td>
+                          <strong style={{ color: 'var(--color-text-primary)', fontSize: '0.92rem' }}>{r.title}</strong>
+                        </td>
+                        <td style={{ color: 'var(--color-text-secondary)' }}>
+                          {formatUnitLocation(r.propertyName, r.buildingName, r.unitNumber)}
+                        </td>
+                        <td style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>{categoryLabel}</td>
+                        <td>
+                          <span className={prio.className}>{prio.label}</span>
+                        </td>
+                        <td>
+                          <span className={status.className}>{status.label}</span>
+                        </td>
+                        <td style={{ fontSize: '0.88rem' }}>
+                          {r.assignedToName ? (
+                            <span style={{ color: 'var(--color-text-primary)' }}>{r.assignedToName}</span>
+                          ) : (
+                            <span style={{ color: 'var(--color-text-muted)' }}>Atanmadı</span>
+                          )}
+                        </td>
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{formatDate(r.createdAt)}</td>
+                        <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="button outline small"
+                            type="button"
+                            onClick={() => handleViewDetail(r)}
+                          >
+                            Detay
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination for Table View */}
+            {totalCount > pageSize && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: '16px',
+                  marginTop: '16px',
+                  borderTop: '1px solid var(--color-border)',
+                }}
+              >
+                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                  Toplam {totalCount} kayıttan {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, totalCount)} arası gösteriliyor
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="button secondary small"
+                    type="button"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    Önceki
+                  </button>
+                  <button
+                    className="button secondary small"
+                    type="button"
+                    disabled={page * pageSize >= totalCount}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Sonraki
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )
+      ) : (
+        /* KANBAN BOARD VIEW */
+        <section className="kanban-board-section" style={{ marginTop: '8px' }}>
+          {isLoading ? (
+            <LoadingSkeleton variant="table" rows={4} />
+          ) : (
+            <div
+              className="kanban-board-grid"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))',
+                gap: '16px',
+                alignItems: 'start',
+                overflowX: 'auto',
+                paddingBottom: '16px',
+              }}
+            >
+              {KANBAN_COLUMNS.map((col) => {
+                const colItems = kanbanRequests.filter((r) => r.status === col.key)
+                const isOver = dragOverColumn === col.key
+
+                return (
+                  <div
+                    key={col.key}
+                    className={`kanban-column ${isOver ? 'drag-over' : ''}`}
+                    onDragOver={(e) => handleDragOver(e, col.key)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, col.key)}
+                    style={{
+                      background: isOver ? col.bgSoft : 'var(--color-surface-secondary)',
+                      borderRadius: '12px',
+                      border: isOver ? `2px dashed ${col.color}` : '1px solid var(--color-border)',
+                      padding: '16px',
+                      minHeight: '480px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      transition: 'background 0.2s ease, border-color 0.2s ease',
+                    }}
+                  >
+                    {/* Column Header */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingBottom: '10px',
+                        borderBottom: '1px solid var(--color-border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
                           style={{
-                            background: 'var(--color-neutral-soft)',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontFamily: 'monospace',
-                            fontWeight: 600,
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            background: col.color,
+                            display: 'inline-block',
+                          }}
+                        />
+                        <strong className="kanban-column-title" style={{ fontSize: '0.95rem', color: 'var(--color-text-primary)' }}>
+                          {col.label}
+                        </strong>
+                      </div>
+                      <span
+                        style={{
+                          background: 'var(--color-surface)',
+                          padding: '2px 10px',
+                          borderRadius: '12px',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          color: 'var(--color-text-secondary)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      >
+                        {colItems.length}
+                      </span>
+                    </div>
+
+                    {/* Column Cards List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                      {colItems.length === 0 ? (
+                        <div
+                          style={{
+                            padding: '24px 12px',
+                            textAlign: 'center',
+                            color: 'var(--color-text-muted)',
                             fontSize: '0.85rem',
-                            color: 'var(--color-text-secondary)',
+                            border: '1px dashed var(--color-border)',
+                            borderRadius: '8px',
+                            marginTop: '4px',
                           }}
                         >
-                          {r.requestNumber}
-                        </code>
-                      </td>
-                      <td>
-                        <strong style={{ color: 'var(--color-text-primary)', fontSize: '0.92rem' }}>{r.title}</strong>
-                      </td>
-                      <td style={{ color: 'var(--color-text-secondary)' }}>
-                        {r.propertyName} / {r.buildingName} / D:{r.unitNumber}
-                      </td>
-                      <td style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)' }}>{categoryLabel}</td>
-                      <td>
-                        <span className={prio.className}>{prio.label}</span>
-                      </td>
-                      <td>
-                        <span className={status.className}>{status.label}</span>
-                      </td>
-                      <td style={{ fontSize: '0.88rem' }}>
-                        {r.assignedToName ? (
-                          <span style={{ color: 'var(--color-text-primary)' }}>{r.assignedToName}</span>
-                        ) : (
-                          <span style={{ color: 'var(--color-text-muted)' }}>Atanmadı</span>
-                        )}
-                      </td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{formatDate(r.createdAt)}</td>
-                      <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="button outline small"
-                          type="button"
-                          onClick={() => handleViewDetail(r)}
-                        >
-                          Detay
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                          Bu aşamada talep yok
+                        </div>
+                      ) : (
+                        colItems.map((r) => {
+                          const prio = PRIORITY_LABEL_MAP[r.priority] || { label: r.priority, className: 'status-badge secondary' }
+                          const categoryLabel = CATEGORY_LABEL_MAP[r.category] || r.category
+                          const isDraggable = r.status !== 'CLOSED' && r.status !== 'CANCELLED'
+                          const isPending = pendingTransitionId === r.id
+
+                          return (
+                            <div
+                              key={r.id}
+                              draggable={isDraggable}
+                              onDragStart={(e) => handleDragStart(e, r)}
+                              onClick={() => handleViewDetail(r)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  handleViewDetail(r)
+                                }
+                              }}
+                              tabIndex={0}
+                              role="button"
+                              aria-label={`Talep ${r.requestNumber}: ${r.title}`}
+                              className="kanban-card"
+                              style={{
+                                background: 'var(--color-surface)',
+                                borderRadius: '8px',
+                                border: '1px solid var(--color-border)',
+                                padding: '14px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                cursor: isDraggable ? 'grab' : 'pointer',
+                                opacity: isPending ? 0.5 : 1,
+                                transition: 'transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                              }}
+                            >
+                              {/* Card Top: Request Number & Priority */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <code
+                                  style={{
+                                    background: 'var(--color-surface-secondary)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontFamily: 'monospace',
+                                    fontWeight: 600,
+                                    fontSize: '0.8rem',
+                                    color: 'var(--color-text-secondary)',
+                                  }}
+                                >
+                                  {r.requestNumber}
+                                </code>
+                                <span className={prio.className} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+                                  {prio.label}
+                                </span>
+                              </div>
+
+                              {/* Card Title */}
+                              <strong
+                                style={{
+                                  fontSize: '0.9rem',
+                                  color: 'var(--color-text-primary)',
+                                  lineHeight: 1.3,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {r.title}
+                              </strong>
+
+                              {/* Card Location */}
+                              <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+                                📍 {formatUnitLocation(r.propertyName, r.buildingName, r.unitNumber)}
+                              </div>
+
+                              {/* Card Category Badge */}
+                              <div>
+                                <span
+                                  style={{
+                                    background: 'var(--color-surface-secondary)',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    color: 'var(--color-text-secondary)',
+                                    border: '1px solid var(--color-border)',
+                                  }}
+                                >
+                                  {categoryLabel}
+                                </span>
+                              </div>
+
+                              {/* Card Footer: Assigned Tech & Date */}
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  marginTop: '4px',
+                                  paddingTop: '8px',
+                                  borderTop: '1px solid var(--color-border)',
+                                  fontSize: '0.8rem',
+                                }}
+                              >
+                                <span style={{ color: r.assignedToName ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                  👤 {r.assignedToName || 'Atanmadı'}
+                                </span>
+                                <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
+                                  {formatDate(r.createdAt)}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </section>
       )}
 
-      {/* Pagination */}
-      {totalCount > pageSize && (
-        <div className="pagination">
-          <button
-            className="button outline small"
-            type="button"
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Önceki
-          </button>
-          <span>
-            Sayfa {page} / {Math.ceil(totalCount / pageSize)}
-          </span>
-          <button
-            className="button outline small"
-            type="button"
-            disabled={page >= Math.ceil(totalCount / pageSize)}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Sonraki
-          </button>
-        </div>
-      )}
-
-      {/* Detail Drawer - Wider operational layout (~660px) */}
-      {shouldRender && selectedRequest && (
+      {/* Shared Detail Drawer */}
+      {shouldRender && selectedRequest !== null && (
         <>
           <button
             className={`drawer-backdrop drawer-${phase}`}
             type="button"
-            aria-label="Talep detayını kapat"
+            aria-label="Bakım talebi detayını kapat"
             onClick={closeDrawer}
           />
+
           <aside
-            ref={drawerRef as any}
-            className={`management-drawer request-drawer drawer-container drawer-${phase}`}
+            ref={drawerRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
-            aria-label="Talep Detayı"
+            aria-labelledby="req-drawer-title"
+            className={`management-drawer request-detail-drawer drawer-${phase}`}
+            onClick={(e) => e.stopPropagation()}
           >
+            {/* Drawer Header */}
             <div className="drawer-header">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <div
-                    style={{
-                      display: 'grid',
-                      placeItems: 'center',
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      background: 'var(--color-surface-secondary)',
-                      color: 'var(--color-primary)',
-                    }}
-                  >
-                    <WrenchIcon width={14} height={14} />
-                  </div>
-                  <code style={{ background: 'var(--color-neutral-soft)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 600 }}>
-                    {selectedRequest.requestNumber}
-                  </code>
-                  <span className={(STATUS_LABEL_MAP[selectedRequest.status] || {}).className || 'status-badge secondary'}>
-                    {(STATUS_LABEL_MAP[selectedRequest.status] || {}).label || selectedRequest.status}
-                  </span>
-                  <span className={(PRIORITY_LABEL_MAP[selectedRequest.priority] || {}).className || 'status-badge secondary'}>
-                    {(PRIORITY_LABEL_MAP[selectedRequest.priority] || {}).label || selectedRequest.priority}
-                  </span>
-                </div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--color-text-primary)' }}>{selectedRequest.title}</h3>
+                <span className="drawer-eyebrow">BAKIM TALEBİ DETAYI</span>
+                <h2 id="req-drawer-title">
+                  <code style={{ fontSize: '1.1rem', marginRight: '8px' }}>{selectedRequest.requestNumber}</code>
+                </h2>
               </div>
-              <button className="drawer-close-button" type="button" onClick={closeDrawer}>
-                ✕
+              <button
+                type="button"
+                className="btn-close"
+                onClick={closeDrawer}
+                aria-label="Kapat"
+              >
+                &times;
               </button>
             </div>
 
-            <div
-              className="drawer-body"
-              ref={drawerBodyRef}
-              style={{
-                background: 'var(--color-surface-secondary)',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '18px',
-              }}
-            >
-              {/* MAJOR SECTION 1: Talep Bilgileri */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                  gap: '12px',
-                  background: 'var(--color-surface-secondary)',
-                  padding: '14px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', display: 'block' }}>Site / Blok / Daire</span>
-                  <strong style={{ fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>
-                    {formatUnitLocation(selectedRequest.propertyName, selectedRequest.buildingName, selectedRequest.unitNumber)}
-                  </strong>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', display: 'block' }}>Talebi Açan Sakin</span>
-                  <strong style={{ fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>{selectedRequest.createdByName}</strong>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', display: 'block' }}>Kategori</span>
-                  <strong style={{ fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>{CATEGORY_LABEL_MAP[selectedRequest.category] || selectedRequest.category}</strong>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', display: 'block' }}>Oluşturulma Tarihi</span>
-                  <span style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>{formatDate(selectedRequest.createdAt)}</span>
-                </div>
-
-                {selectedRequest.description && (
-                  <div style={{ gridColumn: 'span 2', borderTop: '1px solid var(--color-border)', paddingTop: '10px', marginTop: '2px' }}>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '4px' }}>Açıklama</span>
-                    <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.45', color: 'var(--color-text-primary)', fontSize: '0.86rem' }}>
-                      {selectedRequest.description}
-                    </p>
+            {/* Drawer Body */}
+            <div className="drawer-body" ref={drawerBodyRef}>
+              <section className="drawer-section">
+                <h3>Genel Bilgiler</h3>
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <span className="detail-label">Başlık</span>
+                    <strong className="detail-value">{selectedRequest.title}</strong>
                   </div>
-                )}
 
-                {/* Embedded Attachments inside Talep Bilgileri */}
-                {selectedRequest.attachments && selectedRequest.attachments.length > 0 && (
-                  <div style={{ gridColumn: 'span 2', borderTop: '1px solid var(--color-border)', paddingTop: '10px', marginTop: '2px' }}>
-                    <span style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '8px' }}>
-                      Ekler ({selectedRequest.attachments.length})
+                  <div className="detail-item">
+                    <span className="detail-label">Konum</span>
+                    <span className="detail-value">
+                      {formatUnitLocation(
+                        selectedRequest.propertyName,
+                        selectedRequest.buildingName,
+                        selectedRequest.unitNumber
+                      )}
                     </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {selectedRequest.attachments.map((att) => (
-                        <div
-                          key={att.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            background: 'var(--color-surface)',
-                            borderRadius: '6px',
-                            border: '1px solid var(--color-border)',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                            </svg>
-                            <div>
-                              <strong style={{ display: 'block', fontSize: '0.84rem', color: 'var(--color-text-primary)' }}>{att.originalFileName}</strong>
-                              <small style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>
-                                {formatFileSize(att.fileSizeBytes)} • {att.uploadedByName}
-                              </small>
-                            </div>
-                          </div>
-                          <button
-                            className="button outline small"
-                            type="button"
-                            onClick={() => handleDownloadAttachment(att.id)}
-                          >
-                            İndir
-                          </button>
-                        </div>
-                      ))}
+                  </div>
+
+                  <div className="detail-item">
+                    <span className="detail-label">Kategori</span>
+                    <span className="detail-value">
+                      {CATEGORY_LABEL_MAP[selectedRequest.category] || selectedRequest.category}
+                    </span>
+                  </div>
+
+                  <div className="detail-item">
+                    <span className="detail-label">Talep Eden</span>
+                    <span className="detail-value">{selectedRequest.createdByName || '-'}</span>
+                  </div>
+
+                  <div className="detail-item">
+                    <span className="detail-label">Oluşturulma Tarihi</span>
+                    <span className="detail-value">{formatDate(selectedRequest.createdAt)}</span>
+                  </div>
+
+                  <div className="detail-item">
+                    <span className="detail-label">Durum</span>
+                    <span
+                      className={
+                        (STATUS_LABEL_MAP[selectedRequest.status] || { className: 'status-badge secondary' }).className
+                      }
+                    >
+                      {(STATUS_LABEL_MAP[selectedRequest.status] || { label: selectedRequest.status }).label}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="detail-item full-width" style={{ marginTop: '12px' }}>
+                  <span className="detail-label">Açıklama</span>
+                  <p className="detail-description">{selectedRequest.description || '-'}</p>
+                </div>
+              </section>
+
+              {/* Priority & Staff Assignment Panel */}
+              {selectedRequest.status !== 'CLOSED' && selectedRequest.status !== 'CANCELLED' && (
+                <section className="drawer-section">
+                  <h3>Yönetim İşlemleri</h3>
+
+                  <div className="drawer-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label htmlFor="drawer-prio-select">Öncelik Seviyesi</label>
+                      <select
+                        id="drawer-prio-select"
+                        value={selectedPriority}
+                        disabled={isSubmittingAction}
+                        onChange={(e) => handlePriorityChange(e.target.value)}
+                      >
+                        <option value="LOW">Düşük</option>
+                        <option value="NORMAL">Normal</option>
+                        <option value="HIGH">Yüksek</option>
+                        <option value="EMERGENCY">Acil</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="drawer-tech-select">Atanan Teknik Personel</label>
+                      <select
+                        id="drawer-tech-select"
+                        value={selectedTechUserId}
+                        disabled={isSubmittingAction}
+                        onChange={(e) => {
+                          const val = Number(e.target.value)
+                          setSelectedTechUserId(val)
+                          if (val > 0) {
+                            handleAssignSubmit(val)
+                          }
+                        }}
+                      >
+                        <option value={0}>Personele Atanmadı</option>
+                        {techStaffList.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.fullName}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* MAJOR SECTION 2: Yönetim İşlemleri */}
-              {selectedRequest.status !== 'CLOSED' && selectedRequest.status !== 'CANCELLED' && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                    gap: '12px',
-                    background: 'var(--color-primary-soft)',
-                    padding: '14px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(99, 102, 241, 0.22)',
-                  }}
-                >
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label htmlFor="drawer-assign-select" style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginBottom: '4px', display: 'block' }}>
-                      Atanan Teknik Personel
-                    </label>
-                    <select
-                      id="drawer-assign-select"
-                      value={selectedTechUserId}
-                      onChange={(e) => {
-                        const id = Number(e.target.value)
-                        setSelectedTechUserId(id)
-                        handleAssignSubmit(id)
-                      }}
-                      disabled={isSubmittingAction}
-                    >
-                      <option value={0}>-- Atanmadı --</option>
-                      {techStaffList.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.fullName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label htmlFor="drawer-prio-select" style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginBottom: '4px', display: 'block' }}>
-                      Öncelik
-                    </label>
-                    <select
-                      id="drawer-prio-select"
-                      value={selectedPriority}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setSelectedPriority(val)
-                        handlePriorityChange(val)
-                      }}
-                      disabled={isSubmittingAction}
-                    >
-                      <option value="LOW">Düşük</option>
-                      <option value="NORMAL">Normal</option>
-                      <option value="HIGH">Yüksek</option>
-                      <option value="EMERGENCY">Acil</option>
-                    </select>
-                  </div>
-                </div>
+                </section>
               )}
 
-              {/* MAJOR SECTION 3: Çalışma Notu */}
-              {selectedRequest.status !== 'CLOSED' && selectedRequest.status !== 'CANCELLED' && (
-                <div
-                  className="detail-section"
-                  style={{
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '10px',
-                    padding: '18px 20px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                    <NoteIcon width={18} height={18} />
-                    <strong style={{ fontSize: '1rem', color: 'var(--color-text-primary)' }}>Çalışma Notu</strong>
-                  </div>
-                  <form onSubmit={handleAddNote}>
-                    <div className="form-group" style={{ marginBottom: '12px' }}>
+              {/* Attachments Section */}
+              {selectedRequest.attachments && selectedRequest.attachments.length > 0 && (
+                <section className="drawer-section">
+                  <h3>Ekli Dosyalar ({selectedRequest.attachments.length})</h3>
+                  <ul className="attachment-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {selectedRequest.attachments.map((att) => (
+                      <li
+                        key={att.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          background: 'var(--color-surface-secondary)',
+                          marginBottom: '6px',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        <div>
+                          <strong>{att.originalFileName}</strong>
+                          <span style={{ color: 'var(--color-text-muted)', marginLeft: '8px' }}>
+                            ({formatFileSize(att.fileSizeBytes)})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="button outline small"
+                          onClick={() => handleDownloadAttachment(att.id)}
+                        >
+                          İndir
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Work Notes Section */}
+              <section className="drawer-section">
+                <h3>
+                  <NoteIcon width={16} height={16} /> Çalışma Notları
+                </h3>
+
+                {selectedRequest.status !== 'CLOSED' && selectedRequest.status !== 'CANCELLED' && (
+                  <form onSubmit={handleAddNote} style={{ marginBottom: '16px' }}>
+                    <div className="form-group">
                       <textarea
-                        rows={3}
-                        style={{ width: '100%', minHeight: '85px', margin: 0, fontSize: '0.9rem', padding: '10px 12px', borderRadius: '8px' }}
-                        placeholder="Teknik ekibe veya takibe özel çalışma notu ekleyin..."
+                        rows={2}
+                        placeholder="Teknik veya yönetimsel çalışma notu ekleyin..."
                         value={workNoteText}
                         onChange={(e) => setWorkNoteText(e.target.value)}
-                        maxLength={1000}
+                        disabled={isSubmittingAction}
+                        style={{ width: '100%', resize: 'vertical' }}
                       />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <small style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-                        Bu not sakin tarafından da görüntülenebilir.
-                      </small>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
                       <button
-                        className="button secondary"
                         type="submit"
+                        className="button primary small"
                         disabled={isSubmittingAction || !workNoteText.trim()}
                       >
-                        Notu Ekle
+                        Not Ekle
                       </button>
                     </div>
                   </form>
-                </div>
-              )}
+                )}
 
-              {/* MAJOR SECTION 4: Talep Geçmişi */}
-              <div
-                className="detail-section"
-                style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '10px',
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                  <HistoryIcon width={18} height={18} />
-                  <strong style={{ fontSize: '1rem', color: 'var(--color-text-primary)' }}>
-                    Talep Geçmişi ({selectedRequest.histories.length})
-                  </strong>
-                </div>
-                {selectedRequest.histories.length === 0 ? (
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.88rem' }}>Geçmiş kaydı yok.</p>
-                ) : (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      paddingLeft: '12px',
-                      borderLeft: '2px solid var(--color-border)',
-                      marginLeft: '4px',
-                    }}
-                  >
-                    {selectedRequest.histories.map((h) => {
-                      const eventMeta = ACTION_TYPE_LABEL_MAP[h.actionType] || { title: h.actionType, color: '#64748b' }
+                {/* History & Timeline */}
+                <div className="timeline-list">
+                  {selectedRequest.histories && selectedRequest.histories.length > 0 ? (
+                    selectedRequest.histories.map((h) => {
                       const userNote = getSanitizedUserNote(h.note)
+                      const actionInfo = ACTION_TYPE_LABEL_MAP[h.actionType] || {
+                        title: h.actionType,
+                        color: 'var(--color-text-secondary)',
+                      }
 
                       return (
                         <div
                           key={h.id}
+                          className="timeline-item"
                           style={{
-                            position: 'relative',
-                            paddingLeft: '14px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            gap: '12px',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            background: 'var(--color-surface-secondary)',
+                            marginBottom: '8px',
+                            borderLeft: `4px solid ${actionInfo.color}`,
                           }}
                         >
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: '-19px',
-                              top: '4px',
-                              width: '10px',
-                              height: '10px',
-                              borderRadius: '50%',
-                              background: eventMeta.color,
-                              border: '2px solid var(--color-surface)',
-                            }}
-                          />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <strong style={{ fontSize: '0.86rem', display: 'block', color: 'var(--color-text-primary)', marginBottom: '2px' }}>
-                              {eventMeta.title}
-                            </strong>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>Yapan: {h.changedByName}</div>
-                            {userNote && (
-                              <div
-                                style={{
-                                  fontSize: '0.82rem',
-                                  marginTop: '6px',
-                                  padding: '6px 10px',
-                                  background: 'var(--color-surface-secondary)',
-                                  borderRadius: '4px',
-                                  border: '1px solid var(--color-border)',
-                                  color: 'var(--color-text-primary)',
-                                }}
-                              >
-                                {userNote}
-                              </div>
-                            )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                            <strong style={{ color: 'var(--color-text-primary)' }}>{actionInfo.title}</strong>
+                            <span style={{ color: 'var(--color-text-muted)' }}>{formatDate(h.createdAt)}</span>
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                            {formatDate(h.createdAt)}
-                          </span>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                            İşlemi Yapan: {h.changedByName || 'Sistem'}
+                          </div>
+                          {userNote && (
+                            <div
+                              style={{
+                                marginTop: '6px',
+                                padding: '6px 10px',
+                                background: 'var(--color-surface)',
+                                borderRadius: '4px',
+                                fontSize: '0.85rem',
+                                color: 'var(--color-text-primary)',
+                              }}
+                            >
+                              "{userNote}"
+                            </div>
+                          )}
                         </div>
                       )
-                    })}
-                  </div>
-                )}
-              </div>
+                    })
+                  ) : (
+                    <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Geçmiş kaydı bulunmuyor.</div>
+                  )}
+                </div>
+              </section>
             </div>
 
-            {/* Footer Action Bar Aligned Right */}
+            {/* Drawer Footer Actions */}
             {selectedRequest.status !== 'CLOSED' && selectedRequest.status !== 'CANCELLED' && (
-              <div className="drawer-footer">
+              <div className="drawer-footer" style={{ padding: '16px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                 {selectedRequest.status === 'OPEN' && (
                   <>
                     <button
@@ -986,11 +1381,23 @@ export function MaintenanceRequestManagement() {
                       onClick={() =>
                         setPendingStatusAction({
                           newStatus: 'IN_PROGRESS',
-                          label: 'Talebi İşleme Al',
+                          label: 'İşleme Al',
                         })
                       }
                     >
                       İşleme Al
+                    </button>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() =>
+                        setPendingStatusAction({
+                          newStatus: 'RESOLVED',
+                          label: 'Çözüldü Olarak İşaretle',
+                        })
+                      }
+                    >
+                      Çözüldü Olarak İşaretle
                     </button>
                     <button
                       className="button danger filled"

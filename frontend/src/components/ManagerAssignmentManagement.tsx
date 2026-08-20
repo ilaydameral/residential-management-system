@@ -278,7 +278,7 @@ export function ManagerAssignmentManagement({ onDirtyChange }: ManagerAssignment
       {drawerAnimation.shouldRender && isDrawerOpen && (
         <>
           <button className={`drawer-backdrop drawer-${drawerAnimation.phase}`} type="button" aria-label="Atama formunu kapat" disabled={drawerAnimation.isClosing} onClick={() => void closeDrawer()} />
-          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="manager-assignment-drawer-title">
+          <aside ref={drawerRef} tabIndex={-1} className={`management-drawer drawer-${drawerAnimation.phase}`} role="dialog" aria-modal="true" aria-labelledby="manager-assignment-drawer-title" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header"><div><p className="eyebrow">Yönetici Atamaları</p><h2 id="manager-assignment-drawer-title" tabIndex={-1} data-drawer-initial-focus>Yeni Atama</h2><p className="drawer-description">Bir site yöneticisini yapı geneline veya belirli bir bloğa atayın.</p></div><button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void closeDrawer()}>×</button></div>
             {actionError && <p className="status-message error-message" role="alert">{actionError}</p>}
             <form className="property-form drawer-form" onSubmit={handleCreateSubmit}>

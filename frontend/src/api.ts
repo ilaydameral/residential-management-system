@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config'
 import type {
   ApiErrorResponse,
+  GlobalSearchResponse,
   AccountProfile,
   AuthenticatedUser,
   Building,
@@ -1368,4 +1369,56 @@ export async function getTechnicalMaintenanceRequestAttachmentFile(requestId: nu
     }
   }
   return { blob, fileName, contentType }
+}
+
+export interface BuildingFloorMapDto {
+  buildingId: number
+  buildingName: string
+  buildingCode: string
+  propertyId: number
+  propertyName: string
+  totalFloors: number
+  totalUnits: number
+  floors: FloorMapFloorDto[]
+}
+
+export interface FloorMapFloorDto {
+  floorNumber: number
+  floorLabel: string
+  unitCount: number
+  units: FloorMapUnitDto[]
+}
+
+export interface FloorMapUnitDto {
+  unitId: number
+  unitNumber: string
+  floorNumber: number
+  unitTypeName: string
+  isActive: boolean
+  occupancyStatus: 'VACANT' | 'OCCUPIED_OWNER' | 'OCCUPIED_TENANT' | string
+  primaryResidentName?: string | null
+  activeResidentCount: number
+  outstandingBalance: number
+  hasOverdueDebt: boolean
+  openMaintenanceRequestCount: number
+  hasEmergencyMaintenanceRequest: boolean
+  maintenanceStatus: 'NONE' | 'LOW' | 'NORMAL' | 'HIGH' | 'EMERGENCY' | string
+}
+
+export async function getBuildingFloorMap(buildingId: number): Promise<BuildingFloorMapDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/buildings/${buildingId}/floor-map`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<BuildingFloorMapDto>(response)
+}
+
+export async function globalSearch(query: string, limit = 5, signal?: AbortSignal): Promise<GlobalSearchResponse> {
+  const response = await safeFetch(
+    `${API_BASE_URL}/api/global-search?q=${encodeURIComponent(query)}&limit=${limit}`,
+    {
+      headers: getAuthHeaders(),
+      signal,
+    }
+  )
+  return handleResponse<GlobalSearchResponse>(response)
 }

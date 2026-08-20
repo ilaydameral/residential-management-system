@@ -62,6 +62,26 @@ public class BuildingsController : ControllerBase
         return Ok(building);
     }
 
+    [HttpGet("{buildingId:int}/floor-map")]
+    [Authorize(Roles = $"{AppRoles.Admin},{AppRoles.Manager}")]
+    public async Task<ActionResult<BuildingFloorMapDto>> GetBuildingFloorMap(int buildingId)
+    {
+        await EnsureManagerCanAccessBuildingAsync(buildingId);
+
+        var floorMap = await _buildingService.GetBuildingFloorMapAsync(buildingId);
+        if (floorMap is null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                StatusCode = 404,
+                Message = $"ID'si {buildingId} olan bina bulunamadı.",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        return Ok(floorMap);
+    }
+
     [HttpGet("property/{propertyId:int}")]
     [Authorize(Roles = AppRoles.AnyRole)]
     public async Task<ActionResult<List<BuildingDto>>> GetBuildingsByPropertyId(int propertyId, [FromQuery] bool includeInactive = false)
