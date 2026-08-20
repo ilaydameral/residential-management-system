@@ -9,4 +9,5 @@ public interface IRealtimePublisher
     Task PublishNotificationCreatedAsync(NotificationDto notification);
     Task PublishNotificationsAsync(IEnumerable<NotificationDto> notifications);
     Task PublishUserScopeInvalidatedAsync(int userId, string reason = "SCOPE_CHANGED");
+    Task PublishMaintenanceRequestUpdatedAsync(MaintenanceRequestUpdatedEvent evt, IEnumerable<int> targetUserIds);
 }

@@ -42,4 +42,17 @@ public class RealtimePublisher : IRealtimePublisher
         var evt = new UserScopeInvalidatedEvent { UserId = userId, Reason = reason };
         await _hubContext.Clients.Group($"user:{userId}").SendAsync("UserScopeInvalidated", evt);
     }
+
+    public async Task PublishMaintenanceRequestUpdatedAsync(MaintenanceRequestUpdatedEvent evt, IEnumerable<int> targetUserIds)
+    {
+        // 1. Send to all ADMIN connections
+        await _hubContext.Clients.Group("role:ADMIN").SendAsync("MaintenanceRequestUpdated", evt);
+
+        // 2. Send to targeted user groups (scoped managers, request owner, assigned technician, previous technician)
+        var distinctUserIds = targetUserIds.Distinct().Where(id => id > 0).ToList();
+        foreach (var userId in distinctUserIds)
+        {
+            await _hubContext.Clients.Group($"user:{userId}").SendAsync("MaintenanceRequestUpdated", evt);
+        }
+    }
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { RealtimeContext } from './RealtimeContext'
-import type { NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
+import type { MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
 
 interface RealtimeProviderProps {
   user: any
@@ -16,6 +16,7 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
   // Event handlers stores
   const notificationHandlersRef = useRef<Set<(evt: NotificationCreatedEvent) => void>>(new Set())
   const scopeInvalidatedHandlersRef = useRef<Set<(evt: UserScopeInvalidatedEvent) => void>>(new Set())
+  const maintenanceHandlersRef = useRef<Set<(evt: MaintenanceRequestUpdatedEvent) => void>>(new Set())
   const reconnectedHandlersRef = useRef<Set<() => void>>(new Set())
 
   useEffect(() => {
@@ -91,6 +92,16 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
       }
     })
 
+    conn.on('MaintenanceRequestUpdated', (evt: MaintenanceRequestUpdatedEvent) => {
+      maintenanceHandlersRef.current.forEach((handler) => {
+        try {
+          handler(evt)
+        } catch (err) {
+          console.error('Error handling MaintenanceRequestUpdated event:', err)
+        }
+      })
+    })
+
     connectionRef.current = conn
     setConnectionState('connecting')
 
@@ -131,6 +142,13 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
     }
   }, [])
 
+  const onMaintenanceRequestUpdated = useCallback((handler: (evt: MaintenanceRequestUpdatedEvent) => void) => {
+    maintenanceHandlersRef.current.add(handler)
+    return () => {
+      maintenanceHandlersRef.current.delete(handler)
+    }
+  }, [])
+
   const onReconnected = useCallback((handler: () => void) => {
     reconnectedHandlersRef.current.add(handler)
     return () => {
@@ -160,6 +178,7 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
         connectionState,
         onNotificationCreated,
         onUserScopeInvalidated,
+        onMaintenanceRequestUpdated,
         onReconnected,
         reconnect,
       }}

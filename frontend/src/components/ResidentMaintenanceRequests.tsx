@@ -13,6 +13,8 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
+import type { MaintenanceRequestUpdatedEvent } from '../realtime/types'
 import type { MaintenanceRequestDetailDto, MaintenanceRequestListItemDto } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
@@ -171,6 +173,31 @@ export function ResidentMaintenanceRequests() {
   useEffect(() => {
     void loadRequests()
   }, [loadRequests])
+
+  // Real-Time Maintenance Listener & Reconnect Re-sync
+  const isDetailOpenRef = useRef<boolean>(false)
+  useEffect(() => {
+    isDetailOpenRef.current = isDetailOpen
+  }, [isDetailOpen])
+
+  const selectedRequestIdRef = useRef<number | null>(null)
+  useEffect(() => {
+    selectedRequestIdRef.current = selectedRequest?.id || null
+  }, [selectedRequest])
+
+  const handleRealtimeUpdate = useCallback(
+    (evt: MaintenanceRequestUpdatedEvent) => {
+      void loadRequests()
+      if (isDetailOpenRef.current && selectedRequestIdRef.current === evt.requestId) {
+        getResidentMaintenanceRequest(evt.requestId)
+          .then((fresh) => setSelectedRequest(fresh))
+          .catch((err) => console.error('Error refreshing resident detail on realtime event:', err))
+      }
+    },
+    [loadRequests]
+  )
+
+  useRealtimeMaintenance(handleRealtimeUpdate, () => { void loadRequests() })
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
