@@ -13,6 +13,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
     private readonly IManagerScopeService _managerScopeService;
     private readonly INotificationService _notificationService;
     private readonly IRequestFileStorageService _fileStorageService;
+    private readonly IRealtimePublisher _realtimePublisher;
 
     private static readonly HashSet<string> AllowedCategories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -33,12 +34,14 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         AppDbContext context,
         IManagerScopeService managerScopeService,
         INotificationService notificationService,
-        IRequestFileStorageService fileStorageService)
+        IRequestFileStorageService fileStorageService,
+        IRealtimePublisher realtimePublisher)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _notificationService = notificationService;
         _fileStorageService = fileStorageService;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<MaintenanceRequestDetailDto> CreateRequestAsync(MaintenanceRequestCreateDto dto, int residentUserId)
@@ -107,6 +110,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
             _context.MaintenanceRequestHistories.Add(history);
 
             // Notify scoped managers
+            List<Notification> createdNotifications = new();
             var propertyManagers = await _context.ManagerAssignments
                 .AsNoTracking()
                 .Where(ma => ma.IsActive &&
@@ -122,7 +126,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
                 var notificationTitle = $"Yeni Talep: #{request.RequestNumber}";
                 var notificationMessage = $"{request.Title} ({request.Category})";
 
-                await _notificationService.AddNotificationEntitiesForUsersAsync(
+                createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                     propertyManagers,
                     notificationTitle,
                     notificationMessage,
@@ -134,6 +138,12 @@ public class MaintenanceRequestService : IMaintenanceRequestService
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            if (createdNotifications.Count > 0)
+            {
+                var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+                await _realtimePublisher.PublishNotificationsAsync(dtos);
+            }
 
             var created = await FetchRequestDetailByIdAsync(request.Id);
             return ToDetailDto(created!);
@@ -583,7 +593,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         _context.MaintenanceRequestHistories.Add(history);
 
         // Notify technician
-        await _notificationService.AddNotificationEntitiesForUsersAsync(
+        var createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
             new[] { assignedToUserId },
             $"Size Yeni Talep Atandı: #{request.RequestNumber}",
             $"{request.Title} ({request.Category})",
@@ -593,6 +603,12 @@ public class MaintenanceRequestService : IMaintenanceRequestService
             "REQUEST_ASSIGNED");
 
         await _context.SaveChangesAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
 
         var updated = await FetchRequestDetailByIdAsync(requestId);
         return ToDetailDto(updated!);
@@ -740,12 +756,13 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         _context.MaintenanceRequestHistories.Add(history);
 
         // Notify creator resident
+        List<Notification> createdNotifications = new();
         if (request.CreatedByUserId != userId)
         {
             var notificationTitle = $"Talep Durumu Güncellendi: #{request.RequestNumber}";
             var notificationMessage = $"Talebap durumunuz '{targetStatus}' olarak güncellendi.";
 
-            await _notificationService.AddNotificationEntitiesForUsersAsync(
+            createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                 new[] { request.CreatedByUserId },
                 notificationTitle,
                 notificationMessage,
@@ -756,6 +773,12 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         }
 
         await _context.SaveChangesAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
 
         var updated = await FetchRequestDetailByIdAsync(requestId);
         return ToDetailDto(updated!);

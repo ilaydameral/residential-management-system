@@ -52,6 +52,7 @@ import { ManagementShell } from './components/nav/ManagementShell'
 import type { GlobalSearchItem } from './types'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { NotificationCenter } from './components/NotificationCenter'
+import { RealtimeProvider } from './realtime/RealtimeProvider'
 import { OccupancyManagement } from './components/OccupancyManagement'
 import { ResidentPortal } from './components/ResidentPortal'
 import { TechnicalStaffPortal } from './components/TechnicalStaffPortal'
@@ -1765,7 +1766,8 @@ function App() {
 
   if (isManagementPanel) {
     return (
-      <ManagementShell
+      <RealtimeProvider user={user}>
+        <ManagementShell
         user={user}
         userRoles={user?.roles || []}
         activeView={activeManagementView}
@@ -3201,7 +3203,6 @@ function App() {
                           {selectedOccupancyUnit?.id === u.id ? 'Sakinler Açık' : 'Sakinleri Yönet'}
                         </button>
                       )}
-
                       {showUnitManagementActions && canDeleteUnit && (
                         <button className="action-button danger-btn" onClick={() => handleDeleteUnitClick(u.id)}>
                           Sil
@@ -3230,100 +3231,106 @@ function App() {
           )}
         </section>
       )}
-          </main>
-        </div>
 
-        {destructiveConfirmation && (
-        <ConfirmationDialog
-          title={destructiveConfirmation.title}
-          message={destructiveConfirmation.message}
-          confirmLabel={destructiveConfirmation.confirmLabel}
-          danger
-          isLoading={isDestructiveActionRunning}
-          onCancel={() => setDestructiveConfirmation(null)}
-          onConfirm={() => { void confirmDestructiveAction() }}
-        />
-      )}
-      {isLogoutDialogOpen && !destructiveConfirmation && (
-        <ConfirmationDialog
-          title="Çıkış Yap"
-          message={hasUnsavedChanges
-            ? 'Kaydedilmemiş değişiklikleriniz var. Çıkış yaparsanız bu değişiklikler kaybolacak.'
-            : 'Çıkış yapmak istediğinizden emin misiniz?'}
-          confirmLabel="Çıkış Yap"
-          danger
-          onCancel={() => setIsLogoutDialogOpen(false)}
-          onConfirm={confirmLogout}
-        />
-      )}
-        {unsavedChangesDialog}
-      </ManagementShell>
+        {hasRole('RESIDENT') && <ResidentPortal />}
+        {hasRole('TECHNICAL_STAFF') && <TechnicalStaffPortal />}
+            </main>
+          </div>
+
+          {destructiveConfirmation && (
+            <ConfirmationDialog
+              title={destructiveConfirmation.title}
+              message={destructiveConfirmation.message}
+              confirmLabel={destructiveConfirmation.confirmLabel}
+              danger
+              isLoading={isDestructiveActionRunning}
+              onCancel={() => setDestructiveConfirmation(null)}
+              onConfirm={() => { void confirmDestructiveAction() }}
+            />
+          )}
+          {isLogoutDialogOpen && !destructiveConfirmation && (
+            <ConfirmationDialog
+              title="Çıkış Yap"
+              message={hasUnsavedChanges
+                ? 'Kaydedilmemiş değişiklikleriniz var. Çıkış yaparsanız bu değişiklikler kaybolacak.'
+                : 'Çıkış yapmak istediğinizden emin misiniz?'}
+              confirmLabel="Çıkış Yap"
+              danger
+              onCancel={() => setIsLogoutDialogOpen(false)}
+              onConfirm={confirmLogout}
+            />
+          )}
+          {unsavedChangesDialog}
+        </ManagementShell>
+      </RealtimeProvider>
     )
   }
 
   return (
-    <div>
-      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
-      <div className="auth-bar">
-        <div className="user-info">
-          <span className="user-name">
-            {user?.firstName} {user?.lastName}
-          </span>
-          {user?.roles?.map((role) => (
-            <span key={role} className={`role-badge ${role.toLowerCase()}`}>
-              {ROLE_LABEL_MAP[role] || role}
+    <RealtimeProvider user={user}>
+      <div>
+        <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
+        <div className="auth-bar">
+          <div className="user-info">
+            <span className="user-name">
+              {user?.firstName} {user?.lastName}
             </span>
-          ))}
+            {user?.roles?.map((role) => (
+              <span key={role} className={`role-badge ${role.toLowerCase()}`}>
+                {ROLE_LABEL_MAP[role] || role}
+              </span>
+            ))}
+          </div>
+          <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
+          <ThemeToggle />
+          <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
+          <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
+          <HeaderLogoutButton onActivate={handleLogout} />
         </div>
-        <NotificationCenter onNavigateToView={(view) => handleNavigationItemClick(view as ManagementView)} />
-        <ThemeToggle />
-        <HeaderAccountButton onActivate={() => handleNavigationItemClick('account')} />
-        <HeaderSettingsButton onActivate={() => handleNavigationItemClick('settings')} />
-        <HeaderLogoutButton onActivate={handleLogout} />
+
+        <main id="main-content" ref={mainContentRef} tabIndex={-1} className="page-shell">
+          {activeManagementView !== 'account' && (
+            <header className="page-header">
+              <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
+              <h1>{isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
+              <p className="page-description">
+                {isStandaloneSettingsView
+                  ? 'Görünüm ve hesap tercihlerinizi yönetin.'
+                  : 'Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.'}
+              </p>
+            </header>
+          )}
+
+          {hasRole('RESIDENT') && <ResidentPortal />}
+          {hasRole('TECHNICAL_STAFF') && <TechnicalStaffPortal />}
+
+          {destructiveConfirmation && (
+            <ConfirmationDialog
+              title={destructiveConfirmation.title}
+              message={destructiveConfirmation.message}
+              confirmLabel={destructiveConfirmation.confirmLabel}
+              danger
+              isLoading={isDestructiveActionRunning}
+              onCancel={() => setDestructiveConfirmation(null)}
+              onConfirm={() => { void confirmDestructiveAction() }}
+            />
+          )}
+          {isLogoutDialogOpen && !destructiveConfirmation && (
+            <ConfirmationDialog
+              title="Çıkış Yap"
+              message={hasUnsavedChanges
+                ? 'Kaydedilmemiş değişiklikleriniz var. Çıkış yaparsanız bu değişiklikler kaybolacak.'
+                : 'Çıkış yapmak istediğinizden emin misiniz?'}
+              confirmLabel="Çıkış Yap"
+              danger
+              onCancel={() => setIsLogoutDialogOpen(false)}
+              onConfirm={confirmLogout}
+            />
+          )}
+          {unsavedChangesDialog}
+        </main>
       </div>
-
-      <main id="main-content" ref={mainContentRef} tabIndex={-1} className="page-shell">
-        {activeManagementView !== 'account' && (
-          <header className="page-header">
-            <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
-            <h1>{isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
-            <p className="page-description">
-              {isStandaloneSettingsView
-                ? 'Görünüm ve hesap tercihlerinizi yönetin.'
-                : 'Gayrimenkul, bina/blok ve bağımsız bölüm hiyerarşisini rolünüze uygun yetkilerle yönetin.'}
-            </p>
-          </header>
-        )}
-
-        {hasRole('RESIDENT') && <ResidentPortal />}
-        {hasRole('TECHNICAL_STAFF') && <TechnicalStaffPortal />}
-
-        {destructiveConfirmation && (
-          <ConfirmationDialog
-            title={destructiveConfirmation.title}
-            message={destructiveConfirmation.message}
-            confirmLabel={destructiveConfirmation.confirmLabel}
-            danger
-            isLoading={isDestructiveActionRunning}
-            onCancel={() => setDestructiveConfirmation(null)}
-            onConfirm={() => { void confirmDestructiveAction() }}
-          />
-        )}
-        {isLogoutDialogOpen && !destructiveConfirmation && (
-          <ConfirmationDialog
-            title="Çıkış Yap"
-            message={hasUnsavedChanges
-              ? 'Kaydedilmemiş değişiklikleriniz var. Çıkış yaparsanız bu değişiklikler kaybolacak.'
-              : 'Çıkış yapmak istediğinizden emin misiniz?'}
-            confirmLabel="Çıkış Yap"
-            danger
-            onCancel={() => setIsLogoutDialogOpen(false)}
-            onConfirm={confirmLogout}
-          />
-        )}
-        {unsavedChangesDialog}
-      </main>
-    </div>
+    </RealtimeProvider>
   )
 }
 

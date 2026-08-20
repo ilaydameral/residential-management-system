@@ -112,7 +112,7 @@ public class NotificationService : INotificationService
         return ToDto(notification);
     }
 
-    public async Task AddNotificationEntitiesForUsersAsync(
+    public async Task<List<Notification>> AddNotificationEntitiesForUsersAsync(
         IEnumerable<int> userIds,
         string title,
         string message,
@@ -121,10 +121,11 @@ public class NotificationService : INotificationService
         int? relatedEntityId = null,
         string? eventKey = null)
     {
+        var addedList = new List<Notification>();
         var distinctUserIds = userIds.Distinct().ToList();
         if (distinctUserIds.Count == 0)
         {
-            return;
+            return addedList;
         }
 
         var utcNow = DateTime.UtcNow;
@@ -171,10 +172,13 @@ public class NotificationService : INotificationService
             };
 
             _context.Notifications.Add(notification);
+            addedList.Add(notification);
         }
+
+        return addedList;
     }
 
-    private static NotificationDto ToDto(Notification n)
+    public NotificationDto ToDto(Notification n)
     {
         return new NotificationDto
         {

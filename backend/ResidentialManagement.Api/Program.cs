@@ -69,6 +69,9 @@ builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 builder.Services.AddScoped<IRequestFileStorageService, RequestFileStorageService>();
 builder.Services.AddScoped<IMaintenanceRequestService, MaintenanceRequestService>();
 builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
+builder.Services.AddScoped<IRealtimePublisher, RealtimePublisher>();
+
+builder.Services.AddSignalR();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -95,6 +98,19 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtSettings["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
         ClockSkew = TimeSpan.Zero
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -135,6 +151,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ResidentialManagement.Api.Hubs.RealtimeHub>("/hubs/realtime");
 
 // Execute Development Bootstrap Admin / Test Users Initializer
 using (var scope = app.Services.CreateScope())

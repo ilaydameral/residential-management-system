@@ -11,6 +11,7 @@ public class AnnouncementService : IAnnouncementService
     private readonly AppDbContext _context;
     private readonly IManagerScopeService _managerScopeService;
     private readonly INotificationService _notificationService;
+    private readonly IRealtimePublisher _realtimePublisher;
 
     private static readonly HashSet<string> AllowedPriorities = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -22,11 +23,13 @@ public class AnnouncementService : IAnnouncementService
     public AnnouncementService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IRealtimePublisher realtimePublisher)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _notificationService = notificationService;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<AnnouncementListResponseDto> GetManagementAnnouncementsAsync(
@@ -289,6 +292,7 @@ public class AnnouncementService : IAnnouncementService
             }
 
             // Stage notifications if target residents exist
+            List<Notification> createdNotifications = new();
             if (targetResidentUserIds.Count > 0)
             {
                 var notificationTitle = $"Yeni Duyuru: {announcement.Title}";
@@ -296,7 +300,7 @@ public class AnnouncementService : IAnnouncementService
                     ? $"{announcement.Content[..147]}..."
                     : announcement.Content;
 
-                await _notificationService.AddNotificationEntitiesForUsersAsync(
+                createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
                     targetResidentUserIds,
                     notificationTitle,
                     notificationMessage,
@@ -308,6 +312,12 @@ public class AnnouncementService : IAnnouncementService
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            if (createdNotifications.Count > 0)
+            {
+                var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+                await _realtimePublisher.PublishNotificationsAsync(dtos);
+            }
 
             return ToDetailDto(announcement);
         });

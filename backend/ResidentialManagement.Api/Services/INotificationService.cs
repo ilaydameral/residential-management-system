@@ -12,7 +12,7 @@ public interface INotificationService
     Task<NotificationDto?> DismissAsync(int id, int userId);
 
     // Operational helper method for transactional event triggers (does NOT call SaveChanges/BeginTransaction)
-    Task AddNotificationEntitiesForUsersAsync(
+    Task<List<Entities.Notification>> AddNotificationEntitiesForUsersAsync(
         IEnumerable<int> userIds,
         string title,
         string message,
@@ -20,4 +20,6 @@ public interface INotificationService
         string? relatedEntityName = null,
         int? relatedEntityId = null,
         string? eventKey = null);
+
+    NotificationDto ToDto(Entities.Notification notification);
 }

@@ -13,17 +13,20 @@ public class PaymentSubmissionService : IPaymentSubmissionService
     private readonly IManagerScopeService _managerScopeService;
     private readonly IReceiptStorageService _receiptStorageService;
     private readonly INotificationService _notificationService;
+    private readonly IRealtimePublisher _realtimePublisher;
 
     public PaymentSubmissionService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
         IReceiptStorageService receiptStorageService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IRealtimePublisher realtimePublisher)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _receiptStorageService = receiptStorageService;
         _notificationService = notificationService;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<List<ResidentUnitChargeDto>> GetMyUnitChargesAsync(int residentUserId)
@@ -340,7 +343,7 @@ public class PaymentSubmissionService : IPaymentSubmissionService
         submission.ReviewedAt = utcNow;
         submission.UpdatedAt = utcNow;
 
-        await _notificationService.AddNotificationEntitiesForUsersAsync(
+        var createdNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
             new[] { submission.SubmittedByUserId },
             "Ödeme Dekontunuz Onaylandı",
             $"{submission.Amount:N2} TL tutarındaki ödeme dekontu başvurunuz onaylanmıştır.",
@@ -350,6 +353,12 @@ public class PaymentSubmissionService : IPaymentSubmissionService
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        if (createdNotifications.Count > 0)
+        {
+            var dtos = createdNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
 
         return await GetManagementSubmissionByIdAsync(submission.Id, reviewerUserId, isAdmin)
             ?? throw new InvalidOperationException("Başvuru onaylandı ancak detayları alınamadı.");
@@ -389,7 +398,7 @@ public class PaymentSubmissionService : IPaymentSubmissionService
         submission.RejectionReason = dto.RejectionReason.Trim();
         submission.UpdatedAt = utcNow;
 
-        await _notificationService.AddNotificationEntitiesForUsersAsync(
+        var rejectedNotifications = await _notificationService.AddNotificationEntitiesForUsersAsync(
             new[] { submission.SubmittedByUserId },
             "Ödeme Dekontunuz Reddedildi",
             $"{submission.Amount:N2} TL tutarındaki ödeme dekontu başvurunuz reddedilmiştir. Gerekçe: {submission.RejectionReason}",
@@ -398,6 +407,12 @@ public class PaymentSubmissionService : IPaymentSubmissionService
             submission.Id);
 
         await _context.SaveChangesAsync();
+
+        if (rejectedNotifications.Count > 0)
+        {
+            var dtos = rejectedNotifications.Select(n => _notificationService.ToDto(n)).ToList();
+            await _realtimePublisher.PublishNotificationsAsync(dtos);
+        }
 
         return await GetManagementSubmissionByIdAsync(submission.Id, reviewerUserId, isAdmin)
             ?? throw new InvalidOperationException("Başvuru reddedildi ancak detayları alınamadı.");
