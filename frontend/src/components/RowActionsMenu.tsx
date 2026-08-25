@@ -39,11 +39,15 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
     const trigger = triggerRef.current
     if (!trigger) return
     const rect = trigger.getBoundingClientRect()
-    const estimatedHeight = secondaryActions.length * 40 + 12
+    const estimatedHeight = secondaryActions.length * 36 + 12
     const openAbove = window.innerHeight - rect.bottom < estimatedHeight + 12
-    setMenuStyle(openAbove
-      ? { right: window.innerWidth - rect.right, bottom: window.innerHeight - rect.top + 6 }
-      : { right: window.innerWidth - rect.right, top: rect.bottom + 6 })
+    const rightOffset = Math.max(8, window.innerWidth - rect.right)
+
+    setMenuStyle(
+      openAbove
+        ? { right: rightOffset, bottom: window.innerHeight - rect.top + 4 }
+        : { right: rightOffset, top: rect.bottom + 4 }
+    )
     initialMenuFocusRef.current = initialFocus
     setIsOpen(true)
   }

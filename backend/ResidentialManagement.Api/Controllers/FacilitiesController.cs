@@ -10,7 +10,7 @@ namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/facilities")]
-[Authorize(Roles = AppRoles.AdminOrManager)]
+[Authorize]
 public class FacilitiesController : ControllerBase
 {
     private readonly IFacilityService _facilityService;
@@ -43,6 +43,7 @@ public class FacilitiesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<CommonFacilityDto>> Create([FromBody] CreateCommonFacilityDto dto)
     {
         var userId = GetCurrentUserId();
@@ -52,6 +53,7 @@ public class FacilitiesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<CommonFacilityDto>> Update(int id, [FromBody] UpdateCommonFacilityDto dto)
     {
         var userId = GetCurrentUserId();
@@ -61,6 +63,7 @@ public class FacilitiesController : ControllerBase
     }
 
     [HttpPut("{id}/status")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<CommonFacilityDto>> SetStatus(int id, [FromQuery] bool isActive)
     {
         var userId = GetCurrentUserId();
@@ -79,6 +82,7 @@ public class FacilitiesController : ControllerBase
     }
 
     [HttpPost("{facilityId}/maintenance-blocks")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<FacilityMaintenanceBlockDto>> CreateMaintenanceBlock(int facilityId, [FromBody] CreateMaintenanceBlockDto dto)
     {
         var userId = GetCurrentUserId();
@@ -88,6 +92,7 @@ public class FacilitiesController : ControllerBase
     }
 
     [HttpDelete("maintenance-blocks/{blockId}")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<IActionResult> DeleteMaintenanceBlock(int blockId)
     {
         var userId = GetCurrentUserId();

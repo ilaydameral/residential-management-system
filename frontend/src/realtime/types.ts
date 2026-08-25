@@ -43,4 +43,24 @@ export interface ActivityFeedItemDto {
   routeParams?: string
 }
 
+export interface PagedActivityFeedDto {
+  items: ActivityFeedItemDto[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+export interface FacilityReservationUpdatedEvent {
+  reservationId: number
+  facilityId: number
+  status: string
+  updatedAt: string
+}
+
+export interface FacilityAvailabilityInvalidatedEvent {
+  facilityId: number
+  date: string
+}
+
 export type RealtimeConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { RealtimeContext } from './RealtimeContext'
-import type { ActivityFeedInvalidatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
+import type { ActivityFeedInvalidatedEvent, FacilityAvailabilityInvalidatedEvent, FacilityReservationUpdatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
 
 interface RealtimeProviderProps {
   user: any
@@ -18,6 +18,8 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
   const scopeInvalidatedHandlersRef = useRef<Set<(evt: UserScopeInvalidatedEvent) => void>>(new Set())
   const maintenanceHandlersRef = useRef<Set<(evt: MaintenanceRequestUpdatedEvent) => void>>(new Set())
   const activityFeedHandlersRef = useRef<Set<(evt: ActivityFeedInvalidatedEvent) => void>>(new Set())
+  const facilityReservationHandlersRef = useRef<Set<(evt: FacilityReservationUpdatedEvent) => void>>(new Set())
+  const facilityAvailabilityHandlersRef = useRef<Set<(evt: FacilityAvailabilityInvalidatedEvent) => void>>(new Set())
   const reconnectedHandlersRef = useRef<Set<() => void>>(new Set())
 
   useEffect(() => {
@@ -87,7 +89,6 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
           console.error('Error handling UserScopeInvalidated event:', err)
         }
       })
-      // Perform automatic reconnection on scope invalidation to recompute hub groups
       if (conn.state === HubConnectionState.Connected) {
         void conn.stop().then(() => conn.start())
       }
@@ -109,6 +110,26 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
           handler(evt)
         } catch (err) {
           console.error('Error handling ActivityFeedInvalidated event:', err)
+        }
+      })
+    })
+
+    conn.on('FacilityReservationUpdated', (evt: FacilityReservationUpdatedEvent) => {
+      facilityReservationHandlersRef.current.forEach((handler) => {
+        try {
+          handler(evt)
+        } catch (err) {
+          console.error('Error handling FacilityReservationUpdated event:', err)
+        }
+      })
+    })
+
+    conn.on('FacilityAvailabilityInvalidated', (evt: FacilityAvailabilityInvalidatedEvent) => {
+      facilityAvailabilityHandlersRef.current.forEach((handler) => {
+        try {
+          handler(evt)
+        } catch (err) {
+          console.error('Error handling FacilityAvailabilityInvalidated event:', err)
         }
       })
     })
@@ -167,6 +188,20 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
     }
   }, [])
 
+  const onFacilityReservationUpdated = useCallback((handler: (evt: FacilityReservationUpdatedEvent) => void) => {
+    facilityReservationHandlersRef.current.add(handler)
+    return () => {
+      facilityReservationHandlersRef.current.delete(handler)
+    }
+  }, [])
+
+  const onFacilityAvailabilityInvalidated = useCallback((handler: (evt: FacilityAvailabilityInvalidatedEvent) => void) => {
+    facilityAvailabilityHandlersRef.current.add(handler)
+    return () => {
+      facilityAvailabilityHandlersRef.current.delete(handler)
+    }
+  }, [])
+
   const onReconnected = useCallback((handler: () => void) => {
     reconnectedHandlersRef.current.add(handler)
     return () => {
@@ -198,6 +233,8 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
         onUserScopeInvalidated,
         onMaintenanceRequestUpdated,
         onActivityFeedInvalidated,
+        onFacilityReservationUpdated,
+        onFacilityAvailabilityInvalidated,
         onReconnected,
         reconnect,
       }}

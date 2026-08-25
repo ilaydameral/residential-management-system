@@ -44,6 +44,7 @@ import { PaymentSubmissionsManagement } from './components/PaymentSubmissionsMan
 import { DataImportManagement } from './components/DataImportManagement'
 import { AnnouncementManagement } from './components/AnnouncementManagement'
 import { MaintenanceRequestManagement } from './components/MaintenanceRequestManagement'
+import { ManagementFacilities } from './components/ManagementFacilities'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -151,6 +152,7 @@ export type ManagementView =
   | 'dataImport'
   | 'announcements'
   | 'maintenanceRequests'
+  | 'facilities'
   | 'account'
   | 'settings'
 
@@ -177,6 +179,7 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'expenses', label: 'Giderler & Borçlandırma' },
   { id: 'paymentSubmissions', label: 'Ödeme Dekont Onayları' },
   { id: 'dataImport', label: 'Veri Aktarımı' },
+  { id: 'facilities', label: 'Ortak Alanlar' },
   { id: 'announcements', label: 'Duyurular' },
   { id: 'maintenanceRequests', label: 'Talepler' },
   { id: 'account', label: 'Hesabım' },
@@ -199,6 +202,7 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   expenses: '/management/finance/expenses',
   paymentSubmissions: '/management/finance/payment-submissions',
   dataImport: '/management/import',
+  facilities: '/management/facilities',
   announcements: '/management/announcements',
   maintenanceRequests: '/management/maintenance-requests',
   account: '/account',
@@ -627,6 +631,8 @@ function App() {
         location.pathname === '/resident/my-units' ||
         Boolean(matchPath('/resident/my-units/:unitId', location.pathname)) ||
         location.pathname === '/resident/finance' ||
+        location.pathname === '/resident/facilities' ||
+        location.pathname.startsWith('/resident/facilities') ||
         location.pathname === '/resident/announcements' ||
         location.pathname === '/resident/requests' ||
         location.pathname === '/resident/maintenance-requests' ||
@@ -1000,11 +1006,19 @@ function App() {
   }
 
   if (isResidentView) {
-    return <ResidentPortal />
+    return (
+      <RealtimeProvider user={user}>
+        <ResidentPortal />
+      </RealtimeProvider>
+    )
   }
 
   if (isTechnicalStaffView) {
-    return <TechnicalStaffPortal />
+    return (
+      <RealtimeProvider user={user}>
+        <TechnicalStaffPortal />
+      </RealtimeProvider>
+    )
   }
 
   // ==========================================
@@ -1763,8 +1777,10 @@ function App() {
                           ? 'Sakinlerden gelen ödeme dekontlarını inceleyin, onaylayın veya reddedin.'
                           : activeManagementView === 'dataImport'
                             ? 'CSV ve XLSX dosyaları üzerinden toplu veri aktarımı yapın.'
-                            : activeManagementView === 'announcements'
-                              ? 'Sakinlere yönelik site ve blok duyurularını oluşturun ve yönetin.'
+                            : activeManagementView === 'facilities'
+                              ? 'Ortak alan tesislerini, rezervasyonlarını ve bakım zamanlarını yönetin.'
+                              : activeManagementView === 'announcements'
+                                ? 'Sakinlere yönelik site ve blok duyurularını oluşturun ve yönetin.'
                               : activeManagementView === 'maintenanceRequests'
                                 ? 'Sakinlerden gelen bakım taleplerini yönetin ve operasyon sürecini takip edin.'
                                 : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
@@ -1910,6 +1926,10 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'announcements' && (
         <AnnouncementManagement />
+      )}
+
+      {isManagementPanel && activeManagementView === 'facilities' && (
+        <ManagementFacilities />
       )}
 
       {isManagementPanel && activeManagementView === 'maintenanceRequests' && (

@@ -925,3 +925,132 @@ export interface GlobalSearchResponse {
   maintenanceRequests: GlobalSearchItem[]
   announcements: GlobalSearchItem[]
 }
+
+// ============================================================================
+// Phase 12: Common Area Reservations DTOs
+// ============================================================================
+
+export interface CommonFacility {
+  id: number
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  name: string
+  description: string | null
+  locationHint: string | null
+  capacity: number
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  requiresManagerApproval: boolean
+  maxActiveReservationsPerResident: number
+  cancellationLeadTimeHours: number
+  isActive: boolean
+  createdAt: string
+}
+
+export interface CreateCommonFacilityPayload {
+  propertyId: number
+  buildingId?: number | null
+  name: string
+  description?: string
+  locationHint?: string
+  capacity: number
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  requiresManagerApproval: boolean
+  maxActiveReservationsPerResident: number
+  cancellationLeadTimeHours: number
+}
+
+export interface UpdateCommonFacilityPayload {
+  name: string
+  description?: string
+  locationHint?: string
+  capacity: number
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  requiresManagerApproval: boolean
+  maxActiveReservationsPerResident: number
+  cancellationLeadTimeHours: number
+}
+
+export interface FacilityReservation {
+  id: number
+  facilityId: number
+  facilityName: string
+  residentUserId: number
+  residentName: string
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  startTime: string
+  endTime: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'
+  note?: string | null
+  reviewedByName?: string | null
+  reviewedAt?: string | null
+  rejectionReason?: string | null
+  createdAt: string
+}
+
+export interface CreateReservationPayload {
+  facilityId: number
+  unitId: number
+  startTime: string
+  endTime: string
+  note?: string
+}
+
+export interface ReviewReservationPayload {
+  rejectionReason?: string
+}
+
+export interface FacilityMaintenanceBlock {
+  id: number
+  facilityId: number
+  facilityName: string
+  startTime: string
+  endTime: string
+  reason: string
+  createdByName: string
+  createdAt: string
+}
+
+export interface CreateMaintenanceBlockPayload {
+  startTime: string
+  endTime: string
+  reason: string
+}
+
+export interface TimeSlot {
+  startTime: string
+  endTime: string
+  status: 'AVAILABLE' | 'BOOKED' | 'BLOCKED' | 'PAST'
+  reason?: string | null
+}
+
+export interface FacilityAvailability {
+  facilityId: number
+  facilityName: string
+  date: string
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  slots: TimeSlot[]
+}
+
+export interface FacilityReservationUpdatedEvent {
+  reservationId: number
+  facilityId: number
+  status: string
+  updatedAt: string
+}
+
+export interface FacilityAvailabilityInvalidatedEvent {
+  facilityId: number
+  date: string
+}

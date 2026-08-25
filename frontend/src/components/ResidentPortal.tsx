@@ -13,6 +13,7 @@ import { HeaderLogoutButton } from './HeaderLogoutButton'
 import { HeaderSettingsButton } from './HeaderSettingsButton'
 import { NotificationCenter } from './NotificationCenter'
 import { ResidentAnnouncements } from './ResidentAnnouncements'
+import { ResidentFacilities } from './ResidentFacilities'
 import { ResidentFinance } from './ResidentFinance'
 import { ResidentHome } from './ResidentHome'
 import { ResidentMaintenanceRequests } from './ResidentMaintenanceRequests'
@@ -25,6 +26,7 @@ const RESIDENT_NAVIGATION = [
   { path: '/resident/home', label: 'Ana Sayfa' },
   { path: '/resident/my-units', label: 'Dairelerim' },
   { path: '/resident/finance', label: 'Finans' },
+  { path: '/resident/facilities', label: 'Ortak Alanlar' },
   { path: '/resident/announcements', label: 'Duyurular' },
   { path: '/resident/requests', label: 'Taleplerim' },
 ]
@@ -85,6 +87,7 @@ export function ResidentPortal() {
 
   const isMyUnits = location.pathname === '/resident/my-units'
   const isFinance = location.pathname === '/resident/finance'
+  const isFacilities = location.pathname.startsWith('/resident/facilities')
   const isAnnouncements = location.pathname === '/resident/announcements'
   const isRequests = location.pathname === '/resident/requests' || location.pathname === '/resident/maintenance-requests'
   const isAccount = location.pathname === '/account' || location.pathname === '/resident/account'
@@ -143,6 +146,8 @@ export function ResidentPortal() {
           />
         ) : isFinance ? (
           <ResidentFinance />
+        ) : isFacilities ? (
+          <ResidentFacilities />
         ) : isAnnouncements ? (
           <ResidentAnnouncements />
         ) : isRequests ? (

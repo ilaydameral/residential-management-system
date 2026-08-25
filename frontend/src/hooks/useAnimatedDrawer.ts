@@ -16,7 +16,14 @@ export function useAnimatedDrawer(isOpen: boolean) {
   }, [])
 
   useEffect(() => {
-    if (!isOpen || phaseRef.current !== 'closed') return
+    if (!isOpen) return
+    if (phaseRef.current === 'open' || phaseRef.current === 'opening') return
+
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+
     updatePhase('opening')
     frameRef.current = window.requestAnimationFrame(() => updatePhase('open'))
   }, [isOpen, updatePhase])

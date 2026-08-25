@@ -76,9 +76,18 @@ import type {
   AnnouncementListResponseDto,
   CreateAnnouncementPayload,
   UpdateAnnouncementPayload,
-  MaintenanceRequestAttachmentDto,
   MaintenanceRequestDetailDto,
+  MaintenanceRequestAttachmentDto,
   MaintenanceRequestListResponseDto,
+  CommonFacility,
+  CreateCommonFacilityPayload,
+  UpdateCommonFacilityPayload,
+  FacilityReservation,
+  CreateReservationPayload,
+  ReviewReservationPayload,
+  FacilityMaintenanceBlock,
+  CreateMaintenanceBlockPayload,
+  FacilityAvailability,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -1429,4 +1438,161 @@ export async function globalSearch(query: string, limit = 5, signal?: AbortSigna
     }
   )
   return handleResponse<GlobalSearchResponse>(response)
+}
+
+// ============================================================================
+// Phase 12: Common Area Reservations API
+// ============================================================================
+
+export async function getFacilities(params?: {
+  propertyId?: number
+  buildingId?: number
+  isActive?: boolean
+}): Promise<CommonFacility[]> {
+  const query = new URLSearchParams()
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.isActive !== undefined) query.append('isActive', params.isActive.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility[]>(response)
+}
+
+export async function getFacility(id: number): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function createFacility(payload: CreateCommonFacilityPayload): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function updateFacility(id: number, payload: UpdateCommonFacilityPayload): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function setFacilityStatus(id: number, isActive: boolean): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${id}/status?isActive=${isActive}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function getMaintenanceBlocks(facilityId: number): Promise<FacilityMaintenanceBlock[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${facilityId}/maintenance-blocks`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityMaintenanceBlock[]>(response)
+}
+
+export async function createMaintenanceBlock(
+  facilityId: number,
+  payload: CreateMaintenanceBlockPayload
+): Promise<FacilityMaintenanceBlock> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${facilityId}/maintenance-blocks`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<FacilityMaintenanceBlock>(response)
+}
+
+export async function deleteMaintenanceBlock(blockId: number): Promise<void> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/maintenance-blocks/${blockId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    await handleResponse(response)
+  }
+}
+
+export async function getFacilityAvailability(facilityId: number, date: string): Promise<FacilityAvailability> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facilities/${facilityId}/availability?date=${date}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityAvailability>(response)
+}
+
+export async function createFacilityReservation(payload: CreateReservationPayload): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facility-reservations`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<FacilityReservation>(response)
+}
+
+export async function cancelFacilityReservation(id: number): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facility-reservations/${id}/cancel`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation>(response)
+}
+
+export async function getMyFacilityReservations(): Promise<FacilityReservation[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facility-reservations/my`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation[]>(response)
+}
+
+export async function getManagementFacilityReservations(params?: {
+  facilityId?: number
+  propertyId?: number
+  buildingId?: number
+  status?: string
+  dateFrom?: string
+  dateTo?: string
+}): Promise<FacilityReservation[]> {
+  const query = new URLSearchParams()
+  if (params?.facilityId) query.append('facilityId', params.facilityId.toString())
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.status) query.append('status', params.status)
+  if (params?.dateFrom) query.append('dateFrom', params.dateFrom)
+  if (params?.dateTo) query.append('dateTo', params.dateTo)
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/management/facility-reservations${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation[]>(response)
+}
+
+export async function approveFacilityReservation(id: number): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/management/facility-reservations/${id}/approve`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation>(response)
+}
+
+export async function rejectFacilityReservation(
+  id: number,
+  payload?: ReviewReservationPayload
+): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/management/facility-reservations/${id}/reject`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload || {}),
+  })
+  return handleResponse<FacilityReservation>(response)
 }
