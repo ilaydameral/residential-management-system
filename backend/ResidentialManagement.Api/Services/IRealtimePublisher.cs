@@ -13,4 +13,5 @@ public interface IRealtimePublisher
     Task PublishActivityFeedInvalidatedAsync(string category);
     Task PublishFacilityReservationUpdatedAsync(FacilityReservationUpdatedEvent evt, IEnumerable<int> targetUserIds);
     Task PublishFacilityAvailabilityInvalidatedAsync(int facilityId, string date);
+    Task PublishVisitorStatusChangedAsync(VisitorStatusChangedEvent evt, IEnumerable<int> targetUserIds);
 }
