@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './config'
-import type { ActivityFeedItemDto } from './realtime/types'
+import type { PagedActivityFeedDto } from './realtime/types'
 import type {
   ApiErrorResponse,
   GlobalSearchResponse,
@@ -513,11 +513,26 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   return handleResponse<DashboardSummary>(response)
 }
 
-export async function getActivityFeed(limit: number = 10): Promise<ActivityFeedItemDto[]> {
-  const response = await safeFetch(`${API_BASE_URL}/api/dashboard/activity-feed?limit=${limit}`, {
+export async function getActivityFeed(page: number = 1, pageSize: number = 6): Promise<PagedActivityFeedDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/dashboard/activity-feed?page=${page}&pageSize=${pageSize}`, {
     headers: getAuthHeaders(),
   })
-  return handleResponse<ActivityFeedItemDto[]>(response)
+  const data = await handleResponse<any>(response)
+
+  if (Array.isArray(data)) {
+    const totalCount = data.length
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+    const pagedItems = data.slice((page - 1) * pageSize, page * pageSize)
+    return {
+      items: pagedItems,
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+    }
+  }
+
+  return data as PagedActivityFeedDto
 }
 
 // Manager Assignments API

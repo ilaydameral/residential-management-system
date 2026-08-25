@@ -47,11 +47,19 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("activity-feed")]
-    public async Task<ActionResult<List<ActivityFeedItemDto>>> GetActivityFeed([FromQuery] int limit = 10)
+    public async Task<ActionResult<PagedActivityFeedDto>> GetActivityFeed(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 6,
+        [FromQuery] int? limit = null)
     {
+        if (limit.HasValue && limit.Value > 0)
+        {
+            pageSize = limit.Value;
+        }
+
         var userId = GetCurrentUserId();
         var isAdmin = User.IsInRole(AppRoles.Admin);
-        var result = await _dashboardService.GetActivityFeedAsync(limit, userId, isAdmin);
+        var result = await _dashboardService.GetActivityFeedPagedAsync(page, pageSize, userId, isAdmin);
         return Ok(result);
     }
 
