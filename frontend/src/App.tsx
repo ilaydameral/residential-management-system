@@ -45,6 +45,8 @@ import { DataImportManagement } from './components/DataImportManagement'
 import { AnnouncementManagement } from './components/AnnouncementManagement'
 import { MaintenanceRequestManagement } from './components/MaintenanceRequestManagement'
 import { ManagementFacilities } from './components/ManagementFacilities'
+import { ManagementVisitors } from './components/ManagementVisitors'
+import { ManagementVehicles } from './components/ManagementVehicles'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -153,6 +155,8 @@ export type ManagementView =
   | 'announcements'
   | 'maintenanceRequests'
   | 'facilities'
+  | 'visitors'
+  | 'vehicles'
   | 'account'
   | 'settings'
 
@@ -180,6 +184,8 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'paymentSubmissions', label: 'Ödeme Dekont Onayları' },
   { id: 'dataImport', label: 'Veri Aktarımı' },
   { id: 'facilities', label: 'Ortak Alanlar' },
+  { id: 'visitors', label: 'Ziyaretçiler' },
+  { id: 'vehicles', label: 'Araç Dizini' },
   { id: 'announcements', label: 'Duyurular' },
   { id: 'maintenanceRequests', label: 'Talepler' },
   { id: 'account', label: 'Hesabım' },
@@ -203,6 +209,8 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   paymentSubmissions: '/management/finance/payment-submissions',
   dataImport: '/management/import',
   facilities: '/management/facilities',
+  visitors: '/management/visitors',
+  vehicles: '/management/vehicles',
   announcements: '/management/announcements',
   maintenanceRequests: '/management/maintenance-requests',
   account: '/account',
@@ -633,6 +641,10 @@ function App() {
         location.pathname === '/resident/finance' ||
         location.pathname === '/resident/facilities' ||
         location.pathname.startsWith('/resident/facilities') ||
+        location.pathname === '/resident/visitors' ||
+        location.pathname.startsWith('/resident/visitors') ||
+        location.pathname === '/resident/vehicles' ||
+        location.pathname.startsWith('/resident/vehicles') ||
         location.pathname === '/resident/announcements' ||
         location.pathname === '/resident/requests' ||
         location.pathname === '/resident/maintenance-requests' ||
@@ -1930,6 +1942,14 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'facilities' && (
         <ManagementFacilities />
+      )}
+
+      {isManagementPanel && activeManagementView === 'visitors' && (
+        <ManagementVisitors />
+      )}
+
+      {isManagementPanel && activeManagementView === 'vehicles' && (
+        <ManagementVehicles />
       )}
 
       {isManagementPanel && activeManagementView === 'maintenanceRequests' && (

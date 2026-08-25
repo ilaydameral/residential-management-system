@@ -1054,3 +1054,103 @@ export interface FacilityAvailabilityInvalidatedEvent {
   facilityId: number
   date: string
 }
+
+// ============================================================================
+// Phase 12: Visitor & Resident Vehicle DTOs
+// ============================================================================
+
+export type VisitorType = 'GUEST' | 'SERVICE_PROVIDER' | 'DELIVERY' | 'COMMERCIAL'
+export type VisitorStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED' | 'EXPIRED'
+
+export interface CreateVisitorPayload {
+  unitId: number
+  visitorName: string
+  visitorPhone?: string
+  visitorType: VisitorType
+  vehiclePlate?: string
+  expectedArrival: string
+  expectedDeparture: string
+}
+
+export interface Visitor {
+  id: number
+  hostUserId: number
+  hostUserName: string
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  propertyName: string
+  propertyId: number
+  buildingId: number
+  visitorName: string
+  visitorPhone?: string | null
+  visitorType: VisitorType
+  vehiclePlate?: string | null
+  expectedArrival: string
+  expectedDeparture: string
+  accessCode: string
+  status: VisitorStatus
+  checkedInAt?: string | null
+  checkedInByUserName?: string | null
+  checkedOutAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PagedVisitorResult {
+  items: Visitor[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+export interface VisitorStatusChangedEvent {
+  visitorId: number
+  unitId: number
+  status: VisitorStatus
+  updatedAt: string
+}
+
+export type VehicleType = 'CAR' | 'MOTORCYCLE' | 'ELECTRIC_VEHICLE' | 'SUV' | 'OTHER'
+
+export interface CreateResidentVehiclePayload {
+  unitId: number
+  plateNumber: string
+  vehicleType: VehicleType
+  brandModel?: string
+  color?: string
+}
+
+export interface UpdateResidentVehiclePayload {
+  vehicleType: VehicleType
+  brandModel?: string
+  color?: string
+}
+
+export interface ResidentVehicle {
+  id: number
+  residentUserId: number
+  residentUserName: string
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  propertyName: string
+  propertyId: number
+  buildingId: number
+  plateNumber: string
+  vehicleType: VehicleType
+  brandModel?: string | null
+  color?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PagedResidentVehicleResult {
+  items: ResidentVehicle[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}

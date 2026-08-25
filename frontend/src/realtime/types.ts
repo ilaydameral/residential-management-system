@@ -49,6 +49,15 @@ export interface PagedActivityFeedDto {
   pageSize: number
   totalCount: number
   totalPages: number
+  hasPreviousPage?: boolean
+  hasNextPage?: boolean
+}
+
+export interface VisitorStatusChangedEvent {
+  visitorId: number
+  unitId: number
+  status: string
+  updatedAt: string
 }
 
 export interface FacilityReservationUpdatedEvent {

@@ -173,6 +173,8 @@ public class VisitorService : IVisitorService
     public async Task<VisitorDto> CancelVisitorAsync(int residentUserId, long visitorId)
     {
         var visitor = await _context.Visitors
+            .Include(v => v.Unit)
+                .ThenInclude(u => u.Building)
             .FirstOrDefaultAsync(v => v.Id == visitorId && v.HostUserId == residentUserId);
 
         if (visitor == null)
@@ -324,6 +326,7 @@ public class VisitorService : IVisitorService
     {
         var visitor = await _context.Visitors
             .Include(v => v.Unit)
+                .ThenInclude(u => u.Building)
             .FirstOrDefaultAsync(v => v.Id == visitorId);
 
         if (visitor == null)
@@ -389,6 +392,7 @@ public class VisitorService : IVisitorService
     {
         var visitor = await _context.Visitors
             .Include(v => v.Unit)
+                .ThenInclude(u => u.Building)
             .FirstOrDefaultAsync(v => v.Id == visitorId);
 
         if (visitor == null)

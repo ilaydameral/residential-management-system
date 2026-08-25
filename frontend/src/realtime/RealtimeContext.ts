@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 import type { HubConnection } from '@microsoft/signalr'
-import type { ActivityFeedInvalidatedEvent, FacilityAvailabilityInvalidatedEvent, FacilityReservationUpdatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
+import type { ActivityFeedInvalidatedEvent, FacilityAvailabilityInvalidatedEvent, FacilityReservationUpdatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent, VisitorStatusChangedEvent } from './types'
 
 export interface RealtimeContextType {
   connection: HubConnection | null
@@ -11,6 +11,7 @@ export interface RealtimeContextType {
   onActivityFeedInvalidated: (handler: (evt: ActivityFeedInvalidatedEvent) => void) => () => void
   onFacilityReservationUpdated: (handler: (evt: FacilityReservationUpdatedEvent) => void) => () => void
   onFacilityAvailabilityInvalidated: (handler: (evt: FacilityAvailabilityInvalidatedEvent) => void) => () => void
+  onVisitorStatusChanged: (handler: (evt: VisitorStatusChangedEvent) => void) => () => void
   onReconnected: (handler: () => void) => () => void
   reconnect: () => Promise<void>
 }

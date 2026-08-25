@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { RealtimeContext } from './RealtimeContext'
-import type { ActivityFeedInvalidatedEvent, FacilityAvailabilityInvalidatedEvent, FacilityReservationUpdatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent } from './types'
+import type { ActivityFeedInvalidatedEvent, FacilityAvailabilityInvalidatedEvent, FacilityReservationUpdatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent, VisitorStatusChangedEvent } from './types'
 
 interface RealtimeProviderProps {
   user: any
@@ -20,6 +20,7 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
   const activityFeedHandlersRef = useRef<Set<(evt: ActivityFeedInvalidatedEvent) => void>>(new Set())
   const facilityReservationHandlersRef = useRef<Set<(evt: FacilityReservationUpdatedEvent) => void>>(new Set())
   const facilityAvailabilityHandlersRef = useRef<Set<(evt: FacilityAvailabilityInvalidatedEvent) => void>>(new Set())
+  const visitorStatusHandlersRef = useRef<Set<(evt: VisitorStatusChangedEvent) => void>>(new Set())
   const reconnectedHandlersRef = useRef<Set<() => void>>(new Set())
 
   useEffect(() => {
@@ -134,6 +135,16 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
       })
     })
 
+    conn.on('VisitorStatusChanged', (evt: VisitorStatusChangedEvent) => {
+      visitorStatusHandlersRef.current.forEach((handler) => {
+        try {
+          handler(evt)
+        } catch (err) {
+          console.error('Error handling VisitorStatusChanged event:', err)
+        }
+      })
+    })
+
     connectionRef.current = conn
     setConnectionState('connecting')
 
@@ -202,6 +213,13 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
     }
   }, [])
 
+  const onVisitorStatusChanged = useCallback((handler: (evt: VisitorStatusChangedEvent) => void) => {
+    visitorStatusHandlersRef.current.add(handler)
+    return () => {
+      visitorStatusHandlersRef.current.delete(handler)
+    }
+  }, [])
+
   const onReconnected = useCallback((handler: () => void) => {
     reconnectedHandlersRef.current.add(handler)
     return () => {
@@ -235,6 +253,7 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
         onActivityFeedInvalidated,
         onFacilityReservationUpdated,
         onFacilityAvailabilityInvalidated,
+        onVisitorStatusChanged,
         onReconnected,
         reconnect,
       }}
