@@ -3160,27 +3160,31 @@ textarea:focus-visible,
 
 .row-actions-menu {
   position: fixed;
-  z-index: 75;
-  display: grid;
-  min-width: 178px;
-  gap: 4px;
-  padding: 6px;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  max-width: 160px;
+  gap: 2px;
+  padding: 4px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 11px;
+  border-radius: 8px;
   background: var(--color-surface-elevated);
-  box-shadow: 0 16px 36px var(--color-shadow);
+  box-shadow: 0 10px 28px var(--color-shadow);
 }
 
 .row-actions-menu button {
   width: 100%;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   padding: 6px 10px;
   color: var(--color-text-primary);
   background: transparent;
   text-align: left;
-  font-size: 0.78rem;
-  font-weight: 650;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .row-actions-menu button:hover:not(:disabled) {
@@ -7040,6 +7044,16 @@ textarea:focus-visible,
   color: var(--color-text-primary);
 }
 
+.shell-sidebar-area {
+  display: flex;
+  position: relative;
+  z-index: 105;
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
+  flex-shrink: 0;
+}
+
 /* 1. PRIMARY NAVIGATION RAIL (64px) */
 .nav-rail {
   width: 64px;
@@ -7077,9 +7091,9 @@ textarea:focus-visible,
 .nav-rail-categories {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 0 8px;
+  padding: 0 5px;
   box-sizing: border-box;
 }
 

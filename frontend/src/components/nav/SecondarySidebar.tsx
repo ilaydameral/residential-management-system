@@ -7,6 +7,7 @@ interface SecondarySidebarProps {
   activeView: string
   onSelectView: (viewId: string) => void
   isCollapsed: boolean
+  isHoverOverlay?: boolean
   onToggleCollapse: () => void
   userRoles: string[]
   user?: any
@@ -20,6 +21,7 @@ export function SecondarySidebar({
   activeView,
   onSelectView,
   isCollapsed,
+  isHoverOverlay,
   onToggleCollapse,
   userRoles,
   user,
@@ -43,7 +45,7 @@ export function SecondarySidebar({
 
   return (
     <aside
-      className={`nav-secondary-sidebar ${isCollapsed ? 'collapsed' : ''}`}
+      className={`nav-secondary-sidebar ${isCollapsed ? 'collapsed' : ''} ${isHoverOverlay ? 'hover-overlay' : ''}`}
       aria-label={`${currentCategoryObj.label} alt menüsü`}
     >
       <div className="sidebar-header">

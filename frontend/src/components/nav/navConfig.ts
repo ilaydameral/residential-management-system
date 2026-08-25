@@ -65,6 +65,7 @@ export const NAV_CATEGORIES: NavCategory[] = [
     iconName: 'tools',
     children: [
       { id: 'maintenanceRequests', label: 'Bakım & Arıza Talepleri', path: '/management/maintenance-requests', description: 'Bakım talepleri ve Kanban takibi.' },
+      { id: 'facilities', label: 'Ortak Alanlar', path: '/management/facilities', description: 'Ortak alan tesisleri ve rezervasyon yönetimi.' },
       { id: 'announcements', label: 'Duyurular', path: '/management/announcements', description: 'Sakinlere yönelik duyurular.' },
     ],
   },
