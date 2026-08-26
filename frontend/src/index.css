@@ -2602,6 +2602,10 @@ code {
   flex: 0 0 auto;
 }
 
+.dashboard-actions-panel .section-heading {
+  margin-bottom: 14px;
+}
+
 .dashboard-actions-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2610,17 +2614,17 @@ code {
 
 .dashboard-actions-grid button {
   display: flex;
-  min-height: 92px;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   border: 1px solid var(--color-border-strong);
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px 14px;
   color: var(--color-primary);
   background: var(--color-surface-secondary);
   text-align: left;
+  transition: all 0.15s ease;
 }
 
 .dashboard-actions-grid button:hover {
@@ -2628,9 +2632,14 @@ code {
   background: var(--color-surface-hover);
 }
 
+.dashboard-actions-grid button strong {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .dashboard-actions-grid button span {
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 @media (max-width: 1100px) {
@@ -8105,12 +8114,12 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
   overflow: hidden;
 }
 
 .activity-feed-header {
-  padding: 14px 18px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--color-border, #e2e8f0);
   display: flex;
   align-items: center;
@@ -8163,15 +8172,14 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
 }
 
 .activity-feed-list {
-  padding: 8px 8px 14px 8px;
-  flex: 1;
+  padding: 4px 8px;
   display: flex;
   flex-direction: column;
 }
 
 .activity-feed-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 8px;
@@ -8202,7 +8210,7 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 0;
   border: 1px solid transparent;
   box-sizing: border-box;
 }
@@ -8322,12 +8330,11 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 50px;
-  padding: 10px 16px;
+  min-height: 42px;
+  padding: 8px 16px;
   border-top: 1px solid var(--color-border, #e2e8f0);
   background: var(--color-surface-hover, #f8fafc);
   border-radius: 0 0 12px 12px;
-  margin-top: auto;
   box-sizing: border-box;
 }
 
