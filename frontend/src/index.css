@@ -8386,6 +8386,11 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
   user-select: none;
 }
 
+.activity-feed-retry-btn {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+}
+
 /* ==========================================
    MANAGEMENT COMMON AREAS (FACILITIES) POLISH
    ========================================== */

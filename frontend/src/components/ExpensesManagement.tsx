@@ -567,6 +567,26 @@ export function ExpensesManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        {(propertyFilter !== 'all' || buildingFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all' || Boolean(searchQuery)) && (
+          <div className="form-field" style={{ justifyContent: 'flex-end', flex: '0 0 auto' }}>
+            <label>&nbsp;</label>
+            <button
+              type="button"
+              className="ghost-button"
+              style={{ fontSize: '13px', height: '38px', whiteSpace: 'nowrap' }}
+              onClick={() => {
+                setPropertyFilter('all')
+                setBuildingFilter('all')
+                setCategoryFilter('all')
+                setStatusFilter('all')
+                setSearchQuery('')
+              }}
+            >
+              Filtreleri Temizle
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Main Content: Standardized Management Table */}

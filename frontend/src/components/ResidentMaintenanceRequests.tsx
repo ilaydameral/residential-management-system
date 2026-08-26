@@ -20,11 +20,11 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  OPEN: { label: 'Açık', className: 'status-badge info' },
-  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge warning' },
-  RESOLVED: { label: 'Çözüldü', className: 'status-badge success' },
-  CLOSED: { label: 'Kapandı', className: 'status-badge secondary' },
-  CANCELLED: { label: 'İptal Edildi', className: 'status-badge danger' },
+  OPEN: { label: 'Açık', className: 'status-badge warning' },
+  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge info' },
+  RESOLVED: { label: 'Çözüldü', className: 'status-badge active' },
+  CLOSED: { label: 'Kapandı', className: 'status-badge inactive' },
+  CANCELLED: { label: 'İptal Edildi', className: 'status-badge secondary' },
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {

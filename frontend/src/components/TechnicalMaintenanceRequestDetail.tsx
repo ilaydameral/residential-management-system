@@ -13,18 +13,18 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  OPEN: { label: 'Açık', className: 'status-badge info' },
-  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge warning' },
-  RESOLVED: { label: 'Çözüldü', className: 'status-badge success' },
-  CLOSED: { label: 'Kapandı', className: 'status-badge secondary' },
-  CANCELLED: { label: 'İptal Edildi', className: 'status-badge danger' },
+  OPEN: { label: 'Açık', className: 'status-badge warning' },
+  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge info' },
+  RESOLVED: { label: 'Çözüldü', className: 'status-badge active' },
+  CLOSED: { label: 'Kapandı', className: 'status-badge inactive' },
+  CANCELLED: { label: 'İptal Edildi', className: 'status-badge secondary' },
 }
 
 const PRIORITY_LABEL_MAP: Record<string, { label: string; className: string }> = {
   LOW: { label: 'Düşük', className: 'status-badge muted' },
   NORMAL: { label: 'Normal', className: 'status-badge secondary' },
-  IMPORTANT: { label: 'Önemli', className: 'status-badge secondary' },
-  URGENT: { label: 'Acil', className: 'status-badge secondary' },
+  IMPORTANT: { label: 'Önemli', className: 'status-badge warning' },
+  URGENT: { label: 'Acil', className: 'status-badge danger' },
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {

@@ -50,7 +50,7 @@ const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
   IN_PROGRESS: { label: 'İşlemde', className: 'status-badge info' },
   RESOLVED: { label: 'Çözüldü', className: 'status-badge active' },
   CLOSED: { label: 'Kapandı', className: 'status-badge inactive' },
-  CANCELLED: { label: 'İptal Edildi', className: 'status-badge inactive' },
+  CANCELLED: { label: 'İptal Edildi', className: 'status-badge secondary' },
 }
 
 const ACTION_TYPE_LABEL_MAP: Record<string, { title: string; color: string }> = {

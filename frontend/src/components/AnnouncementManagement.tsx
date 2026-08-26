@@ -449,6 +449,27 @@ export function AnnouncementManagement() {
             }}
           />
         </div>
+
+        {(propertyFilter !== 'all' || buildingFilter !== 'all' || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(searchQuery)) && (
+          <div className="form-field" style={{ justifyContent: 'flex-end', flex: '0 0 auto' }}>
+            <label>&nbsp;</label>
+            <button
+              type="button"
+              className="ghost-button"
+              style={{ fontSize: '13px', height: '38px', whiteSpace: 'nowrap' }}
+              onClick={() => {
+                setPropertyFilter('all')
+                setBuildingFilter('all')
+                setStatusFilter('all')
+                setPriorityFilter('all')
+                setSearchQuery('')
+                setPage(1)
+              }}
+            >
+              Filtreleri Temizle
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Announcements Table */}

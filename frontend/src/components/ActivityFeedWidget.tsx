@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getActivityFeed } from '../api'
 import { useRealtime } from '../realtime/useRealtime'
 import type { ActivityFeedItemDto, PagedActivityFeedDto } from '../realtime/types'
+import { LoadingSkeleton } from './LoadingSkeleton'
 
 interface ActivityFeedWidgetProps {
   onNavigate?: (view: string, params?: Record<string, string>) => void
@@ -189,17 +190,16 @@ export function ActivityFeedWidget({ onNavigate }: ActivityFeedWidgetProps) {
       {/* Content Area */}
       <div className="activity-feed-list">
         {loading && !pagedData ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
-            Yükleniyor...
+          <div style={{ padding: '16px' }}>
+            <LoadingSkeleton variant="table" rows={3} />
           </div>
         ) : error ? (
           <div style={{ padding: '16px', textAlign: 'center' }}>
-            <p style={{ color: '#ef4444', marginBottom: '8px', fontSize: '0.875rem' }}>{error}</p>
+            <p style={{ color: 'var(--color-danger, #dc2626)', marginBottom: '8px', fontSize: '0.875rem' }}>{error}</p>
             <button
               onClick={() => void fetchFeed(currentPage)}
-              className="secondary-button"
+              className="secondary-button activity-feed-retry-btn"
               type="button"
-              style={{ padding: '4px 12px', fontSize: '0.75rem' }}
             >
               Yeniden Dene
             </button>

@@ -370,6 +370,25 @@ export function PaymentSubmissionsManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        {(statusFilter !== 'all' || propertyFilter !== 'all' || buildingFilter !== 'all' || Boolean(searchQuery)) && (
+          <div className="form-field" style={{ justifyContent: 'flex-end', flex: '0 0 auto' }}>
+            <label>&nbsp;</label>
+            <button
+              type="button"
+              className="ghost-button"
+              style={{ fontSize: '13px', height: '38px', whiteSpace: 'nowrap' }}
+              onClick={() => {
+                setStatusFilter('all')
+                setPropertyFilter('all')
+                setBuildingFilter('all')
+                setSearchQuery('')
+              }}
+            >
+              Filtreleri Temizle
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Main Content: Standardized Management Table */}
