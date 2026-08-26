@@ -54,6 +54,7 @@ import { HeaderSettingsButton } from './components/HeaderSettingsButton'
 import { ManagementShell } from './components/nav/ManagementShell'
 import type { GlobalSearchItem } from './types'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
+import { PageHeader } from './components/PageHeader'
 import { NotificationCenter } from './components/NotificationCenter'
 import { RealtimeProvider } from './realtime/RealtimeProvider'
 import { OccupancyManagement } from './components/OccupancyManagement'
@@ -1814,7 +1815,7 @@ function App() {
         <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
         <div className="management-workspace">
           <main id="main-content" ref={mainContentRef} tabIndex={-1} className="management-content">
-      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && activeManagementView !== 'units' && activeManagementView !== 'residents' && <header className="page-header">
+      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && activeManagementView !== 'units' && activeManagementView !== 'residents' && !['properties', 'buildings', 'users', 'managerAssignments', 'dueDefinitions', 'duePeriods', 'expenses', 'announcements', 'maintenanceRequests'].includes(activeManagementView) && <header className="page-header">
         <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
         <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
         <p className="page-description">
@@ -1973,14 +1974,17 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'properties' && (
         <section className="section-container entity-management-view">
-          <div className="entity-page-actions">
-            <p>{filteredProperties.length} yapı gösteriliyor.</p>
-            {canCreateProperty && (
+          <PageHeader
+            eyebrow="Yönetim Paneli"
+            title="Yapılar"
+            subtitle="Site, apartman ve diğer yapı kayıtlarını tek merkezden yönetin."
+            meta={`${filteredProperties.length} yapı gösteriliyor.`}
+            action={canCreateProperty ? (
               <button className="primary-button" type="button" onClick={() => void handleOpenNewProperty()}>
                 Yeni Yapı
               </button>
-            )}
-          </div>
+            ) : undefined}
+          />
 
           <section className="panel entity-toolbar" aria-label="Yapı filtreleri">
             <div className="form-field">
@@ -2105,14 +2109,17 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'buildings' && (
         <section className="section-container entity-management-view">
-          <div className="entity-page-actions">
-            <p>{filteredBuildings.length} blok gösteriliyor.</p>
-            {canCreateBuilding && (
+          <PageHeader
+            eyebrow="Yönetim Paneli"
+            title="Bloklar"
+            subtitle="Tüm yapılara bağlı blokları tek merkezden yönetin."
+            meta={`${filteredBuildings.length} blok gösteriliyor.`}
+            action={canCreateBuilding ? (
               <button className="primary-button" type="button" onClick={() => void handleOpenNewBuilding()}>
                 Yeni Blok
               </button>
-            )}
-          </div>
+            ) : undefined}
+          />
 
           <section className="panel entity-toolbar" aria-label="Blok filtreleri">
             <div className="form-field">

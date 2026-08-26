@@ -15,6 +15,7 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import { RowActionsMenu } from './RowActionsMenu'
 import type {
   ApportionExpensePayload,
@@ -486,17 +487,17 @@ export function ExpensesManagement() {
 
   return (
     <div className="section-container entity-management-view">
-      {/* Standard Entity Page Actions Header */}
-      <div className="entity-page-actions">
-        <p>{!isLoading && !listError ? `${filteredExpenses.length} gider gösteriliyor.` : 'Ortak alan giderlerini yönetin.'}</p>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handleOpenCreateDrawer}
-        >
-          Yeni Gider
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Giderler ve Borçlandırma"
+        subtitle="Gider kayıtları oluşturun ve dairelere borçlandırma modlarıyla dağıtın."
+        meta={!isLoading && !listError ? `${filteredExpenses.length} gider gösteriliyor.` : 'Ortak alan giderlerini yönetin.'}
+        action={(
+          <button type="button" className="primary-button" onClick={handleOpenCreateDrawer}>
+            Yeni Gider
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar exp-toolbar" aria-label="Gider filtreleri">

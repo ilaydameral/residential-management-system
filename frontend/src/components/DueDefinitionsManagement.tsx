@@ -13,6 +13,7 @@ import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import type {
   Building,
   CreateDueDefinitionPayload,
@@ -273,17 +274,17 @@ export function DueDefinitionsManagement() {
 
   return (
     <div className="section-container entity-management-view">
-      {/* Standard Entity Page Actions Header */}
-      <div className="entity-page-actions">
-        <p>{!isLoading && !listError ? `${filteredDefinitions.length} aidat tanımı gösteriliyor.` : 'Aidat tanımlarını görüntüleyin.'}</p>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handleOpenCreateDrawer}
-        >
-          Yeni Aidat Tanımı
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Aidat Tanımları"
+        subtitle="Düzenli aidat şablonlarını ve birim tutarları yönetin."
+        meta={!isLoading && !listError ? `${filteredDefinitions.length} aidat tanımı gösteriliyor.` : 'Aidat tanımlarını görüntüleyin.'}
+        action={(
+          <button type="button" className="primary-button" onClick={handleOpenCreateDrawer}>
+            Yeni Aidat Tanımı
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar due-toolbar" aria-label="Aidat tanımı filtreleri">

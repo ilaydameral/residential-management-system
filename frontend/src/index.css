@@ -8910,6 +8910,78 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
   width: 100%;
 }
 
+.app-page-header {
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+
+.management-content .page-header-row {
+  align-items: flex-end;
+}
+
+.entity-management-view > .app-page-header {
+  margin-bottom: 0;
+}
+
+.app-page-header-copy {
+  min-width: 0;
+}
+
+.app-page-header h1 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: clamp(1.8rem, 4vw, 2.55rem);
+  line-height: 1.12;
+}
+
+.app-page-header-subtitle {
+  max-width: 720px;
+  margin: 10px 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+.app-page-header .page-header-meta {
+  margin: 8px 0 0;
+}
+
+.app-page-header-action {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.app-page-header-action .primary-button {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.maintenance-view-mode-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .app-page-header,
+  .management-content .page-header-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-page-header-action {
+    align-self: flex-start;
+    justify-content: flex-start;
+  }
+
+  .management-content .page-header-row > .primary-button,
+  .management-content .page-header-row > .header-primary-button {
+    align-self: flex-start;
+  }
+}
+
 .management-content .page-header-row > .header-primary-button,
 .management-content .page-header-row > .primary-button,
 .resident-view-content > .page-header-row > .primary-button {

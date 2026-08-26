@@ -14,6 +14,7 @@ import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { Building, ManagedUser, ManagerAssignment, Property } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import { SaveShortcutHint } from './SaveShortcutHint'
 
 interface ManagerAssignmentManagementProps {
@@ -221,12 +222,17 @@ export function ManagerAssignmentManagement({ onDirtyChange }: ManagerAssignment
 
   return (
     <section className="manager-assignment-view entity-management-view" aria-busy={isLoading}>
-      <div className="entity-page-actions">
-        <p>{!isLoading && !loadError ? `${filteredAssignments.length} atama gösteriliyor.` : 'Yönetici sorumluluklarını merkezi olarak yönetin.'}</p>
-        <button className="primary-button" type="button" onClick={openCreate} disabled={isLoading || managers.length === 0 || properties.length === 0}>
-          Yeni Atama
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Yönetici Atamaları"
+        subtitle="Site yöneticilerinin yapı ve blok sorumluluklarını yönetin."
+        meta={!isLoading && !loadError ? `${filteredAssignments.length} atama gösteriliyor.` : 'Yönetici sorumluluklarını merkezi olarak yönetin.'}
+        action={(
+          <button className="primary-button" type="button" onClick={openCreate} disabled={isLoading || managers.length === 0 || properties.length === 0}>
+            Yeni Atama
+          </button>
+        )}
+      />
 
       <section className="panel entity-toolbar manager-assignment-toolbar" aria-label="Yönetici ataması filtreleri">
         <div className="form-field">

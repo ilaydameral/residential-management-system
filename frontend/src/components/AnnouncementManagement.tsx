@@ -12,6 +12,7 @@ import {
 } from '../api'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
@@ -325,39 +326,16 @@ export function AnnouncementManagement() {
 
   return (
     <div className="management-page">
-      {/* Compact Page Action Strip */}
-      <div className="entity-action-strip">
-        <div className="entity-action-strip-info">
-          <div
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'var(--color-surface-secondary)',
-              color: 'var(--color-primary)',
-              flexShrink: 0,
-            }}
-          >
-            <MegaphoneIcon width={20} height={20} />
-          </div>
-          <div className="entity-action-strip-text">
-            <strong style={{ fontSize: '0.95rem', display: 'block', color: 'var(--color-text-primary)' }}>
-              Duyuru Yönetimi
-            </strong>
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              Site veya blok bazlı duyuruları oluşturun, yayınlayın ve geçmişi takip edin.
-            </span>
-          </div>
-        </div>
-        <button className="primary-button" type="button" onClick={handleOpenCreate}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Yeni Duyuru
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Duyurular"
+        subtitle="Sakinlere yönelik site ve blok duyurularını oluşturun ve yönetin."
+        action={(
+          <button className="primary-button" type="button" onClick={handleOpenCreate}>
+            Yeni Duyuru
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar announcement-toolbar" aria-label="Duyuru filtreleri">

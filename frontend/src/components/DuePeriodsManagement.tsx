@@ -12,6 +12,7 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import type {
   CancelDuePeriodPayload,
   CreateDraftDuePeriodPayload,
@@ -294,17 +295,17 @@ export function DuePeriodsManagement() {
 
   return (
     <div className="section-container entity-management-view">
-      {/* Standard Entity Page Actions Header */}
-      <div className="entity-page-actions">
-        <p>{!isLoading && !listError ? `${periods.length} aidat dönemi gösteriliyor.` : 'Aidat dönemlerini görüntüleyin.'}</p>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handleOpenDraftDrawer}
-        >
-          Yeni Taslak Dönem
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Aidat Dönemleri"
+        subtitle="Dönem bazlı aidat taslakları oluşturun ve borçlandırmaları yayınlayın."
+        meta={!isLoading && !listError ? `${periods.length} aidat dönemi gösteriliyor.` : 'Aidat dönemlerini görüntüleyin.'}
+        action={(
+          <button type="button" className="primary-button" onClick={handleOpenDraftDrawer}>
+            Yeni Taslak Dönem
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar due-toolbar" aria-label="Aidat dönemi filtreleri">

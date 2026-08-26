@@ -4,6 +4,7 @@ import { getTechnicalMaintenanceRequests } from '../api'
 import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
 import type { MaintenanceRequestListItemDto } from '../types'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
   PLUMBING: 'Tesisat',
@@ -64,14 +65,6 @@ function formatDate(dateString?: string | null): string {
   }
 }
 
-function WrenchIcon({ width = 18, height = 18 }: { width?: number; height?: number }) {
-  return (
-    <svg width={width} height={height} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </svg>
-  )
-}
-
 export function TechnicalMaintenanceRequests() {
   const navigate = useNavigate()
   const [requests, setRequests] = useState<MaintenanceRequestListItemDto[]>([])
@@ -128,39 +121,11 @@ export function TechnicalMaintenanceRequests() {
 
   return (
     <div className="management-page">
-      <header className="resident-view-header">
-        <p className="eyebrow">TEKNİK PERSONEL PORTALI</p>
-        <h1>Atanan Talepler</h1>
-        <p>Üzerinize atanan bakım ve onarım taleplerini takip edin ve işlem durumlarını güncelleyin.</p>
-      </header>
-
-      {/* Information / Action Strip */}
-      <div className="entity-action-strip">
-        <div className="entity-action-strip-info">
-          <div
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'var(--color-surface-secondary)',
-              color: 'var(--color-primary)',
-              flexShrink: 0,
-            }}
-          >
-            <WrenchIcon width={20} height={20} />
-          </div>
-          <div className="entity-action-strip-text">
-            <strong style={{ fontSize: '0.95rem', display: 'block', color: 'var(--color-text-primary)' }}>
-              Atanan Talep Yönetimi
-            </strong>
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              Üzerinize atanan bakım ve onarım taleplerini takip edin ve işlem durumlarını güncelleyin.
-            </span>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Teknik Personel Portalı"
+        title="Atanan Talepler"
+        subtitle="Üzerinize atanan bakım ve onarım taleplerini takip edin ve işlem durumlarını güncelleyin."
+      />
 
       {/* Standard Management Entity Toolbar */}
       <section className="panel entity-toolbar request-toolbar" aria-label="Talep filtreleri">

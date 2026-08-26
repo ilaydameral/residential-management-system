@@ -14,6 +14,7 @@ import {
 } from '../api'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
@@ -120,14 +121,6 @@ function getSanitizedUserNote(note: string | null): string | null {
   if (trimmed === 'Bakım talebi oluşturuldu.' || trimmed === 'Maintenance request created.') return null
 
   return trimmed
-}
-
-function WrenchIcon({ width = 18, height = 18 }: { width?: number; height?: number }) {
-  return (
-    <svg width={width} height={height} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </svg>
-  )
 }
 
 function ListIcon({ width = 16, height = 16 }: { width?: number; height?: number }) {
@@ -574,47 +567,13 @@ export function MaintenanceRequestManagement() {
 
   return (
     <div className="management-page">
-      {/* Compact Operational Intro Strip with View Mode Toggle */}
-      <div
-        className="entity-action-strip"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          marginBottom: '16px',
-          background: 'var(--color-surface)',
-          padding: '14px 20px',
-          borderRadius: '10px',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'var(--color-surface-secondary)',
-              color: 'var(--color-primary)',
-            }}
-          >
-            <WrenchIcon width={20} height={20} />
-          </div>
-          <div>
-            <strong style={{ fontSize: '0.95rem', display: 'block', color: 'var(--color-text-primary)' }}>
-              Talep Operasyonları
-            </strong>
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              Gelen talepleri teknik personele atayın, önceliklendirin ve çözüm sürecini takip edin.
-            </span>
-          </div>
-        </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Bakım ve Onarım Talepleri"
+        subtitle="Sakinlerden gelen bakım taleplerini yönetin ve operasyon sürecini takip edin."
+      />
 
-        {/* View Mode Switcher */}
+      <div className="maintenance-view-mode-row">
         <div
           style={{
             display: 'flex',

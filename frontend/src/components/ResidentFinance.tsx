@@ -10,6 +10,7 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import type {
   PaymentSubmission,
   ResidentFinanceSummaryDto,
@@ -324,15 +325,12 @@ export function ResidentFinance() {
 
   return (
     <div className="section-container entity-management-view">
-      {/* Page Action Header */}
-      <div className="entity-page-actions">
-        <div>
-          <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--color-text-primary)' }}>Finans</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-            Borçlarınızı, ödeme durumunuzu ve gönderdiğiniz ödeme bildirimlerini takip edin.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        className="resident-page-header"
+        eyebrow="Sakin Portalı"
+        title="Finans"
+        subtitle="Borçlarınızı, ödeme durumunuzu ve gönderdiğiniz ödeme bildirimlerini takip edin."
+      />
 
       {/* Finance Summary Cards */}
       {isLoading ? (
