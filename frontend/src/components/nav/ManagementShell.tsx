@@ -292,7 +292,9 @@ export function ManagementShell({
         />
 
         <main id="main-content" className="shell-content">
-          {children}
+          <div className="shell-page-content">
+            {children}
+          </div>
         </main>
       </div>
 
