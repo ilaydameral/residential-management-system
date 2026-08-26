@@ -157,7 +157,7 @@ export function ManagementVisitors() {
   const checkedOutCount = data.items.filter(v => v.status === 'CHECKED_OUT').length
 
   return (
-    <div className="space-y-6">
+    <div className="management-visitors-container">
       {/* Toast Banner */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-50 p-4 rounded-lg bg-surface border border-border shadow-lg text-sm text-primary animate-in fade-in slide-in-from-top-2">
@@ -165,50 +165,63 @@ export function ManagementVisitors() {
         </div>
       )}
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-main">Ziyaretçi Yönetimi</h1>
-        <p className="text-sm text-muted mt-1">
-          Siteye gelen ziyaretçilerin giriş ve çıkış kayıtlarını yönetin.
-        </p>
-      </div>
-
-      {/* Operational Summary Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl border border-border bg-surface flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-muted uppercase tracking-wider">Beklenen</span>
-            <div className="text-2xl font-bold text-main mt-1">{expectedCount}</div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-warning-soft text-warning flex items-center justify-center font-bold">
-            ⏳
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-border bg-surface flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-muted uppercase tracking-wider">İçeride</span>
-            <div className="text-2xl font-bold text-success mt-1">{checkedInCount}</div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-success-soft text-success flex items-center justify-center font-bold">
-            ✓
-          </div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-border bg-surface flex items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold text-muted uppercase tracking-wider">Çıkış Yapan</span>
-            <div className="text-2xl font-bold text-secondary mt-1">{checkedOutCount}</div>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-surface-secondary text-secondary flex items-center justify-center font-bold">
-            ➜
-          </div>
+      {/* Page Header */}
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">YÖNETİM PANELİ</p>
+          <h1>Ziyaretçiler</h1>
+          <p className="subtitle">
+            Siteye gelen ziyaretçilerin giriş ve çıkış kayıtlarını yönetin.
+          </p>
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="p-4 rounded-xl border border-border bg-surface space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* Operational Summary Cards */}
+      <div className="management-visitor-metrics">
+        <div className="management-visitor-metric-card">
+          <div>
+            <span className="metric-label">Beklenen</span>
+            <div className="metric-value">{expectedCount}</div>
+          </div>
+          <div className="management-visitor-metric-icon expected">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="management-visitor-metric-card">
+          <div>
+            <span className="metric-label">İçeride</span>
+            <div className="metric-value" style={{ color: 'var(--color-success, #137333)' }}>{checkedInCount}</div>
+          </div>
+          <div className="management-visitor-metric-icon checked-in">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="management-visitor-metric-card">
+          <div>
+            <span className="metric-label">Çıkış Yapan</span>
+            <div className="metric-value" style={{ color: 'var(--color-text-secondary)' }}>{checkedOutCount}</div>
+          </div>
+          <div className="management-visitor-metric-icon checked-out">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Toolbar Card */}
+      <div className="management-visitor-filter-card">
+        <div className="management-visitor-filter-row">
           <div className="form-field">
             <label htmlFor="mgmt-search">Arama</label>
             <input
@@ -276,8 +289,10 @@ export function ManagementVisitors() {
               <option value="EXPIRED">Süresi Doldu</option>
             </select>
           </div>
+        </div>
 
-          <div className="form-field">
+        <div className="management-visitor-filter-row-secondary">
+          <div className="form-field" style={{ minWidth: '220px' }}>
             <label htmlFor="mgmt-date-from">Başlangıç Tarihi</label>
             <input
               id="mgmt-date-from"
@@ -289,87 +304,109 @@ export function ManagementVisitors() {
               }}
             />
           </div>
+
+          {(Boolean(search) || Boolean(selectedPropertyId) || Boolean(selectedBuildingId) || Boolean(selectedStatus) || Boolean(dateFrom)) && (
+            <button
+              type="button"
+              className="ghost-button"
+              style={{ fontSize: '13px' }}
+              onClick={() => {
+                setSearch('')
+                setSelectedPropertyId('')
+                setSelectedBuildingId('')
+                setSelectedStatus('')
+                setDateFrom('')
+                setPage(1)
+              }}
+            >
+              Filtreleri Temizle
+            </button>
+          )}
         </div>
       </div>
 
       {/* Table Section */}
       {loading ? (
-        <div className="p-8 text-center text-muted">Ziyaretçiler yükleniyor...</div>
+        <div className="panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-secondary)' }}>
+          Ziyaretçiler yükleniyor...
+        </div>
       ) : data.items.length === 0 ? (
-        <div className="p-12 text-center border border-dashed border-border rounded-xl bg-surface">
+        <div className="panel" style={{ textAlign: 'center', padding: '48px' }}>
           <p className="text-muted">Kayıtlı ziyaretçi bulunamadı.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="table-responsive rounded-xl border border-border bg-surface shadow-sm">
-            <table className="management-table">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="table-responsive management-card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="management-table management-visitor-table">
               <thead>
                 <tr>
-                  <th>Ziyaretçi</th>
-                  <th>Ev Sahibi</th>
-                  <th>Daire</th>
-                  <th>Yapı / Blok</th>
-                  <th>Ziyaret Aralığı</th>
-                  <th>Araç</th>
-                  <th>Durum</th>
-                  <th>Giriş Kodu</th>
-                  <th className="text-right">İşlemler</th>
+                  <th className="col-visitor">Ziyaretçi</th>
+                  <th className="col-host">Ev Sahibi</th>
+                  <th className="col-unit">Daire</th>
+                  <th className="col-property">Yapı / Blok</th>
+                  <th className="col-range">Ziyaret Aralığı</th>
+                  <th className="col-vehicle">Araç</th>
+                  <th className="col-status">Durum</th>
+                  <th className="col-code">Giriş Kodu</th>
+                  <th className="col-actions" style={{ textAlign: 'right' }}>İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {data.items.map(v => (
                   <tr key={v.id}>
-                    <td>
-                      <div className="font-semibold text-main">{v.visitorName}</div>
-                      <div className="text-xs text-muted">
+                    <td className="col-visitor">
+                      <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{v.visitorName}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
                         {VISITOR_TYPE_LABELS[v.visitorType] || v.visitorType}
                         {v.visitorPhone ? ` • ${v.visitorPhone}` : ''}
                       </div>
                     </td>
-                    <td>{v.hostUserName}</td>
-                    <td>No: {v.unitNumber}</td>
-                    <td>{v.buildingName}</td>
-                    <td>
-                      <div className="text-xs">
-                        <div>
-                          {new Date(v.expectedArrival).toLocaleString('tr-TR', {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </div>
-                        <div className="text-muted">
-                          -{' '}
-                          {new Date(v.expectedDeparture).toLocaleString('tr-TR', {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </div>
+                    <td className="col-host">{v.hostUserName || '-'}</td>
+                    <td className="col-unit">Daire {v.unitNumber}</td>
+                    <td className="col-property">
+                      <div style={{ fontWeight: 500 }}>{v.propertyName || v.buildingName}</div>
+                      {v.propertyName && v.buildingName && (
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{v.buildingName}</div>
+                      )}
+                    </td>
+                    <td className="col-range">
+                      <div style={{ fontSize: '13px', whiteSpace: 'nowrap' }}>
+                        {new Date(v.expectedArrival).toLocaleString('tr-TR', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                        <span style={{ color: 'var(--color-text-tertiary)', margin: '0 4px' }}>→</span>
+                        {new Date(v.expectedDeparture).toLocaleString('tr-TR', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
                       </div>
                     </td>
-                    <td>
+                    <td className="col-vehicle">
                       {v.vehiclePlate ? (
-                        <span className="font-mono font-bold text-xs px-2 py-0.5 bg-surface-secondary rounded border border-border">
+                        <span className="resident-visitor-plate-code">
                           {v.vehiclePlate}
                         </span>
                       ) : (
-                        '-'
+                        <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>
                       )}
                     </td>
-                    <td>
+                    <td className="col-status">
                       <span className={`status-badge ${STATUS_BADGE_CLASSES[v.status] || 'status-badge-neutral'}`}>
                         {STATUS_LABELS[v.status] || v.status}
                       </span>
                     </td>
-                    <td>
-                      <code className="font-mono font-bold text-xs px-2 py-0.5 bg-surface-secondary rounded border border-border text-primary">
+                    <td className="col-code">
+                      <code className="resident-visitor-access-value" style={{ fontSize: '14px' }}>
                         {v.accessCode}
                       </code>
                     </td>
-                    <td className="text-right space-x-2">
+                    <td className="col-actions" style={{ textAlign: 'right' }}>
                       {v.status === 'EXPECTED' && (
                         <button
                           type="button"
-                          className="primary-button text-xs py-1 px-2"
+                          className="primary-button"
+                          style={{ padding: '6px 12px', fontSize: '13px', whiteSpace: 'nowrap' }}
                           onClick={() => setCheckingInVisitor(v)}
                         >
                           Giriş Yap
@@ -378,7 +415,8 @@ export function ManagementVisitors() {
                       {v.status === 'CHECKED_IN' && (
                         <button
                           type="button"
-                          className="secondary-button text-xs py-1 px-2"
+                          className="secondary-button"
+                          style={{ padding: '6px 12px', fontSize: '13px', whiteSpace: 'nowrap' }}
                           onClick={() => setCheckingOutVisitor(v)}
                         >
                           Çıkış Yap
@@ -393,14 +431,15 @@ export function ManagementVisitors() {
 
           {/* Pagination */}
           {data.totalPages > 1 && (
-            <div className="flex items-center justify-between px-2">
-              <span className="text-xs text-muted">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
                 Toplam {data.totalCount} kayıt • Sayfa {data.page} / {data.totalPages}
               </span>
-              <div className="flex items-center gap-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
                 <button
                   type="button"
-                  className="secondary-button text-xs py-1 px-3"
+                  className="secondary-button"
+                  style={{ padding: '6px 14px', fontSize: '13px' }}
                   disabled={data.page <= 1}
                   onClick={() => setPage(p => p - 1)}
                 >
@@ -408,7 +447,8 @@ export function ManagementVisitors() {
                 </button>
                 <button
                   type="button"
-                  className="secondary-button text-xs py-1 px-3"
+                  className="secondary-button"
+                  style={{ padding: '6px 14px', fontSize: '13px' }}
                   disabled={data.page >= data.totalPages}
                   onClick={() => setPage(p => p + 1)}
                 >

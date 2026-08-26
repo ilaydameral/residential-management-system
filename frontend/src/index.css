@@ -2218,21 +2218,21 @@ code {
 }
 
 .overview-welcome-panel {
-  padding: clamp(28px, 5vw, 52px);
+  padding: 24px 28px;
   background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%);
 }
 
 .overview-welcome-panel h2 {
   margin: 0;
   color: var(--color-text-primary);
-  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-size: clamp(1.45rem, 3vw, 1.75rem);
 }
 
 .overview-welcome-panel > p:last-child {
   max-width: 720px;
-  margin: 14px 0 0;
+  margin: 8px 0 0;
   color: var(--color-text-secondary);
-  line-height: 1.65;
+  line-height: 1.5;
 }
 
 .management-placeholder {
@@ -2533,8 +2533,10 @@ code {
 }
 
 .dashboard-overview {
-  display: grid;
-  gap: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
 }
 
 .dashboard-summary-grid {
@@ -8653,4 +8655,214 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
   .resident-visitor-detail-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ==========================================
+   MANAGEMENT VISITORS POLISHED STYLES
+   ========================================== */
+.management-visitors-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.management-visitor-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .management-visitor-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.management-visitor-metric-card {
+  padding: 16px 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--color-shadow-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.management-visitor-metric-card .metric-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+.management-visitor-metric-card .metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-top: 2px;
+  line-height: 1;
+}
+
+.management-visitor-metric-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.management-visitor-metric-icon.expected {
+  background: var(--color-warning-soft, #fef7e0);
+  color: var(--color-warning, #b06000);
+  border: 1px solid var(--color-warning-border, #ffe0b2);
+}
+
+.management-visitor-metric-icon.checked-in {
+  background: var(--color-success-soft, #e6f4ea);
+  color: var(--color-success, #137333);
+  border: 1px solid var(--color-success-border, #a8dab5);
+}
+
+.management-visitor-metric-icon.checked-out {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.management-visitor-filter-card {
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px var(--color-shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.management-visitor-filter-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.management-visitor-filter-row-secondary {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 1024px) {
+  .management-visitor-filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .management-visitor-filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .management-visitor-filter-row-secondary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Management Visitors Table Column Proportions & Nowrap Rules */
+.management-table.management-visitor-table {
+  min-width: 1140px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.management-visitor-table th.col-visitor,
+.management-visitor-table td.col-visitor {
+  width: 170px;
+  min-width: 160px;
+}
+
+.management-visitor-table th.col-host,
+.management-visitor-table td.col-host {
+  width: 120px;
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.management-visitor-table th.col-unit,
+.management-visitor-table td.col-unit {
+  width: 90px;
+  min-width: 90px;
+  white-space: nowrap;
+}
+
+.management-visitor-table th.col-property,
+.management-visitor-table td.col-property {
+  width: 200px;
+  min-width: 180px;
+}
+
+.management-visitor-table th.col-range,
+.management-visitor-table td.col-range {
+  width: 240px;
+  min-width: 230px;
+  white-space: nowrap;
+}
+
+.management-visitor-table th.col-vehicle,
+.management-visitor-table td.col-vehicle {
+  width: 120px;
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.management-visitor-table th.col-status,
+.management-visitor-table td.col-status {
+  width: 110px;
+  min-width: 100px;
+  white-space: nowrap;
+}
+
+.management-visitor-table th.col-code,
+.management-visitor-table td.col-code {
+  width: 115px;
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.management-visitor-table th.col-actions,
+.management-visitor-table td.col-actions {
+  width: 125px;
+  min-width: 115px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.management-visitor-table .resident-visitor-plate-code {
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.management-visitor-table .resident-visitor-access-value {
+  white-space: nowrap;
+  display: inline-block;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: 0.08em;
+}
+
+.management-visitor-table .primary-button,
+.management-visitor-table .secondary-button {
+  white-space: nowrap;
 }

@@ -1814,7 +1814,7 @@ function App() {
         <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
         <div className="management-workspace">
           <main id="main-content" ref={mainContentRef} tabIndex={-1} className="management-content">
-      {activeManagementView !== 'account' && <header className="page-header">
+      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && <header className="page-header">
         <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
         <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
         <p className="page-description">
