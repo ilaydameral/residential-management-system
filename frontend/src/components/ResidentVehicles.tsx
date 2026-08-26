@@ -57,6 +57,7 @@ export function ResidentVehicles() {
   const drawerAnimation = useAnimatedDrawer(isDrawerOpen)
 
   const handleCloseDrawer = async () => {
+    if (isSaving) return
     if (!(await requestDiscard())) return
     setIsDrawerOpen(false)
     setEditingVehicle(null)
@@ -132,6 +133,8 @@ export function ResidentVehicles() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSaving) return
+
     setFormError(null)
 
     if (!editingVehicle && !formData.unitId) {
@@ -203,48 +206,62 @@ export function ResidentVehicles() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Toast */}
+    <section className="resident-view-content" aria-label="Araçlarım">
+      {/* Toast Banner */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 p-4 rounded-lg bg-surface border border-border shadow-lg text-sm text-primary animate-in fade-in slide-in-from-top-2">
+        <div style={{
+          position: 'fixed',
+          top: '16px',
+          right: '16px',
+          zIndex: 50,
+          padding: '16px',
+          borderRadius: '8px',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+          fontSize: '14px',
+          color: 'var(--color-text-primary)'
+        }}>
           {toastMessage}
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Page Header Row */}
+      <div className="page-header-row" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
         <div>
-          <h1 className="text-2xl font-bold text-main">Araçlarım</h1>
-          <p className="text-sm text-muted mt-1">
-            Dairelerinize tanımlı araç bilgilerinizi yönetin.
+          <p className="eyebrow" style={{ margin: '0 0 4px 0' }}>SAKİN PORTALI</p>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 0 }}>Araçlarım</h1>
+          <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+            Dairelerinize tanımlı araç bilgilerinizi görüntüleyin ve yeni araç kaydı ekleyin.
           </p>
         </div>
         <button
           type="button"
-          className="primary-button inline-flex items-center gap-2 self-start sm:self-auto"
+          className="primary-button"
           onClick={handleOpenNewDrawer}
+          style={{ width: 'auto', flex: '0 0 auto', padding: '10px 18px', whiteSpace: 'nowrap' }}
         >
-          <span>+ Yeni Araç</span>
+          Yeni Araç
         </button>
       </div>
 
       {/* Content Surface Card */}
-      <div className="management-card p-4">
+      <div className="management-card" style={{ padding: '20px' }}>
         {loading || unitsLoading ? (
-          <div className="p-12 text-center text-muted">Araçlar yükleniyor...</div>
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Araçlar yükleniyor...</div>
         ) : vehicles.length === 0 ? (
-          <div className="p-12 text-center flex flex-col items-center justify-center space-y-2">
-            <div className="w-12 h-12 rounded-full bg-surface-secondary flex items-center justify-center text-muted text-xl mb-1">
+          <div className="panel entity-state-panel" style={{ padding: '48px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--color-surface-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', marginBottom: '8px' }}>
               🚗
             </div>
-            <h3 className="text-base font-semibold text-main">Kayıtlı aracınız bulunmuyor.</h3>
-            <p className="text-xs text-muted max-w-sm">
-              Sitenize ait araçlarınızı yukarıdaki "+ Yeni Araç" butonu ile sisteme ekleyebilirsiniz.
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}>Kayıtlı aracınız bulunmuyor.</h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', maxWidth: '400px' }}>
+              Sitenize ait araçlarınızı yukarıdaki "Yeni Araç" butonu ile sisteme ekleyebilirsiniz.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="management-table w-full">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="management-table" style={{ width: '100%' }}>
               <thead>
                 <tr>
                   <th>Plaka</th>
@@ -253,27 +270,27 @@ export function ResidentVehicles() {
                   <th>Renk</th>
                   <th>Daire</th>
                   <th>Durum</th>
-                  <th className="text-right">İşlemler</th>
+                  <th style={{ textAlign: 'right' }}>İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {vehicles.map(v => (
                   <tr key={v.id}>
                     <td>
-                      <code className="font-mono font-bold text-main bg-surface-secondary px-2 py-0.5 rounded border border-border">
+                      <code className="resident-visitor-plate-code">
                         {v.plateNumber}
                       </code>
                     </td>
-                    <td className="text-sm text-main font-medium">
+                    <td style={{ fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: 500 }}>
                       {VEHICLE_TYPE_LABELS[v.vehicleType] || v.vehicleType}
                     </td>
-                    <td className="text-sm text-secondary">
+                    <td style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                       {v.brandModel || '-'}
                     </td>
-                    <td className="text-sm text-secondary">
+                    <td style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                       {v.color || '-'}
                     </td>
-                    <td className="text-sm text-secondary font-medium">
+                    <td style={{ fontSize: '14px', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
                       Daire {v.unitNumber} · {v.buildingName}
                     </td>
                     <td>
@@ -281,7 +298,7 @@ export function ResidentVehicles() {
                         {v.isActive ? 'Aktif' : 'Pasif'}
                       </span>
                     </td>
-                    <td className="text-right">
+                    <td style={{ textAlign: 'right' }}>
                       <RowActionsMenu
                         primaryAction={{
                           label: 'Düzenle',
@@ -332,15 +349,15 @@ export function ResidentVehicles() {
           >
             <div className="drawer-header">
               <h2>{editingVehicle ? 'Araç Bilgilerini Düzenle' : 'Yeni Araç'}</h2>
-              <button type="button" className="close-button" onClick={handleCloseDrawer}>
+              <button type="button" className="close-button" onClick={handleCloseDrawer} disabled={isSaving}>
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="drawer-form flex-1 flex flex-col justify-between">
-              <div className="drawer-body space-y-4">
+            <form onSubmit={handleSubmit} className="drawer-form" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
                 {formError && (
-                  <div className="p-3 rounded-lg bg-danger-soft text-danger text-sm border border-danger-border">
+                  <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--color-danger-soft, #fce8e6)', color: 'var(--color-danger, #c5221f)', fontSize: '14px', border: '1px solid var(--color-danger-border, #f5c6cb)' }}>
                     {formError}
                   </div>
                 )}
@@ -349,11 +366,11 @@ export function ResidentVehicles() {
                   <div className="form-field">
                     <label htmlFor="veh-unit">Bağlı Daire *</label>
                     {groupedUnits.length === 0 ? (
-                      <div className="p-3 rounded-lg bg-warning-soft text-warning text-xs border border-warning-border">
+                      <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--color-warning-soft, #fef7e0)', color: 'var(--color-warning, #b06000)', fontSize: '12px', border: '1px solid var(--color-warning-border, #ffe0b2)' }}>
                         Aktif bir daire yerleşiminiz bulunmamaktadır.
                       </div>
                     ) : groupedUnits.length === 1 ? (
-                      <div className="px-3 py-2.5 bg-surface-secondary border border-border rounded-lg text-main text-sm font-medium">
+                      <div style={{ padding: '10px 12px', background: 'var(--color-surface-secondary)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)', fontSize: '14px', fontWeight: 500 }}>
                         Daire {groupedUnits[0].unitNumber} · {groupedUnits[0].buildingName} · {groupedUnits[0].propertyName}
                       </div>
                     ) : (
@@ -385,7 +402,9 @@ export function ResidentVehicles() {
                     onChange={e => setFormData({ ...formData, plateNumber: e.target.value.toUpperCase() })}
                   />
                   {editingVehicle && (
-                    <small className="field-help">Plaka bilgisi değiştirilemez.</small>
+                    <small className="field-help" style={{ marginTop: '4px', display: 'block', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                      Plaka bilgisi değiştirilemez.
+                    </small>
                   )}
                 </div>
 
@@ -405,7 +424,7 @@ export function ResidentVehicles() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                   <div className="form-field">
                     <label htmlFor="veh-brand">Marka / Model</label>
                     <input
@@ -430,9 +449,9 @@ export function ResidentVehicles() {
                 </div>
               </div>
 
-              <div className="drawer-actions form-field-full">
+              <div className="drawer-actions form-field-full" style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--color-border)', position: 'sticky', bottom: 0, background: 'var(--color-surface)' }}>
                 <SaveShortcutHint />
-                <button type="button" className="secondary-button" onClick={handleCloseDrawer}>
+                <button type="button" className="secondary-button" onClick={handleCloseDrawer} disabled={isSaving}>
                   Vazgeç
                 </button>
                 <button
@@ -449,6 +468,6 @@ export function ResidentVehicles() {
       )}
 
       {unsavedChangesDialog}
-    </div>
+    </section>
   )
 }
