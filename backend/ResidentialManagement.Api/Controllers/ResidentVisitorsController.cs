@@ -29,7 +29,7 @@ public class ResidentVisitorsController : ControllerBase
         return Ok(visitors);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id}", Name = "GetResidentVisitorById")]
     public async Task<ActionResult<VisitorDto>> GetById(long id)
     {
         var residentUserId = GetCurrentUserId();
@@ -45,7 +45,7 @@ public class ResidentVisitorsController : ControllerBase
         try
         {
             var visitor = await _visitorService.CreateVisitorAsync(residentUserId, dto);
-            return CreatedAtAction(nameof(GetById), new { id = visitor.Id }, visitor);
+            return CreatedAtRoute("GetResidentVisitorById", new { id = visitor.Id }, visitor);
         }
         catch (InvalidOperationException ex)
         {
