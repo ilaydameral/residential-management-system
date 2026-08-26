@@ -85,8 +85,21 @@ export function ManagementVehicles() {
     ? buildings.filter(b => b.propertyId === selectedPropertyId)
     : buildings
 
+  const handleClearFilters = () => {
+    setPlateNumber('')
+    setSelectedPropertyId('')
+    setSelectedBuildingId('')
+    setSelectedVehicleType('')
+    setSelectedIsActive('')
+    setPage(1)
+  }
+
+  const hasActiveFilters = Boolean(
+    plateNumber || selectedPropertyId || selectedBuildingId || selectedVehicleType || selectedIsActive !== ''
+  )
+
   return (
-    <div className="space-y-6">
+    <div className="management-vehicles-container">
       {/* Toast Banner */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-50 p-4 rounded-lg bg-surface border border-border shadow-lg text-sm text-primary animate-in fade-in slide-in-from-top-2">
@@ -95,16 +108,19 @@ export function ManagementVehicles() {
       )}
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-main">Araç Dizini</h1>
-        <p className="text-sm text-muted mt-1">
-          Site sakinlerine ait kayıtlı araç dizini ve plaka sorgulama.
-        </p>
+      <div className="page-header-row">
+        <div>
+          <p className="eyebrow">YÖNETİM PANELİ</p>
+          <h1>Araç Dizini</h1>
+          <p className="subtitle">
+            Site sakinlerine ait kayıtlı araç dizini ve plaka sorgulama.
+          </p>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="p-4 rounded-xl border border-border bg-surface space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="management-vehicle-filter-card">
+        <div className="management-vehicle-filter-row">
           <div className="form-field">
             <label htmlFor="veh-search-plate">Plaka Arama</label>
             <input
@@ -189,46 +205,66 @@ export function ManagementVehicles() {
             </select>
           </div>
         </div>
+
+        {hasActiveFilters && (
+          <div className="management-vehicle-filter-row-secondary">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={handleClearFilters}
+              style={{ fontSize: '13px', padding: '6px 12px' }}
+            >
+              Filtreleri Temizle
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table Section */}
       {loading ? (
-        <div className="p-8 text-center text-muted">Araçlar yükleniyor...</div>
+        <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+          Araçlar yükleniyor...
+        </div>
       ) : data.items.length === 0 ? (
-        <div className="p-12 text-center border border-dashed border-border rounded-xl bg-surface">
+        <div className="management-card" style={{ padding: '48px', textAlign: 'center', borderStyle: 'dashed' }}>
           <p className="text-muted">Kayıtlı araç bulunamadı.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="table-responsive rounded-xl border border-border bg-surface shadow-sm">
-            <table className="management-table">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="table-responsive management-card" style={{ padding: 0, overflowX: 'auto' }}>
+            <table className="management-table management-vehicle-table">
               <thead>
                 <tr>
-                  <th>Plaka</th>
-                  <th>Sakin</th>
-                  <th>Daire</th>
-                  <th>Yapı / Blok</th>
-                  <th>Tür</th>
-                  <th>Marka / Model</th>
-                  <th>Renk</th>
-                  <th>Durum</th>
+                  <th className="col-plate">Plaka</th>
+                  <th className="col-resident">Sakin</th>
+                  <th className="col-unit">Daire</th>
+                  <th className="col-property">Yapı / Blok</th>
+                  <th className="col-type">Tür</th>
+                  <th className="col-brand">Marka / Model</th>
+                  <th className="col-color">Renk</th>
+                  <th className="col-status">Durum</th>
                 </tr>
               </thead>
               <tbody>
                 {data.items.map(v => (
                   <tr key={v.id}>
-                    <td>
-                      <span className="font-mono font-bold text-main px-2 py-1 bg-surface-secondary rounded border border-border">
+                    <td className="col-plate">
+                      <span className="resident-visitor-plate-code">
                         {v.plateNumber}
                       </span>
                     </td>
-                    <td>{v.residentUserName}</td>
-                    <td>No: {v.unitNumber}</td>
-                    <td>{v.buildingName} ({v.propertyName})</td>
-                    <td>{VEHICLE_TYPE_LABELS[v.vehicleType] || v.vehicleType}</td>
-                    <td>{v.brandModel || '-'}</td>
-                    <td>{v.color || '-'}</td>
-                    <td>
+                    <td className="col-resident">{v.residentUserName}</td>
+                    <td className="col-unit">Daire {v.unitNumber}</td>
+                    <td className="col-property">
+                      <div style={{ fontWeight: 500 }}>{v.propertyName || v.buildingName}</div>
+                      {v.propertyName && v.buildingName && (
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{v.buildingName}</div>
+                      )}
+                    </td>
+                    <td className="col-type">{VEHICLE_TYPE_LABELS[v.vehicleType] || v.vehicleType}</td>
+                    <td className="col-brand">{v.brandModel || '-'}</td>
+                    <td className="col-color">{v.color || '-'}</td>
+                    <td className="col-status">
                       <span className={`status-badge ${v.isActive ? 'status-badge-approved' : 'status-badge-neutral'}`}>
                         {v.isActive ? 'Aktif' : 'Pasif'}
                       </span>
@@ -241,14 +277,15 @@ export function ManagementVehicles() {
 
           {/* Pagination */}
           {data.totalPages > 1 && (
-            <div className="flex items-center justify-between px-2">
-              <span className="text-xs text-muted">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
                 Toplam {data.totalCount} kayıt • Sayfa {data.page} / {data.totalPages}
               </span>
-              <div className="flex items-center gap-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
                 <button
                   type="button"
-                  className="secondary-button text-xs py-1 px-3"
+                  className="secondary-button"
+                  style={{ padding: '4px 12px', fontSize: '13px' }}
                   disabled={data.page <= 1}
                   onClick={() => setPage(p => p - 1)}
                 >
@@ -256,7 +293,8 @@ export function ManagementVehicles() {
                 </button>
                 <button
                   type="button"
-                  className="secondary-button text-xs py-1 px-3"
+                  className="secondary-button"
+                  style={{ padding: '4px 12px', fontSize: '13px' }}
                   disabled={data.page >= data.totalPages}
                   onClick={() => setPage(p => p + 1)}
                 >

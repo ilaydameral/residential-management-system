@@ -8866,3 +8866,111 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
 .management-visitor-table .secondary-button {
   white-space: nowrap;
 }
+
+/* Management Vehicles Container & Filter Card */
+.management-vehicles-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.management-vehicle-filter-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.management-vehicle-filter-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.management-vehicle-filter-row-secondary {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 1024px) {
+  .management-vehicle-filter-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .management-vehicle-filter-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Management Vehicles Table Specific Column Proportions & Polish */
+.management-table.management-vehicle-table {
+  min-width: 980px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.management-vehicle-table th.col-plate,
+.management-vehicle-table td.col-plate {
+  width: 140px;
+  min-width: 130px;
+  white-space: nowrap;
+}
+
+.management-vehicle-table th.col-resident,
+.management-vehicle-table td.col-resident {
+  width: 160px;
+  min-width: 140px;
+}
+
+.management-vehicle-table th.col-unit,
+.management-vehicle-table td.col-unit {
+  width: 90px;
+  min-width: 80px;
+  white-space: nowrap;
+}
+
+.management-vehicle-table th.col-property,
+.management-vehicle-table td.col-property {
+  width: 200px;
+  min-width: 180px;
+}
+
+.management-vehicle-table th.col-type,
+.management-vehicle-table td.col-type {
+  width: 130px;
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.management-vehicle-table th.col-brand,
+.management-vehicle-table td.col-brand {
+  width: 150px;
+  min-width: 130px;
+}
+
+.management-vehicle-table th.col-color,
+.management-vehicle-table td.col-color {
+  width: 100px;
+  min-width: 90px;
+}
+
+.management-vehicle-table th.col-status,
+.management-vehicle-table td.col-status {
+  width: 100px;
+  min-width: 90px;
+  white-space: nowrap;
+}
+
+.management-vehicle-table .resident-visitor-plate-code {
+  white-space: nowrap;
+  display: inline-block;
+}
