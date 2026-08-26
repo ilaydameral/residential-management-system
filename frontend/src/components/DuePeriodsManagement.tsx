@@ -195,6 +195,7 @@ export function DuePeriodsManagement() {
   // Submit Draft Form
   const handleSubmitDraft = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmittingDraft) return
     setDraftError('')
 
     if (!draftDefinitionId) {
@@ -240,7 +241,7 @@ export function DuePeriodsManagement() {
 
   // Confirm and Issue Due Period
   const handleConfirmIssue = async () => {
-    if (!previewPeriodTarget) return
+    if (!previewPeriodTarget || isIssuing) return
     setIsIssuing(true)
     try {
       await issueDuePeriod(previewPeriodTarget.id)
@@ -265,7 +266,7 @@ export function DuePeriodsManagement() {
   // Submit Cancel Form
   const handleSubmitCancel = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!cancelPeriodTarget) return
+    if (!cancelPeriodTarget || isCancelling) return
     setCancelError('')
 
     if (!cancellationReason.trim() || cancellationReason.trim().length < 3) {
@@ -301,7 +302,7 @@ export function DuePeriodsManagement() {
           className="primary-button"
           onClick={handleOpenDraftDrawer}
         >
-          + Yeni Taslak Dönem
+          Yeni Taslak Dönem
         </button>
       </div>
 

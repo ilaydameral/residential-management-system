@@ -494,7 +494,7 @@ export function ExpensesManagement() {
           className="primary-button"
           onClick={handleOpenCreateDrawer}
         >
-          + Yeni Gider
+          Yeni Gider
         </button>
       </div>
 

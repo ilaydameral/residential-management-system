@@ -128,7 +128,7 @@ export function TechnicalMaintenanceRequests() {
 
   return (
     <div className="management-page">
-      <header className="resident-view-header" style={{ marginBottom: '16px' }}>
+      <header className="resident-view-header">
         <p className="eyebrow">TEKNİK PERSONEL PORTALI</p>
         <h1>Atanan Talepler</h1>
         <p>Üzerinize atanan bakım ve onarım taleplerini takip edin ve işlem durumlarını güncelleyin.</p>

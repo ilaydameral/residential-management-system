@@ -327,7 +327,7 @@ export function ResidentMaintenanceRequests() {
           onClick={() => setIsCreateOpen(true)}
           style={{ width: 'auto', flex: '0 0 auto', padding: '10px 18px', whiteSpace: 'nowrap' }}
         >
-          + Yeni Talep
+          Yeni Talep
         </button>
       </header>
 

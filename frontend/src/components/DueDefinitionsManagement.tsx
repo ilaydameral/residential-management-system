@@ -281,7 +281,7 @@ export function DueDefinitionsManagement() {
           className="primary-button"
           onClick={handleOpenCreateDrawer}
         >
-          + Yeni Aidat Tanımı
+          Yeni Aidat Tanımı
         </button>
       </div>
 
