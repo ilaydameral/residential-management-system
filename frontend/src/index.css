@@ -1644,7 +1644,7 @@ textarea::placeholder {
 
 .confirmation-overlay {
   position: fixed;
-  z-index: 1000;
+  z-index: 2100;
   inset: 0;
   display: flex;
   align-items: center;
@@ -7487,6 +7487,27 @@ textarea:focus-visible,
   min-width: 0;
 }
 
+.shell-page-content {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px 48px 64px 48px;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+@media (max-width: 1024px) {
+  .shell-page-content {
+    padding: 24px 28px 48px 28px;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell-page-content {
+    padding: 20px 16px 36px 16px;
+  }
+}
+
 /* ==========================================
    AVATAR & USER IDENTITY ENTRY STYLES
    ========================================== */
@@ -8451,5 +8472,185 @@ svg.w-6 { width: 24px !important; height: 24px !important; }
   .facility-toolbar-5col,
   .facility-toolbar-3col {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+/* Resident Visitor Page Styles */
+.page-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.resident-visitor-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 1000px;
+}
+
+.resident-visitor-card {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 16px var(--color-shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.resident-visitor-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.resident-visitor-card-title {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.resident-visitor-card-location {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.resident-visitor-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.visitor-type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.resident-visitor-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  padding: 16px 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.resident-visitor-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resident-visitor-detail-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.resident-visitor-detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.resident-visitor-plate-code {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--color-surface-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  display: inline-block;
+}
+
+.resident-visitor-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.resident-visitor-access-code {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-surface-secondary);
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.resident-visitor-access-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.resident-visitor-access-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  line-height: 1;
+}
+
+.resident-visitor-access-value {
+  font-family: monospace;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.resident-visitor-copy-button {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.resident-visitor-copy-button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+@media (max-width: 640px) {
+  .resident-visitor-detail-grid {
+    grid-template-columns: 1fr;
   }
 }

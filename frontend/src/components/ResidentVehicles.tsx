@@ -4,14 +4,14 @@ import {
   createResidentVehicle,
   updateResidentVehicle,
   setResidentVehicleStatus,
-  getMyUnits,
 } from '../api'
-import type { ResidentVehicle, CreateResidentVehiclePayload, UpdateResidentVehiclePayload, ResidentUnit, VehicleType } from '../types'
+import type { ResidentVehicle, CreateResidentVehiclePayload, UpdateResidentVehiclePayload, VehicleType } from '../types'
 import { RowActionsMenu } from './RowActionsMenu'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+import { useResidentUnits } from '../hooks/useResidentUnits'
 import { SaveShortcutHint } from './SaveShortcutHint'
 
 const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
@@ -23,8 +23,8 @@ const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
 }
 
 export function ResidentVehicles() {
+  const { groupedUnits, loading: unitsLoading, refetch: refetchUnits } = useResidentUnits()
   const [vehicles, setVehicles] = useState<ResidentVehicle[]>([])
-  const [residentUnits, setResidentUnits] = useState<ResidentUnit[]>([])
   const [loading, setLoading] = useState(true)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
@@ -68,25 +68,25 @@ export function ResidentVehicles() {
     isSaving,
   })
 
+  // Sync unitId when groupedUnits finishes loading
+  useEffect(() => {
+    if (groupedUnits.length > 0 && (!formData.unitId || !groupedUnits.some(u => u.unitId === formData.unitId))) {
+      setFormData(prev => ({ ...prev, unitId: groupedUnits[0].unitId }))
+    }
+  }, [groupedUnits, formData.unitId])
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
-      const [vList, uList] = await Promise.all([
-        getResidentVehicles(),
-        getMyUnits(),
-      ])
+      const vList = await getResidentVehicles()
       setVehicles(vList)
-      setResidentUnits(uList)
-
-      if (uList.length === 1 && formData.unitId === 0) {
-        setFormData(prev => ({ ...prev, unitId: uList[0].unitId }))
-      }
+      await refetchUnits()
     } catch (err) {
       setToastMessage(err instanceof Error ? err.message : 'Araçlar yüklenemedi.')
     } finally {
       setLoading(false)
     }
-  }, [formData.unitId])
+  }, [refetchUnits])
 
   useEffect(() => {
     loadData()
@@ -99,7 +99,12 @@ export function ResidentVehicles() {
   }, [toastMessage])
 
   const handleOpenNewDrawer = () => {
-    const defaultUnitId = residentUnits.length > 0 ? residentUnits[0].unitId : 0
+    if (groupedUnits.length === 0) {
+      setToastMessage('Aktif daire yerleşiminiz bulunmadığı için araç kaydı oluşturamazsınız.')
+      return
+    }
+
+    const defaultUnitId = groupedUnits.length > 0 ? groupedUnits[0].unitId : 0
     setEditingVehicle(null)
     setFormData({
       unitId: defaultUnitId,
@@ -170,7 +175,6 @@ export function ResidentVehicles() {
       return
     }
 
-    // Activating directly
     try {
       setIsTogglingStatus(true)
       await setResidentVehicleStatus(v.id, true)
@@ -200,7 +204,7 @@ export function ResidentVehicles() {
 
   return (
     <div className="space-y-6">
-      {/* Toast Banner */}
+      {/* Toast */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-50 p-4 rounded-lg bg-surface border border-border shadow-lg text-sm text-primary animate-in fade-in slide-in-from-top-2">
           {toastMessage}
@@ -220,87 +224,91 @@ export function ResidentVehicles() {
           className="primary-button inline-flex items-center gap-2 self-start sm:self-auto"
           onClick={handleOpenNewDrawer}
         >
-          <span>Yeni Araç</span>
+          <span>+ Yeni Araç</span>
         </button>
       </div>
 
-      {/* Table Section */}
-      {loading ? (
-        <div className="p-8 text-center text-muted">Araçlar yükleniyor...</div>
-      ) : vehicles.length === 0 ? (
-        <div className="p-12 text-center border border-dashed border-border rounded-xl bg-surface space-y-3">
-          <p className="text-muted">Henüz kayıtlı bir aracınız bulunmuyor.</p>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleOpenNewDrawer}
-          >
-            Araç Ekle
-          </button>
-        </div>
-      ) : (
-        <div className="table-responsive rounded-xl border border-border bg-surface shadow-sm">
-          <table className="management-table">
-            <thead>
-              <tr>
-                <th>Plaka</th>
-                <th>Araç Tipi</th>
-                <th>Marka / Model</th>
-                <th>Renk</th>
-                <th>Daire</th>
-                <th>Durum</th>
-                <th className="text-right">İşlemler</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vehicles.map(v => (
-                <tr key={v.id}>
-                  <td>
-                    <span className="font-mono font-bold text-main px-2 py-1 bg-surface-secondary rounded border border-border">
-                      {v.plateNumber}
-                    </span>
-                  </td>
-                  <td>{VEHICLE_TYPE_LABELS[v.vehicleType] || v.vehicleType}</td>
-                  <td>{v.brandModel || '-'}</td>
-                  <td>{v.color || '-'}</td>
-                  <td>{v.buildingName} No: {v.unitNumber}</td>
-                  <td>
-                    <span className={`status-badge ${v.isActive ? 'status-badge-approved' : 'status-badge-neutral'}`}>
-                      {v.isActive ? 'Aktif' : 'Pasif'}
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    <RowActionsMenu
-                      label="Araç İşlemleri"
-                      primaryAction={{
-                        label: 'Düzenle',
-                        onSelect: () => handleOpenEditDrawer(v),
-                      }}
-                      secondaryActions={[
-                        v.isActive
-                          ? {
-                              label: 'Pasife Al',
-                              danger: true,
-                              onSelect: () => handleToggleStatus(v),
-                            }
-                          : {
-                              label: 'Aktifleştir',
-                              onSelect: () => handleToggleStatus(v),
-                            },
-                      ]}
-                    />
-                  </td>
+      {/* Content Surface Card */}
+      <div className="management-card p-4">
+        {loading || unitsLoading ? (
+          <div className="p-12 text-center text-muted">Araçlar yükleniyor...</div>
+        ) : vehicles.length === 0 ? (
+          <div className="p-12 text-center flex flex-col items-center justify-center space-y-2">
+            <div className="w-12 h-12 rounded-full bg-surface-secondary flex items-center justify-center text-muted text-xl mb-1">
+              🚗
+            </div>
+            <h3 className="text-base font-semibold text-main">Kayıtlı aracınız bulunmuyor.</h3>
+            <p className="text-xs text-muted max-w-sm">
+              Sitenize ait araçlarınızı yukarıdaki "+ Yeni Araç" butonu ile sisteme ekleyebilirsiniz.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="management-table w-full">
+              <thead>
+                <tr>
+                  <th>Plaka</th>
+                  <th>Araç Tipi</th>
+                  <th>Marka / Model</th>
+                  <th>Renk</th>
+                  <th>Daire</th>
+                  <th>Durum</th>
+                  <th className="text-right">İşlemler</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {vehicles.map(v => (
+                  <tr key={v.id}>
+                    <td>
+                      <code className="font-mono font-bold text-main bg-surface-secondary px-2 py-0.5 rounded border border-border">
+                        {v.plateNumber}
+                      </code>
+                    </td>
+                    <td className="text-sm text-main font-medium">
+                      {VEHICLE_TYPE_LABELS[v.vehicleType] || v.vehicleType}
+                    </td>
+                    <td className="text-sm text-secondary">
+                      {v.brandModel || '-'}
+                    </td>
+                    <td className="text-sm text-secondary">
+                      {v.color || '-'}
+                    </td>
+                    <td className="text-sm text-secondary font-medium">
+                      Daire {v.unitNumber} · {v.buildingName}
+                    </td>
+                    <td>
+                      <span className={`status-badge ${v.isActive ? 'status-badge-approved' : 'status-badge-neutral'}`}>
+                        {v.isActive ? 'Aktif' : 'Pasif'}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <RowActionsMenu
+                        primaryAction={{
+                          label: 'Düzenle',
+                          onSelect: () => handleOpenEditDrawer(v),
+                        }}
+                        secondaryActions={[
+                          {
+                            label: v.isActive ? 'Pasife Al' : 'Aktifleştir',
+                            danger: v.isActive,
+                            onSelect: () => void handleToggleStatus(v),
+                          },
+                        ]}
+                        label={`${v.plateNumber} İşlemleri`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-      {/* Deactivate Confirmation Dialog */}
+      {/* Deactivation Dialog */}
       {deactivatingVehicle && (
         <ConfirmationDialog
-          title="Aracı Pasife Al"
+          title="Araç Deaktivasyonu"
           message={`${deactivatingVehicle.plateNumber} plakalı aracı pasife almak istediğinize emin misiniz?`}
           confirmLabel="Pasife Al"
           danger
@@ -310,7 +318,7 @@ export function ResidentVehicles() {
         />
       )}
 
-      {/* Drawer Form */}
+      {/* New / Edit Drawer */}
       {drawerAnimation.phase !== 'closed' && (
         <>
           <div
@@ -340,18 +348,28 @@ export function ResidentVehicles() {
                 {!editingVehicle && (
                   <div className="form-field">
                     <label htmlFor="veh-unit">Bağlı Daire *</label>
-                    <select
-                      id="veh-unit"
-                      required
-                      value={formData.unitId}
-                      onChange={e => setFormData({ ...formData, unitId: Number(e.target.value) })}
-                    >
-                      {residentUnits.map(u => (
-                        <option key={u.unitId} value={u.unitId}>
-                          {u.buildingName} - No: {u.unitNumber}
-                        </option>
-                      ))}
-                    </select>
+                    {groupedUnits.length === 0 ? (
+                      <div className="p-3 rounded-lg bg-warning-soft text-warning text-xs border border-warning-border">
+                        Aktif bir daire yerleşiminiz bulunmamaktadır.
+                      </div>
+                    ) : groupedUnits.length === 1 ? (
+                      <div className="px-3 py-2.5 bg-surface-secondary border border-border rounded-lg text-main text-sm font-medium">
+                        Daire {groupedUnits[0].unitNumber} · {groupedUnits[0].buildingName} · {groupedUnits[0].propertyName}
+                      </div>
+                    ) : (
+                      <select
+                        id="veh-unit"
+                        required
+                        value={formData.unitId}
+                        onChange={e => setFormData({ ...formData, unitId: Number(e.target.value) })}
+                      >
+                        {groupedUnits.map(u => (
+                          <option key={u.unitId} value={u.unitId}>
+                            Daire {u.unitNumber} · {u.buildingName} · {u.propertyName}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 )}
 
@@ -387,36 +405,42 @@ export function ResidentVehicles() {
                   </select>
                 </div>
 
-                <div className="form-field">
-                  <label htmlFor="veh-brand">Marka / Model (İsteğe Bağlı)</label>
-                  <input
-                    id="veh-brand"
-                    type="text"
-                    placeholder="Örn: Volkswagen Golf"
-                    value={formData.brandModel || ''}
-                    onChange={e => setFormData({ ...formData, brandModel: e.target.value })}
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="form-field">
+                    <label htmlFor="veh-brand">Marka / Model</label>
+                    <input
+                      id="veh-brand"
+                      type="text"
+                      placeholder="Örn: Toyota Corolla"
+                      value={formData.brandModel || ''}
+                      onChange={e => setFormData({ ...formData, brandModel: e.target.value })}
+                    />
+                  </div>
 
-                <div className="form-field">
-                  <label htmlFor="veh-color">Renk (İsteğe Bağlı)</label>
-                  <input
-                    id="veh-color"
-                    type="text"
-                    placeholder="Örn: Beyaz"
-                    value={formData.color || ''}
-                    onChange={e => setFormData({ ...formData, color: e.target.value })}
-                  />
+                  <div className="form-field">
+                    <label htmlFor="veh-color">Renk</label>
+                    <input
+                      id="veh-color"
+                      type="text"
+                      placeholder="Örn: Beyaz"
+                      value={formData.color || ''}
+                      onChange={e => setFormData({ ...formData, color: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="drawer-actions form-field-full">
                 <SaveShortcutHint />
                 <button type="button" className="secondary-button" onClick={handleCloseDrawer}>
-                  İptal
+                  Vazgeç
                 </button>
-                <button type="submit" className="primary-button" disabled={isSaving}>
-                  {isSaving ? 'Kaydediliyor...' : editingVehicle ? 'Güncelle' : 'Kaydet'}
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={isSaving || (!editingVehicle && groupedUnits.length === 0)}
+                >
+                  {isSaving ? 'Kaydediliyor...' : editingVehicle ? 'Güncelle' : 'Araç Ekle'}
                 </button>
               </div>
             </form>

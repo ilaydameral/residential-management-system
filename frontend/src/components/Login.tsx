@@ -614,11 +614,14 @@ export const Login: React.FC = () => {
                   <label htmlFor="drawer-userNameOrEmail">Kullanıcı Adı veya E-posta *</label>
                   <input
                     id="drawer-userNameOrEmail"
+                    name="username"
+                    autoComplete="username"
                     type="text"
                     className="auth-input-light"
                     placeholder="Kullanıcı adı veya e-posta girin"
                     value={userNameOrEmail}
                     onChange={(e) => setUserNameOrEmail(e.target.value)}
+                    onInput={(e) => setUserNameOrEmail((e.target as HTMLInputElement).value)}
                     disabled={isSubmitting}
                     autoFocus
                   />
@@ -629,11 +632,14 @@ export const Login: React.FC = () => {
                   <div className="auth-input-wrapper">
                     <input
                       id="drawer-password"
+                      name="password"
+                      autoComplete="current-password"
                       type={showLoginPassword ? 'text' : 'password'}
                       className="auth-input-light"
                       placeholder="Parolanızı girin"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
                       disabled={isSubmitting}
                     />
                     <button
