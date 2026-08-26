@@ -1814,7 +1814,7 @@ function App() {
         <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
         <div className="management-workspace">
           <main id="main-content" ref={mainContentRef} tabIndex={-1} className="management-content">
-      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && <header className="page-header">
+      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && activeManagementView !== 'units' && activeManagementView !== 'residents' && <header className="page-header">
         <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
         <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
         <p className="page-description">
@@ -2352,61 +2352,129 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'units' && routeUnitId == null && (
         <section className="section-container entity-management-view">
-          <div className="entity-page-actions">
-            <p>{filteredUnits.length} daire veya bölüm gösteriliyor.</p>
+          <div className="page-header-row">
+            <div>
+              <p className="eyebrow">YÖNETİM PANELİ</p>
+              <h1>Daireler</h1>
+              <p className="page-description">
+                Tüm daire ve bağımsız bölümleri tek merkezden yönetin.
+              </p>
+              <p className="page-header-meta">
+                {filteredUnits.length} daire veya bölüm gösteriliyor.
+              </p>
+            </div>
             {canCreateUnit && (
-              <button className="primary-button" type="button" onClick={() => void handleOpenNewUnit()}>
+              <button className="primary-button header-primary-button" type="button" onClick={() => void handleOpenNewUnit()}>
                 Yeni Daire
               </button>
             )}
           </div>
 
-          <section className="panel entity-toolbar unit-toolbar" aria-label="Daire filtreleri">
-            <div className="form-field">
-              <label htmlFor="unit-search">Daire / Bölüm No</label>
-              <input id="unit-search" value={unitSearch} onChange={(event) => setUnitSearch(event.target.value)} placeholder="Numaraya göre ara" />
+          <section className="panel unit-filter-card" aria-label="Daire filtreleri">
+            <div className="unit-filter-row row-1">
+              <div className="form-field field-search">
+                <label htmlFor="unit-search">Daire / Bölüm No</label>
+                <input
+                  id="unit-search"
+                  value={unitSearch}
+                  onChange={(event) => setUnitSearch(event.target.value)}
+                  placeholder="Numaraya göre ara..."
+                />
+              </div>
+              <div className="form-field">
+                <label htmlFor="unit-property-filter">Yapı</label>
+                <select
+                  id="unit-property-filter"
+                  value={unitPropertyFilter}
+                  onChange={(event) => {
+                    setUnitPropertyFilter(event.target.value)
+                    setUnitBuildingFilter('all')
+                  }}
+                >
+                  <option value="all">Tüm yapılar</option>
+                  {properties.map((property) => (
+                    <option key={property.id} value={property.id}>{property.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="unit-building-filter">Blok / Bina</label>
+                <select
+                  id="unit-building-filter"
+                  value={unitBuildingFilter}
+                  onChange={(event) => setUnitBuildingFilter(event.target.value)}
+                >
+                  <option value="all">Tüm bloklar</option>
+                  {unitFilterBuildings.map((building) => (
+                    <option key={building.id} value={building.id}>{building.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="unit-floor-filter">Kat</label>
+                <select
+                  id="unit-floor-filter"
+                  value={unitFloorFilter}
+                  onChange={(event) => setUnitFloorFilter(event.target.value)}
+                >
+                  <option value="all">Tüm katlar</option>
+                  {unitFloorOptions.map((floor) => (
+                    <option key={floor} value={floor}>{formatFloorDisplay(floor)}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="form-field">
-              <label htmlFor="unit-property-filter">Yapı</label>
-              <select id="unit-property-filter" value={unitPropertyFilter} onChange={(event) => { setUnitPropertyFilter(event.target.value); setUnitBuildingFilter('all') }}>
-                <option value="all">Tüm yapılar</option>
-                {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
-              </select>
+
+            <div className="unit-filter-row row-2">
+              <div className="unit-filter-left-group">
+                <div className="form-field">
+                  <label htmlFor="unit-occupancy-filter">Doluluk</label>
+                  <select
+                    id="unit-occupancy-filter"
+                    value={unitOccupancyFilter}
+                    onChange={(event) => setUnitOccupancyFilter(event.target.value)}
+                  >
+                    <option value="all">Tümü</option>
+                    <option value="occupied">Dolu</option>
+                    <option value="vacant">Boş</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label htmlFor="unit-status-filter">Durum</label>
+                  <select
+                    id="unit-status-filter"
+                    value={unitStatusFilter}
+                    onChange={(event) => setUnitStatusFilter(event.target.value)}
+                  >
+                    <option value="all">Tüm durumlar</option>
+                    <option value="active">Aktif</option>
+                    <option value="inactive">Pasif</option>
+                  </select>
+                </div>
+              </div>
+              <div className="unit-filter-actions">
+                <button
+                  className={`ghost-button unit-filter-clear ${unitFilterCount > 0 ? 'has-active-filters' : ''}`}
+                  type="button"
+                  disabled={unitFilterCount === 0}
+                  onClick={() => {
+                    setUnitSearch('')
+                    setUnitPropertyFilter('all')
+                    setUnitBuildingFilter('all')
+                    setUnitFloorFilter('all')
+                    setUnitOccupancyFilter('all')
+                    setUnitStatusFilter('all')
+                  }}
+                >
+                  <span>Filtreleri Temizle</span>
+                  {unitFilterCount > 0 && (
+                    <span className="filter-count-badge" aria-label={`${unitFilterCount} aktif filtre`}>
+                      {unitFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="form-field">
-              <label htmlFor="unit-building-filter">Blok / Bina</label>
-              <select id="unit-building-filter" value={unitBuildingFilter} onChange={(event) => setUnitBuildingFilter(event.target.value)}>
-                <option value="all">Tüm bloklar</option>
-                {unitFilterBuildings.map((building) => <option key={building.id} value={building.id}>{building.name}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="unit-floor-filter">Kat</label>
-              <select id="unit-floor-filter" value={unitFloorFilter} onChange={(event) => setUnitFloorFilter(event.target.value)}>
-                <option value="all">Tüm katlar</option>
-                {unitFloorOptions.map((floor) => <option key={floor} value={floor}>{formatFloorDisplay(floor)}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="unit-occupancy-filter">Doluluk</label>
-              <select id="unit-occupancy-filter" value={unitOccupancyFilter} onChange={(event) => setUnitOccupancyFilter(event.target.value)}>
-                <option value="all">Tümü</option>
-                <option value="occupied">Dolu</option>
-                <option value="vacant">Boş</option>
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="unit-status-filter">Durum</label>
-              <select id="unit-status-filter" value={unitStatusFilter} onChange={(event) => setUnitStatusFilter(event.target.value)}>
-                <option value="all">Tüm durumlar</option>
-                <option value="active">Aktif</option>
-                <option value="inactive">Pasif</option>
-              </select>
-            </div>
-            <button className={`secondary-button entity-filter-clear ${unitFilterCount > 0 ? 'has-active-filters' : ''}`} type="button" disabled={unitFilterCount === 0} onClick={() => { setUnitSearch(''); setUnitPropertyFilter('all'); setUnitBuildingFilter('all'); setUnitFloorFilter('all'); setUnitOccupancyFilter('all'); setUnitStatusFilter('all') }}>
-              <span>Filtreleri Temizle</span>
-              {unitFilterCount > 0 && <span className="filter-count-badge" aria-label={`${unitFilterCount} aktif filtre`}>{unitFilterCount}</span>}
-            </button>
           </section>
 
           {isLoadingCentralUnits && <LoadingSkeleton variant="table" />}
@@ -2416,27 +2484,76 @@ function App() {
               <button className="secondary-button" type="button" onClick={() => void Promise.all([loadAllUnitList(), loadAllBuildingList()])}>Tekrar Dene</button>
             </section>
           )}
-          {!isLoadingCentralUnits && !centralUnitError && allUnits.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Henüz daire bulunmuyor</h2><p>Aktif bir blok veya binaya ilk daireyi ekleyin.</p>{canCreateUnit && <button className="primary-button" type="button" onClick={() => void handleOpenNewUnit()}>Yeni Daire Ekle</button>}</section>}
-          {!isLoadingCentralUnits && !centralUnitError && allUnits.length > 0 && filteredUnits.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Filtrelere uygun daire bulunamadı</h2><button className="secondary-button" type="button" onClick={() => { setUnitSearch(''); setUnitPropertyFilter('all'); setUnitBuildingFilter('all'); setUnitFloorFilter('all'); setUnitOccupancyFilter('all'); setUnitStatusFilter('all') }}>Filtreleri Temizle</button></section>}
+          {!isLoadingCentralUnits && !centralUnitError && allUnits.length === 0 && (
+            <section className="panel entity-state-panel actionable-empty-state">
+              <h2>Henüz daire bulunmuyor</h2>
+              <p>Aktif bir blok veya binaya ilk daireyi ekleyin.</p>
+              {canCreateUnit && (
+                <button className="primary-button" type="button" onClick={() => void handleOpenNewUnit()}>
+                  Yeni Daire Ekle
+                </button>
+              )}
+            </section>
+          )}
+          {!isLoadingCentralUnits && !centralUnitError && allUnits.length > 0 && filteredUnits.length === 0 && (
+            <section className="panel entity-state-panel actionable-empty-state">
+              <h2>Filtrelere uygun daire bulunamadı</h2>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setUnitSearch('')
+                  setUnitPropertyFilter('all')
+                  setUnitBuildingFilter('all')
+                  setUnitFloorFilter('all')
+                  setUnitOccupancyFilter('all')
+                  setUnitStatusFilter('all')
+                }}
+              >
+                Filtreleri Temizle
+              </button>
+            </section>
+          )}
 
           {!isLoadingCentralUnits && !centralUnitError && filteredUnits.length > 0 && (
             <section className="panel entity-table-panel">
               <div className="responsive-table-wrapper">
                 <table className="management-table unit-management-table sticky-columns-table">
-                  <thead><tr><th>Daire / Bölüm No</th><th>Yapı</th><th>Blok / Bina</th><th>Kat</th><th>Tür</th><th>Brüt Alan</th><th>Net Alan</th><th>Doluluk</th><th>Durum</th><th>İşlemler</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th className="col-unit-no">Daire / Bölüm No</th>
+                      <th className="col-property">Yapı</th>
+                      <th className="col-building">Blok / Bina</th>
+                      <th className="col-floor">Kat</th>
+                      <th className="col-type">Tür</th>
+                      <th className="col-gross">Brüt Alan</th>
+                      <th className="col-net">Net Alan</th>
+                      <th className="col-occupancy">Doluluk</th>
+                      <th className="col-status">Durum</th>
+                      <th className="col-actions">İşlemler</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {filteredUnits.map((unit) => (
                       <tr key={unit.id}>
-                        <td><strong>{formatUnitNumber(unit.unitNumber)}</strong></td>
-                        <td>{unit.propertyName}</td>
-                        <td>{unit.buildingName}</td>
-                        <td>{formatFloorDisplay(unit.floorNumber)}</td>
-                        <td>{unit.unitTypeName}</td>
-                        <td>{unit.grossArea != null ? `${unit.grossArea} m²` : '—'}</td>
-                        <td>{unit.netArea != null ? `${unit.netArea} m²` : '—'}</td>
-                        <td><span className={`occupancy-state ${unit.activeOccupancyCount > 0 ? 'occupied' : 'vacant'}`}>{unit.activeOccupancyCount > 0 ? `Dolu (${unit.activeOccupancyCount})` : 'Boş'}</span></td>
-                        <td><span className={`status-badge ${unit.isActive ? 'active' : 'inactive'}`}>{unit.isActive ? 'Aktif' : 'Pasif'}</span></td>
-                        <td>
+                        <td className="col-unit-no"><strong>{formatUnitNumber(unit.unitNumber)}</strong></td>
+                        <td className="col-property">{unit.propertyName}</td>
+                        <td className="col-building">{unit.buildingName}</td>
+                        <td className="col-floor">{formatFloorDisplay(unit.floorNumber)}</td>
+                        <td className="col-type">{unit.unitTypeName}</td>
+                        <td className="col-gross">{unit.grossArea != null ? `${unit.grossArea} m²` : '—'}</td>
+                        <td className="col-net">{unit.netArea != null ? `${unit.netArea} m²` : '—'}</td>
+                        <td className="col-occupancy">
+                          <span className={`status-badge ${unit.activeOccupancyCount > 0 ? 'active' : 'inactive'}`}>
+                            {unit.activeOccupancyCount > 0 ? `Dolu (${unit.activeOccupancyCount})` : 'Boş'}
+                          </span>
+                        </td>
+                        <td className="col-status">
+                          <span className={`status-badge ${unit.isActive ? 'active' : 'inactive'}`}>
+                            {unit.isActive ? 'Aktif' : 'Pasif'}
+                          </span>
+                        </td>
+                        <td className="col-actions">
                           <RowActionsMenu
                             label={formatUnitNumber(unit.unitNumber)}
                             primaryAction={{ label: 'Detay', onSelect: () => { void handleOpenUnitDetail(unit) } }}
