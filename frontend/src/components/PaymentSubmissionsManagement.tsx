@@ -11,6 +11,7 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { RowActionsMenu } from './RowActionsMenu'
 import type {
   ApprovePaymentSubmissionPayload,
   Building,
@@ -307,6 +308,8 @@ export function PaymentSubmissionsManagement() {
     }
   }
 
+  const activeFilterCount = [statusFilter !== 'all', propertyFilter !== 'all', buildingFilter !== 'all', Boolean(searchQuery.trim())].filter(Boolean).length
+
   return (
     <div className="section-container entity-management-view">
       {/* Standard Entity Page Actions Header */}
@@ -371,24 +374,15 @@ export function PaymentSubmissionsManagement() {
           />
         </div>
 
-        {(statusFilter !== 'all' || propertyFilter !== 'all' || buildingFilter !== 'all' || Boolean(searchQuery)) && (
-          <div className="form-field" style={{ justifyContent: 'flex-end', flex: '0 0 auto' }}>
-            <label>&nbsp;</label>
-            <button
-              type="button"
-              className="ghost-button"
-              style={{ fontSize: '13px', height: '38px', whiteSpace: 'nowrap' }}
-              onClick={() => {
-                setStatusFilter('all')
-                setPropertyFilter('all')
-                setBuildingFilter('all')
-                setSearchQuery('')
-              }}
-            >
-              Filtreleri Temizle
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          disabled={activeFilterCount === 0}
+          onClick={() => { setStatusFilter('all'); setPropertyFilter('all'); setBuildingFilter('all'); setSearchQuery('') }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content: Standardized Management Table */}
@@ -467,7 +461,7 @@ export function PaymentSubmissionsManagement() {
                             Onaylandı
                           </span>
                         ) : item.status === 'REJECTED' ? (
-                          <span className="status-badge inactive">
+                          <span className="status-badge danger">
                             Reddedildi
                           </span>
                         ) : (
@@ -479,23 +473,9 @@ export function PaymentSubmissionsManagement() {
                     </td>
                     <td className="text-right">
                       {item.status === 'PENDING' ? (
-                        <button
-                          type="button"
-                          className="primary-button"
-                          style={{ padding: '4px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-                          onClick={() => handleOpenDetailDrawer(item)}
-                        >
-                          İncele
-                        </button>
+                        <RowActionsMenu label={`${item.submittedByFullName} ödeme başvurusu`} primaryAction={{ label: 'İncele', variant: 'primary', onSelect: () => handleOpenDetailDrawer(item) }} />
                       ) : (
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          style={{ padding: '4px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-                          onClick={() => handleOpenDetailDrawer(item)}
-                        >
-                          Detay
-                        </button>
+                        <RowActionsMenu label={`${item.submittedByFullName} ödeme başvurusu`} primaryAction={{ label: 'Detay', onSelect: () => handleOpenDetailDrawer(item) }} />
                       )}
                     </td>
                   </tr>

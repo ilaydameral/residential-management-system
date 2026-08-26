@@ -4,6 +4,7 @@ import { getTechnicalMaintenanceRequests } from '../api'
 import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
 import type { MaintenanceRequestListItemDto } from '../types'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { RowActionsMenu } from './RowActionsMenu'
 import { PageHeader } from './PageHeader'
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
@@ -279,13 +280,7 @@ export function TechnicalMaintenanceRequests() {
                         {formatDate(req.createdAt)}
                       </td>
                       <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="button outline small"
-                          type="button"
-                          onClick={() => handleOpenDetail(req.id)}
-                        >
-                          Detay
-                        </button>
+                        <RowActionsMenu label={req.title} primaryAction={{ label: 'Detay', onSelect: () => handleOpenDetail(req.id) }} />
                       </td>
                     </tr>
                   )

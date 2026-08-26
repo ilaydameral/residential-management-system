@@ -294,7 +294,7 @@ export function ResidentVehicles() {
                       Daire {v.unitNumber} · {v.buildingName}
                     </td>
                     <td>
-                      <span className={`status-badge ${v.isActive ? 'status-badge-approved' : 'status-badge-neutral'}`}>
+                      <span className={`status-badge ${v.isActive ? 'active' : 'inactive'}`}>
                         {v.isActive ? 'Aktif' : 'Pasif'}
                       </span>
                     </td>

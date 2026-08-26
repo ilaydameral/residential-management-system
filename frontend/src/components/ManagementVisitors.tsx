@@ -18,11 +18,11 @@ const VISITOR_TYPE_LABELS: Record<VisitorType, string> = {
 }
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  EXPECTED: 'status-badge-pending',
-  CHECKED_IN: 'status-badge-approved',
-  CHECKED_OUT: 'status-badge-neutral',
-  CANCELLED: 'status-badge-rejected',
-  EXPIRED: 'status-badge-rejected',
+  EXPECTED: 'warning',
+  CHECKED_IN: 'active',
+  CHECKED_OUT: 'inactive',
+  CANCELLED: 'danger',
+  EXPIRED: 'danger',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -392,7 +392,7 @@ export function ManagementVisitors() {
                       )}
                     </td>
                     <td className="col-status">
-                      <span className={`status-badge ${STATUS_BADGE_CLASSES[v.status] || 'status-badge-neutral'}`}>
+                      <span className={`status-badge ${STATUS_BADGE_CLASSES[v.status] || 'inactive'}`}>
                         {STATUS_LABELS[v.status] || v.status}
                       </span>
                     </td>
@@ -405,8 +405,7 @@ export function ManagementVisitors() {
                       {v.status === 'EXPECTED' && (
                         <button
                           type="button"
-                          className="primary-button"
-                          style={{ padding: '6px 12px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                          className="row-primary-action primary"
                           onClick={() => setCheckingInVisitor(v)}
                         >
                           Giriş Yap
@@ -415,8 +414,7 @@ export function ManagementVisitors() {
                       {v.status === 'CHECKED_IN' && (
                         <button
                           type="button"
-                          className="secondary-button"
-                          style={{ padding: '6px 12px', fontSize: '13px', whiteSpace: 'nowrap' }}
+                          className="row-primary-action"
                           onClick={() => setCheckingOutVisitor(v)}
                         >
                           Çıkış Yap

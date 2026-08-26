@@ -15,6 +15,7 @@ import {
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
@@ -565,6 +566,16 @@ export function MaintenanceRequestManagement() {
     }
   }
 
+  const activeFilterCount = [
+    propertyFilter !== 'all',
+    buildingFilter !== 'all',
+    viewMode === 'table' && statusFilter !== 'all',
+    priorityFilter !== 'all',
+    categoryFilter !== 'all',
+    assignedStaffFilter !== 'all',
+    Boolean(searchQuery.trim()),
+  ].filter(Boolean).length
+
   return (
     <div className="management-page">
       <PageHeader
@@ -766,6 +777,15 @@ export function MaintenanceRequestManagement() {
             }}
           />
         </div>
+        <button
+          type="button"
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          disabled={activeFilterCount === 0}
+          onClick={() => { setPropertyFilter('all'); setBuildingFilter('all'); setStatusFilter('all'); setPriorityFilter('all'); setCategoryFilter('all'); setAssignedStaffFilter('all'); setSearchQuery(''); setPage(1) }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content Area: Table View vs. Kanban View */}
@@ -839,13 +859,7 @@ export function MaintenanceRequestManagement() {
                         </td>
                         <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{formatDate(r.createdAt)}</td>
                         <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className="button outline small"
-                            type="button"
-                            onClick={() => handleViewDetail(r)}
-                          >
-                            Detay
-                          </button>
+                          <RowActionsMenu label={r.title} primaryAction={{ label: 'Detay', onSelect: () => handleViewDetail(r) }} />
                         </td>
                       </tr>
                     )

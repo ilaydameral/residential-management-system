@@ -38,11 +38,11 @@ const VISITOR_TYPE_LABELS: Record<VisitorType, string> = {
 }
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  EXPECTED: 'status-badge-pending',
-  CHECKED_IN: 'status-badge-approved',
-  CHECKED_OUT: 'status-badge-neutral',
-  CANCELLED: 'status-badge-rejected',
-  EXPIRED: 'status-badge-rejected',
+  EXPECTED: 'warning',
+  CHECKED_IN: 'active',
+  CHECKED_OUT: 'inactive',
+  CANCELLED: 'danger',
+  EXPIRED: 'danger',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -96,7 +96,7 @@ export function ResidentVisitorCard({
           </p>
         </div>
         <div className="resident-visitor-badges">
-          <span className={`status-badge ${STATUS_BADGE_CLASSES[visitor.status] || 'status-badge-neutral'}`}>
+          <span className={`status-badge ${STATUS_BADGE_CLASSES[visitor.status] || 'inactive'}`}>
             {STATUS_LABELS[visitor.status] || visitor.status}
           </span>
           <span className="visitor-type-chip">

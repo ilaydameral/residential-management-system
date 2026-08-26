@@ -17,7 +17,7 @@ export interface RowAction {
 }
 
 interface RowActionsMenuProps {
-  primaryAction: RowAction
+  primaryAction?: RowAction
   secondaryActions?: RowAction[]
   label: string
 }
@@ -108,14 +108,16 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
 
   return (
     <div className="row-actions">
-      <button
-        className={`row-primary-action ${primaryAction.variant === 'primary' ? 'primary' : ''}`}
-        type="button"
-        disabled={primaryAction.disabled}
-        onClick={primaryAction.onSelect}
-      >
-        {primaryAction.label}
-      </button>
+      {primaryAction && (
+        <button
+          className={`row-primary-action ${primaryAction.variant === 'primary' ? 'primary' : ''}`}
+          type="button"
+          disabled={primaryAction.disabled}
+          onClick={primaryAction.onSelect}
+        >
+          {primaryAction.label}
+        </button>
+      )}
       {secondaryActions.length > 0 && (
         <>
           <button
@@ -123,6 +125,7 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
             className="row-actions-trigger"
             type="button"
             aria-label={`${label} için diğer işlemler`}
+            title={`${label} için diğer işlemler`}
             aria-haspopup="menu"
             aria-expanded={isOpen}
             aria-controls={menuId}

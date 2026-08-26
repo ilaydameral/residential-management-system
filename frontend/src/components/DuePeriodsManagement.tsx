@@ -13,6 +13,7 @@ import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import type {
   CancelDuePeriodPayload,
   CreateDraftDuePeriodPayload,
@@ -183,6 +184,8 @@ export function DuePeriodsManagement() {
   useEffect(() => {
     void loadPeriods()
   }, [loadPeriods])
+
+  const activeFilterCount = [definitionFilter !== 'all', yearFilter !== 'all', monthFilter !== 'all', statusFilter !== 'all'].filter(Boolean).length
 
   // Open Create Draft Drawer
   const handleOpenDraftDrawer = () => {
@@ -364,6 +367,15 @@ export function DuePeriodsManagement() {
             <option value="CANCELLED">İptal Edildi (CANCELLED)</option>
           </select>
         </div>
+        <button
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          type="button"
+          disabled={activeFilterCount === 0}
+          onClick={() => { setDefinitionFilter('all'); setYearFilter('all'); setMonthFilter('all'); setStatusFilter('all') }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content: Standardized Management Table */}
@@ -449,33 +461,13 @@ export function DuePeriodsManagement() {
                       </td>
                       <td className="text-right">
                         {item.status === 'ISSUED' ? (
-                          <button
-                            type="button"
-                            className="primary-button"
-                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                            onClick={() => { void handleOpenCollectionDetails(item) }}
-                          >
-                            Tahsilat Detayı
-                          </button>
+                          <RowActionsMenu label={item.periodName} primaryAction={{ label: 'Tahsilat Detayı', onSelect: () => { void handleOpenCollectionDetails(item) } }} />
                         ) : item.status === 'DRAFT' ? (
-                          <div style={{ display: 'inline-flex', gap: '6px' }}>
-                            <button
-                              type="button"
-                              className="primary-button"
-                              style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                              onClick={() => { void handleOpenIssuePreview(item) }}
-                            >
-                              Önizle ve Yayınla
-                            </button>
-                            <button
-                              type="button"
-                              className="secondary-button"
-                              style={{ padding: '4px 10px', fontSize: '0.78rem', color: 'var(--color-danger)' }}
-                              onClick={() => handleOpenCancelModal(item)}
-                            >
-                              İptal Et
-                            </button>
-                          </div>
+                          <RowActionsMenu
+                            label={item.periodName}
+                            primaryAction={{ label: 'Önizle ve Yayınla', variant: 'primary', onSelect: () => { void handleOpenIssuePreview(item) } }}
+                            secondaryActions={[{ label: 'İptal Et', danger: true, onSelect: () => handleOpenCancelModal(item) }]}
+                          />
                         ) : (
                           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                             —
@@ -796,19 +788,19 @@ export function DuePeriodsManagement() {
                     <span className="status-badge active" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
                       Ödeyen: {collectionDetails.summary.paidUnitCount} Daire
                     </span>
-                    <span className="status-badge warning" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                    <span className="status-badge info">
                       Kısmi Ödeyen: {collectionDetails.summary.partiallyPaidUnitCount} Daire
                     </span>
-                    <span className="status-badge inactive" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                    <span className="status-badge inactive">
                       Ödenmedi: {collectionDetails.summary.unpaidUnitCount} Daire
                     </span>
                     {collectionDetails.summary.overdueUnitCount > 0 && (
-                      <span className="status-badge inactive" style={{ padding: '4px 10px', fontSize: '0.78rem', backgroundColor: '#fef2f2', color: '#991b1b' }}>
+                      <span className="status-badge danger">
                         Gecikmiş: {collectionDetails.summary.overdueUnitCount} Daire
                       </span>
                     )}
                     {collectionDetails.summary.pendingSubmissionUnitCount > 0 && (
-                      <span className="status-badge" style={{ padding: '4px 10px', fontSize: '0.78rem', backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+                      <span className="status-badge info">
                         Bekleyen Dekont: {collectionDetails.summary.pendingSubmissionUnitCount} Daire
                       </span>
                     )}

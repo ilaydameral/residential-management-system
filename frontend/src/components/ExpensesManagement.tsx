@@ -485,6 +485,14 @@ export function ExpensesManagement() {
     }, 0)
   }, [selectedUnitIds, manualAmounts])
 
+  const activeFilterCount = [
+    propertyFilter !== 'all',
+    buildingFilter !== 'all',
+    categoryFilter !== 'all',
+    statusFilter !== 'all',
+    Boolean(searchQuery.trim()),
+  ].filter(Boolean).length
+
   return (
     <div className="section-container entity-management-view">
       <PageHeader
@@ -569,25 +577,15 @@ export function ExpensesManagement() {
           />
         </div>
 
-        {(propertyFilter !== 'all' || buildingFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all' || Boolean(searchQuery)) && (
-          <div className="form-field" style={{ justifyContent: 'flex-end', flex: '0 0 auto' }}>
-            <label>&nbsp;</label>
-            <button
-              type="button"
-              className="ghost-button"
-              style={{ fontSize: '13px', height: '38px', whiteSpace: 'nowrap' }}
-              onClick={() => {
-                setPropertyFilter('all')
-                setBuildingFilter('all')
-                setCategoryFilter('all')
-                setStatusFilter('all')
-                setSearchQuery('')
-              }}
-            >
-              Filtreleri Temizle
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          disabled={activeFilterCount === 0}
+          onClick={() => { setPropertyFilter('all'); setBuildingFilter('all'); setCategoryFilter('all'); setStatusFilter('all'); setSearchQuery('') }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content: Standardized Management Table */}

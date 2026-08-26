@@ -265,7 +265,7 @@ export function ManagementVehicles() {
                     <td className="col-brand">{v.brandModel || '-'}</td>
                     <td className="col-color">{v.color || '-'}</td>
                     <td className="col-status">
-                      <span className={`status-badge ${v.isActive ? 'status-badge-approved' : 'status-badge-neutral'}`}>
+                      <span className={`status-badge ${v.isActive ? 'active' : 'inactive'}`}>
                         {v.isActive ? 'Aktif' : 'Pasif'}
                       </span>
                     </td>

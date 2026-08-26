@@ -13,6 +13,7 @@ import {
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
@@ -25,15 +26,15 @@ import type {
 } from '../types'
 
 const PRIORITY_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  NORMAL: { label: 'Normal', className: 'badge-secondary' },
-  IMPORTANT: { label: 'Önemli', className: 'badge-warning' },
-  URGENT: { label: 'Acil', className: 'badge-danger' },
+  NORMAL: { label: 'Normal', className: 'secondary' },
+  IMPORTANT: { label: 'Önemli', className: 'warning' },
+  URGENT: { label: 'Acil', className: 'danger' },
 }
 
 const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  DRAFT: { label: 'Taslak', className: 'badge-neutral' },
-  PUBLISHED: { label: 'Yayında', className: 'badge-success' },
-  CANCELLED: { label: 'İptal Edildi', className: 'badge-muted' },
+  DRAFT: { label: 'Taslak', className: 'inactive' },
+  PUBLISHED: { label: 'Yayında', className: 'active' },
+  CANCELLED: { label: 'İptal Edildi', className: 'inactive' },
 }
 
 function formatDate(dateStr: string | null): string {
@@ -324,6 +325,8 @@ export function AnnouncementManagement() {
     }
   }
 
+  const activeFilterCount = [propertyFilter !== 'all', buildingFilter !== 'all', statusFilter !== 'all', priorityFilter !== 'all', Boolean(searchQuery.trim())].filter(Boolean).length
+
   return (
     <div className="management-page">
       <PageHeader
@@ -428,26 +431,15 @@ export function AnnouncementManagement() {
           />
         </div>
 
-        {(propertyFilter !== 'all' || buildingFilter !== 'all' || statusFilter !== 'all' || priorityFilter !== 'all' || Boolean(searchQuery)) && (
-          <div className="form-field" style={{ justifyContent: 'flex-end', flex: '0 0 auto' }}>
-            <label>&nbsp;</label>
-            <button
-              type="button"
-              className="ghost-button"
-              style={{ fontSize: '13px', height: '38px', whiteSpace: 'nowrap' }}
-              onClick={() => {
-                setPropertyFilter('all')
-                setBuildingFilter('all')
-                setStatusFilter('all')
-                setPriorityFilter('all')
-                setSearchQuery('')
-                setPage(1)
-              }}
-            >
-              Filtreleri Temizle
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          disabled={activeFilterCount === 0}
+          onClick={() => { setPropertyFilter('all'); setBuildingFilter('all'); setStatusFilter('all'); setPriorityFilter('all'); setSearchQuery(''); setPage(1) }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Announcements Table */}
@@ -478,8 +470,8 @@ export function AnnouncementManagement() {
               </thead>
               <tbody>
                 {announcements.map((a) => {
-                  const prio = PRIORITY_LABEL_MAP[a.priority] || { label: a.priority, className: 'badge-secondary' }
-                  const status = STATUS_LABEL_MAP[a.status] || { label: a.status, className: 'badge-secondary' }
+                  const prio = PRIORITY_LABEL_MAP[a.priority] || { label: a.priority, className: 'secondary' }
+                  const status = STATUS_LABEL_MAP[a.status] || { label: a.status, className: 'secondary' }
                   return (
                     <tr key={a.id} className="clickable-row" onClick={() => handleViewDetail(a)}>
                       <td>
@@ -497,13 +489,7 @@ export function AnnouncementManagement() {
                       <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{formatDate(a.publishedAt)}</td>
                       <td style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>{a.createdByName}</td>
                       <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="button outline small"
-                          type="button"
-                          onClick={() => handleViewDetail(a)}
-                        >
-                          Detay
-                        </button>
+                        <RowActionsMenu label={a.title} primaryAction={{ label: 'Detay', onSelect: () => handleViewDetail(a) }} />
                       </td>
                     </tr>
                   )

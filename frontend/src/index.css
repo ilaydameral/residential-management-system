@@ -826,7 +826,22 @@ textarea::placeholder {
   color: var(--color-success);
 }
 
+.status-badge.success,
+.status-badge.status-badge-approved {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
 .status-badge.inactive {
+  border-color: var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-muted);
+}
+
+.status-badge.secondary,
+.status-badge.muted,
+.status-badge.status-badge-neutral {
   border-color: var(--color-border);
   background: var(--color-surface-secondary);
   color: var(--color-text-muted);
@@ -836,6 +851,12 @@ textarea::placeholder {
   border-color: var(--color-warning-border, rgba(234, 179, 8, 0.3));
   background: var(--color-warning-soft, rgba(234, 179, 8, 0.12));
   color: var(--color-warning, #d97706);
+}
+
+.status-badge.status-badge-pending {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
 }
 
 .status-badge.info {
@@ -848,6 +869,12 @@ textarea::placeholder {
   border-color: var(--color-danger-border, rgba(239, 68, 68, 0.3));
   background: var(--color-danger-soft, rgba(239, 68, 68, 0.12));
   color: var(--color-danger, #dc2626);
+}
+
+.status-badge.status-badge-rejected {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
 
 .status-message {
@@ -2997,7 +3024,7 @@ textarea:focus-visible,
 
 .management-table th,
 .management-table td {
-  padding: 15px 16px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-secondary);
   text-align: left;
@@ -3122,6 +3149,7 @@ textarea:focus-visible,
 }
 
 .row-primary-action {
+  min-height: 32px;
   padding: 5px 10px;
   white-space: nowrap;
 }
@@ -6121,16 +6149,25 @@ textarea:focus-visible,
    Phase 8 Commit 6: Due Management Views Design System Standardization
    ============================================================================ */
 
-.due-toolbar {
-  grid-template-columns: repeat(3, minmax(160px, 1fr)) minmax(200px, 1.4fr);
-}
-
-.exp-toolbar {
-  grid-template-columns: repeat(4, minmax(130px, 1fr)) minmax(200px, 1.8fr);
-}
-
+.due-toolbar,
+.exp-toolbar,
 .announcement-toolbar {
-  grid-template-columns: repeat(4, minmax(130px, 1fr)) minmax(180px, 1.4fr) auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.due-toolbar .form-field,
+.exp-toolbar .form-field,
+.announcement-toolbar .form-field {
+  flex: 1 1 160px;
+  min-width: 150px;
+}
+
+.due-toolbar .form-field:last-of-type,
+.exp-toolbar .form-field:last-of-type,
+.announcement-toolbar .form-field:last-of-type {
+  flex-grow: 1.5;
 }
 
 .request-toolbar {

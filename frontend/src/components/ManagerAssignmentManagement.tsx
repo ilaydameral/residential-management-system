@@ -15,6 +15,7 @@ import type { Building, ManagedUser, ManagerAssignment, Property } from '../type
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import { SaveShortcutHint } from './SaveShortcutHint'
 
 interface ManagerAssignmentManagementProps {
@@ -273,7 +274,7 @@ export function ManagerAssignmentManagement({ onDirtyChange }: ManagerAssignment
                   <td><strong>{formatDateTime(assignment.assignedAt)}</strong><span className="table-secondary-text">Atayan: {assignment.assignedByFullName}</span></td>
                   <td><span className={`status-badge ${assignment.isActive ? 'active' : 'inactive'}`}>{assignment.isActive ? 'Aktif' : 'Geçmiş'}</span></td>
                   <td className="manager-assignment-end-cell">{assignment.isActive ? '—' : <div className="manager-assignment-end-details"><strong>{formatDateTime(assignment.endedAt)}</strong><span className="table-secondary-text">{assignment.endedByFullName ? `Sonlandıran: ${assignment.endedByFullName}` : 'Sistem tarafından sonlandırıldı'}</span>{assignment.endReason && <span className="table-secondary-text end-reason">Neden: {assignment.endReason}</span>}</div>}</td>
-                  <td className="manager-assignment-actions-cell">{assignment.isActive ? <button className="action-button danger-btn" type="button" onClick={() => { setActionError(''); setEndReason(''); setEndingAssignment(assignment) }}>Sonlandır</button> : <span className="table-secondary-text">İşlem yok</span>}</td>
+                  <td className="manager-assignment-actions-cell">{assignment.isActive ? <RowActionsMenu label={assignment.managerFullName} secondaryActions={[{ label: 'Sonlandır', danger: true, onSelect: () => { setActionError(''); setEndReason(''); setEndingAssignment(assignment) } }]} /> : <span className="table-secondary-text">İşlem yok</span>}</td>
                 </tr>
               ))}</tbody>
             </table>

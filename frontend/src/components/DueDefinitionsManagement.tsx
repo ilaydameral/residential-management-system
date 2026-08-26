@@ -14,6 +14,7 @@ import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import type {
   Building,
   CreateDueDefinitionPayload,
@@ -163,6 +164,13 @@ export function DueDefinitionsManagement() {
         (d.buildingName && d.buildingName.toLowerCase().includes(q))
     )
   }, [definitions, searchQuery])
+
+  const activeFilterCount = [
+    propertyFilter !== 'all',
+    buildingFilter !== 'all',
+    activeFilter !== 'all',
+    Boolean(searchQuery.trim()),
+  ].filter(Boolean).length
 
   // Open Drawer for Create
   const handleOpenCreateDrawer = () => {
@@ -340,6 +348,15 @@ export function DueDefinitionsManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        <button
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          type="button"
+          disabled={activeFilterCount === 0}
+          onClick={() => { setPropertyFilter('all'); setBuildingFilter('all'); setActiveFilter('all'); setSearchQuery('') }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content: Sleek Grid List */}
@@ -384,27 +401,15 @@ export function DueDefinitionsManagement() {
 
               {/* Status & Compact Actions */}
               <div className="due-def-action-col">
-                <span className={`status-badge ${item.isActive ? 'badge-success' : 'badge-secondary'}`}>
+                <span className={`status-badge ${item.isActive ? 'active' : 'inactive'}`}>
                   {item.isActive ? 'Aktif' : 'Pasif'}
                 </span>
 
-                <button
-                  type="button"
-                  className="secondary-button"
-                  style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                  onClick={() => handleOpenEditDrawer(item)}
-                >
-                  Düzenle
-                </button>
-
-                <button
-                  type="button"
-                  className="secondary-button due-compact-toggle-btn"
-                  onClick={() => setToggleConfirmTarget(item)}
-                  title={item.isActive ? 'Pasife Al' : 'Aktife Al'}
-                >
-                  {item.isActive ? 'Pasif' : 'Aktif'}
-                </button>
+                <RowActionsMenu
+                  label={item.title}
+                  primaryAction={{ label: 'Düzenle', onSelect: () => handleOpenEditDrawer(item) }}
+                  secondaryActions={[{ label: item.isActive ? 'Pasife Al' : 'Aktife Al', danger: item.isActive, onSelect: () => setToggleConfirmTarget(item) }]}
+                />
               </div>
             </div>
           ))}
