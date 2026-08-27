@@ -98,6 +98,7 @@ export function ResidentFacilities() {
 
   // Booking / Detail Drawer
   const [selectedFacility, setSelectedFacility] = useState<CommonFacility | null>(null)
+  const [drawerMode, setDrawerMode] = useState<'detail' | 'reservation'>('detail')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0])
   const [availability, setAvailability] = useState<FacilityAvailability | null>(null)
@@ -189,13 +190,32 @@ export function ResidentFacilities() {
 
   const handleOpenFacilityDetail = (facility: CommonFacility) => {
     setSelectedFacility(facility)
+    setDrawerMode('detail')
     setSelectedSlot(null)
     setBookingNote('')
     setBookingError(null)
     setIsDrawerOpen(true)
+  }
+
+  const handleOpenReservation = (facility: CommonFacility) => {
+    setSelectedFacility(facility)
+    setDrawerMode('reservation')
+    setSelectedSlot(null)
+    setBookingNote('')
+    setBookingError(null)
+    if (!selectedUnitId && myUnits.length > 0) {
+      setSelectedUnitId(myUnits[0].unitId)
+    }
     const today = new Date().toISOString().split('T')[0]
     setSelectedDate(today)
+    setIsDrawerOpen(true)
     void fetchAvailability(facility.id, today)
+  }
+
+  const handleStartReservationFromDetail = () => {
+    if (!selectedFacility) return
+    handleOpenReservation(selectedFacility)
+    window.requestAnimationFrame(() => document.getElementById('booking-date')?.focus())
   }
 
   const handleDateChange = (newDate: string) => {
@@ -279,6 +299,10 @@ export function ResidentFacilities() {
   const pastReservations = useMemo(
     () => myReservations.filter((r) => new Date(r.endTime) < now),
     [myReservations, now]
+  )
+  const selectedReservationUnit = useMemo(
+    () => myUnits.find((unit) => unit.unitId === selectedUnitId) ?? null,
+    [myUnits, selectedUnitId]
   )
 
   return (
@@ -388,7 +412,7 @@ export function ResidentFacilities() {
                     <button
                       type="button"
                       className="row-primary-action primary"
-                      onClick={() => handleOpenFacilityDetail(facility)}
+                      onClick={() => handleOpenReservation(facility)}
                     >
                       Rezervasyon Yap
                     </button>
@@ -480,205 +504,243 @@ export function ResidentFacilities() {
         )}
       </div>
 
-      {/* FACILITY DETAIL & BOOKING DRAWER */}
+      {/* FACILITY DETAIL / BOOKING DRAWER */}
       {drawerAnimation.shouldRender && selectedFacility && (
         <>
           <button
             type="button"
             className={`drawer-backdrop drawer-${drawerAnimation.phase}`}
-            aria-label="Tesis detayını kapat"
+            aria-label={drawerMode === 'detail' ? 'Tesis detayını kapat' : 'Rezervasyon formunu kapat'}
             disabled={drawerAnimation.isClosing || isSubmittingBooking}
             onClick={closeDrawer}
           />
           <aside
             ref={drawerRef}
             tabIndex={-1}
-            className={`management-drawer drawer-${drawerAnimation.phase}`}
+            className={`management-drawer facility-booking-drawer drawer-${drawerAnimation.phase}`}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="facility-drawer-title"
+            aria-describedby="facility-drawer-description"
           >
             <div className="drawer-header">
               <div>
-                <span className="badge-context">
-                  {selectedFacility.buildingName
-                    ? `${selectedFacility.propertyName} / ${selectedFacility.buildingName}`
-                    : selectedFacility.propertyName}
-                </span>
-                <h2 id="facility-drawer-title" className="text-xl font-bold">
-                  {selectedFacility.name}
-                </h2>
+                <span className="eyebrow">{drawerMode === 'detail' ? 'TESİS DETAYI' : 'YENİ REZERVASYON'}</span>
+                <h2 id="facility-drawer-title">{selectedFacility.name}</h2>
+                <p id="facility-drawer-description" className="drawer-description">
+                  {drawerMode === 'detail'
+                    ? 'Tesisin kullanım bilgilerini ve rezervasyon kurallarını inceleyin.'
+                    : 'Dairenizi, tarihi ve uygun saat aralığını seçerek rezervasyon oluşturun.'}
+                </p>
               </div>
               <button
                 type="button"
                 className="drawer-close-button"
                 onClick={closeDrawer}
-                aria-label="Kapat"
+                aria-label={drawerMode === 'detail' ? 'Tesis detayını kapat' : 'Rezervasyon formunu kapat'}
                 disabled={isSubmittingBooking}
               >
                 ✕
               </button>
             </div>
 
-            <div className="drawer-body space-y-6">
-              {/* Facility Details Card */}
-              <div className="facility-rules-card">
-                <h4 className="font-semibold text-sm mb-2 text-muted uppercase tracking-wider">Tesis Kuralları & Detaylar</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted">Açılış-Kapanış:</span>{' '}
-                    <span className="font-medium">{selectedFacility.openingTime} - {selectedFacility.closingTime}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted">Slot Süresi:</span>{' '}
-                    <span className="font-medium">{selectedFacility.slotDurationMinutes} Dakika</span>
-                  </div>
-                  <div>
-                    <span className="text-muted">Max Aktif Hak:</span>{' '}
-                    <span className="font-medium">{selectedFacility.maxActiveReservationsPerResident} Rezervasyon</span>
-                  </div>
-                  <div>
-                    <span className="text-muted">İptal Süresi:</span>{' '}
-                    <span className="font-medium">En geç {selectedFacility.cancellationLeadTimeHours} saat önce</span>
-                  </div>
+            <div className="drawer-body facility-drawer-body">
+              {drawerMode === 'detail' ? (
+                <div className="facility-detail-content">
+                  {selectedFacility.description && (
+                    <p className="facility-detail-description">{selectedFacility.description}</p>
+                  )}
+
+                  <section className="facility-drawer-section" aria-labelledby="facility-location-title">
+                    <h3 id="facility-location-title">Konum ve Kapsam</h3>
+                    <dl className="facility-key-value-list">
+                      <div><dt>Yapı</dt><dd>{selectedFacility.propertyName}</dd></div>
+                      <div>
+                        <dt>Kapsam</dt>
+                        <dd>{selectedFacility.buildingName ?? 'Tüm Site Ortak Alanı'}</dd>
+                      </div>
+                      {selectedFacility.locationHint && (
+                        <div><dt>Konum Bilgisi</dt><dd>{selectedFacility.locationHint}</dd></div>
+                      )}
+                    </dl>
+                  </section>
+
+                  <section className="facility-drawer-section" aria-labelledby="facility-rules-title">
+                    <h3 id="facility-rules-title">Kullanım Bilgileri</h3>
+                    <dl className="facility-key-value-list">
+                      <div><dt>Çalışma Saatleri</dt><dd>{selectedFacility.openingTime}–{selectedFacility.closingTime}</dd></div>
+                      <div><dt>Süre</dt><dd>{selectedFacility.slotDurationMinutes} dk</dd></div>
+                      <div><dt>Kapasite</dt><dd>{selectedFacility.capacity} kişi</dd></div>
+                      <div>
+                        <dt>Onay</dt>
+                        <dd>{selectedFacility.requiresManagerApproval ? 'Yönetici onayı gerekir' : 'Anında onaylanır'}</dd>
+                      </div>
+                      <div><dt>Aktif Rezervasyon Hakkı</dt><dd>{selectedFacility.maxActiveReservationsPerResident}</dd></div>
+                      <div><dt>İptal</dt><dd>En geç {selectedFacility.cancellationLeadTimeHours} saat önce</dd></div>
+                    </dl>
+                  </section>
                 </div>
-                {selectedFacility.requiresManagerApproval && (
-                  <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-600 dark:text-amber-400">
-                    ⚠️ Bu tesis için yapılan rezervasyon talepleri site yönetiminin onayına gönderilir.
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="facility-reservation-content">
+                  <section className="facility-drawer-section" aria-labelledby="reservation-context-title">
+                    <h3 id="reservation-context-title">Rezervasyon Bilgileri</h3>
+                    <div className="facility-reservation-context">
+                      <div>
+                        <span>Tesis Kapsamı</span>
+                        <strong>{selectedFacility.buildingName ?? 'Tüm Site Ortak Alanı'}</strong>
+                      </div>
+                      {myUnits.length === 1 && (
+                        <div>
+                          <span>Daire</span>
+                          <strong>{myUnits[0].buildingName} / D:{myUnits[0].unitNumber}</strong>
+                        </div>
+                      )}
+                    </div>
 
-              {/* Unit Selector (If resident has multiple units) */}
-              {myUnits.length > 1 && (
-                <div className="form-group">
-                  <label htmlFor="unit-select" className="form-label">
-                    Rezervasyon Yapılacak Daire
-                  </label>
-                  <select
-                    id="unit-select"
-                    className="form-input"
-                    value={selectedUnitId || ''}
-                    onChange={(e) => setSelectedUnitId(Number(e.target.value))}
-                  >
-                    {myUnits.map((u) => (
-                      <option key={u.unitId} value={u.unitId}>
-                        {u.buildingName} / D:{u.unitNumber}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Date Selector */}
-              <div className="form-group">
-                <label htmlFor="booking-date" className="form-label">
-                  Tarih Seçin
-                </label>
-                <input
-                  id="booking-date"
-                  type="date"
-                  className="form-input"
-                  min={new Date().toISOString().split('T')[0]}
-                  value={selectedDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                />
-              </div>
-
-              {/* Booking Error Banner */}
-              {bookingError && (
-                <div className="status-message error-message" role="alert">
-                  {bookingError}
-                </div>
-              )}
-
-              {/* Availability Slot Picker Grid */}
-              <div className="form-group">
-                <label className="form-label flex justify-between items-center">
-                  <span>Müsait Saat Dilimleri ({selectedDate})</span>
-                  {isLoadingAvailability && <span className="text-xs text-muted animate-pulse">Yükleniyor...</span>}
-                </label>
-
-                {isLoadingAvailability ? (
-                  <LoadingSkeleton variant="table" rows={2} />
-                ) : availability && availability.slots.length > 0 ? (
-                  <div className="slot-grid">
-                    {availability.slots.map((slot, index) => {
-                      const startTimeDisplay = new Date(slot.startTime).toLocaleTimeString('tr-TR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                      const isSelected = selectedSlot?.startTime === slot.startTime
-                      const isAvailable = slot.status === 'AVAILABLE'
-
-                      return (
-                        <button
-                          key={index}
-                          type="button"
-                          disabled={!isAvailable}
-                          className={`slot-btn slot-status-${slot.status.toLowerCase()} ${
-                            isSelected ? 'selected' : ''
-                          }`}
-                          onClick={() => setSelectedSlot(slot)}
-                          title={slot.reason || undefined}
+                    {myUnits.length > 1 && (
+                      <div className="form-group facility-form-group">
+                        <label htmlFor="unit-select">Rezervasyon Yapılacak Daire</label>
+                        <select
+                          id="unit-select"
+                          className="form-input"
+                          value={selectedUnitId || ''}
+                          onChange={(e) => setSelectedUnitId(Number(e.target.value))}
                         >
-                          <span className="font-semibold">{startTimeDisplay}</span>
-                          <span className="text-[10px] block opacity-80">
-                            {slot.status === 'AVAILABLE'
-                              ? 'Müsait'
-                              : slot.status === 'BOOKED'
-                              ? 'Dolu'
-                              : slot.status === 'BLOCKED'
-                              ? 'Bakım'
-                              : 'Geçmiş'}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted">Bu tarih için kullanılabilir saat dilimi bulunamadı.</p>
-                )}
-              </div>
+                          {myUnits.map((unit) => (
+                            <option key={unit.unitId} value={unit.unitId}>
+                              {unit.buildingName} / D:{unit.unitNumber}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </section>
 
-              {/* Selected Slot Summary & Confirmation Form */}
-              {selectedSlot && (
-                <div className="booking-summary-card">
-                  <h4 className="font-bold text-sm mb-2">Rezervasyon Özeti</h4>
-                  <div className="text-sm space-y-1 text-muted">
-                    <p>
-                      <strong className="text-foreground">Tesis:</strong> {selectedFacility.name}
-                    </p>
-                    <p>
-                      <strong className="text-foreground">Tarih & Saat:</strong>{' '}
-                      {formatTimeRange(selectedSlot.startTime, selectedSlot.endTime)}
-                    </p>
-                  </div>
+                  <section className="facility-drawer-section" aria-labelledby="reservation-date-title">
+                    <h3 id="reservation-date-title">Tarih</h3>
+                    <div className="form-group facility-form-group">
+                      <label htmlFor="booking-date">Rezervasyon Tarihi</label>
+                      <input
+                        id="booking-date"
+                        data-drawer-initial-focus
+                        type="date"
+                        className="form-input"
+                        min={new Date().toISOString().split('T')[0]}
+                        value={selectedDate}
+                        onChange={(e) => handleDateChange(e.target.value)}
+                      />
+                    </div>
+                  </section>
 
-                  <div className="form-group mt-3">
-                    <label htmlFor="booking-note" className="form-label text-xs">
-                      Not / Açıklama (İsteğe Bağlı)
-                    </label>
-                    <input
-                      id="booking-note"
-                      type="text"
-                      className="form-input text-sm"
-                      placeholder="Örn: 4 kişi katılım sağlayacağız"
-                      value={bookingNote}
-                      onChange={(e) => setBookingNote(e.target.value)}
-                    />
-                  </div>
+                  {bookingError && (
+                    <div className="status-message error-message" role="alert">
+                      {bookingError}
+                    </div>
+                  )}
 
-                  <button
-                    type="button"
-                    className="btn btn-primary w-full mt-3"
-                    disabled={isSubmittingBooking}
-                    onClick={handleCreateBooking}
-                  >
-                    {isSubmittingBooking ? 'Oluşturuluyor...' : 'Rezervasyonu Oluştur'}
-                  </button>
+                  <section className="facility-drawer-section" aria-labelledby="available-slots-title">
+                    <div className="facility-section-heading-row">
+                      <h3 id="available-slots-title">Uygun Saatler</h3>
+                      {isLoadingAvailability && <span>Yükleniyor...</span>}
+                    </div>
+
+                    {isLoadingAvailability ? (
+                      <LoadingSkeleton variant="table" rows={2} />
+                    ) : availability && availability.slots.length > 0 ? (
+                      <div className="slot-grid" role="group" aria-label={`${selectedDate} tarihindeki saat seçenekleri`}>
+                        {availability.slots.map((slot, index) => {
+                          const startTimeDisplay = new Date(slot.startTime).toLocaleTimeString('tr-TR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                          const isSelected = selectedSlot?.startTime === slot.startTime
+                          const isAvailable = slot.status === 'AVAILABLE'
+                          const statusLabel = slot.status === 'AVAILABLE'
+                            ? 'Müsait'
+                            : slot.status === 'BOOKED'
+                            ? 'Dolu'
+                            : slot.status === 'BLOCKED'
+                            ? 'Bakım nedeniyle kapalı'
+                            : 'Geçmiş'
+
+                          return (
+                            <button
+                              key={index}
+                              type="button"
+                              disabled={!isAvailable}
+                              className={`slot-btn slot-status-${slot.status.toLowerCase()} ${isSelected ? 'selected' : ''}`}
+                              onClick={() => setSelectedSlot(slot)}
+                              title={slot.reason || statusLabel}
+                              aria-label={`${startTimeDisplay} – ${statusLabel}`}
+                              aria-pressed={isAvailable ? isSelected : undefined}
+                            >
+                              {startTimeDisplay}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="facility-inline-empty">Bu tarih için kullanılabilir saat dilimi bulunamadı.</p>
+                    )}
+                  </section>
+
+                  {selectedSlot && (
+                    <section className="booking-summary-card" aria-labelledby="booking-summary-title">
+                      <h3 id="booking-summary-title">Rezervasyon Özeti</h3>
+                      <dl className="facility-key-value-list compact">
+                        <div><dt>Tarih ve Saat</dt><dd>{formatTimeRange(selectedSlot.startTime, selectedSlot.endTime)}</dd></div>
+                        <div>
+                          <dt>Daire</dt>
+                          <dd>
+                            {selectedReservationUnit
+                              ? `${selectedReservationUnit.buildingName} / D:${selectedReservationUnit.unitNumber}`
+                              : 'Seçilmedi'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Onay Süreci</dt>
+                          <dd>{selectedFacility.requiresManagerApproval ? 'Yönetici onayına gönderilir' : 'Anında onaylanır'}</dd>
+                        </div>
+                      </dl>
+                    </section>
+                  )}
+
+                  <section className="facility-drawer-section" aria-labelledby="booking-note-title">
+                    <h3 id="booking-note-title">Not</h3>
+                    <div className="form-group facility-form-group">
+                      <label htmlFor="booking-note">Açıklama <span className="optional-label">(İsteğe bağlı)</span></label>
+                      <textarea
+                        id="booking-note"
+                        className="form-input"
+                        rows={3}
+                        placeholder="Örn: 4 kişi katılım sağlayacağız"
+                        value={bookingNote}
+                        onChange={(e) => setBookingNote(e.target.value)}
+                      />
+                    </div>
+                  </section>
                 </div>
+              )}
+            </div>
+
+            <div className="drawer-footer facility-drawer-footer">
+              <button className="secondary-button" type="button" onClick={closeDrawer} disabled={isSubmittingBooking}>
+                {drawerMode === 'detail' ? 'Kapat' : 'Vazgeç'}
+              </button>
+              {drawerMode === 'detail' ? (
+                <button className="primary-button" type="button" onClick={handleStartReservationFromDetail}>
+                  Rezervasyon Yap
+                </button>
+              ) : (
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!selectedSlot || !selectedUnitId || isSubmittingBooking}
+                  onClick={handleCreateBooking}
+                >
+                  {isSubmittingBooking ? 'Oluşturuluyor...' : 'Rezervasyonu Oluştur'}
+                </button>
               )}
             </div>
           </aside>
