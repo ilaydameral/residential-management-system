@@ -18,6 +18,7 @@ public interface IFacilityService
     Task DeleteMaintenanceBlockAsync(int blockId, int currentUserId, bool isAdmin);
 
     // Resident - Availability & Booking
+    Task<List<CommonFacilityDto>> GetResidentFacilitiesAsync(int residentUserId);
     Task<FacilityAvailabilityDto> GetFacilityAvailabilityAsync(int facilityId, DateTime date, int residentUserId);
     Task<FacilityReservationDto> CreateReservationAsync(CreateReservationDto dto, int residentUserId);
     Task<FacilityReservationDto> CancelReservationAsync(long reservationId, int residentUserId);

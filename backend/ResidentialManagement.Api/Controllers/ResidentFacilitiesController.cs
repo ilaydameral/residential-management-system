@@ -9,6 +9,7 @@ using ResidentialManagement.Api.Services;
 namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
+[Route("api/resident")]
 [Authorize(Roles = AppRoles.Resident)]
 public class ResidentFacilitiesController : ControllerBase
 {
@@ -19,7 +20,15 @@ public class ResidentFacilitiesController : ControllerBase
         _facilityService = facilityService;
     }
 
-    [HttpGet("api/resident/facilities/{facilityId}/availability")]
+    [HttpGet("facilities")]
+    public async Task<ActionResult<List<CommonFacilityDto>>> GetFacilities()
+    {
+        var residentUserId = GetCurrentUserId();
+        var facilities = await _facilityService.GetResidentFacilitiesAsync(residentUserId);
+        return Ok(facilities);
+    }
+
+    [HttpGet("facilities/{facilityId}/availability")]
     public async Task<ActionResult<FacilityAvailabilityDto>> GetAvailability(int facilityId, [FromQuery] DateTime date)
     {
         var residentUserId = GetCurrentUserId();
@@ -27,7 +36,7 @@ public class ResidentFacilitiesController : ControllerBase
         return Ok(availability);
     }
 
-    [HttpPost("api/resident/facility-reservations")]
+    [HttpPost("facility-reservations")]
     public async Task<ActionResult<FacilityReservationDto>> CreateReservation([FromBody] CreateReservationDto dto)
     {
         var residentUserId = GetCurrentUserId();
@@ -35,7 +44,7 @@ public class ResidentFacilitiesController : ControllerBase
         return Ok(reservation);
     }
 
-    [HttpPut("api/resident/facility-reservations/{id}/cancel")]
+    [HttpPut("facility-reservations/{id}/cancel")]
     public async Task<ActionResult<FacilityReservationDto>> CancelReservation(long id)
     {
         var residentUserId = GetCurrentUserId();
@@ -43,7 +52,7 @@ public class ResidentFacilitiesController : ControllerBase
         return Ok(reservation);
     }
 
-    [HttpGet("api/resident/facility-reservations/my")]
+    [HttpGet("facility-reservations/my")]
     public async Task<ActionResult<List<FacilityReservationDto>>> GetMyReservations()
     {
         var residentUserId = GetCurrentUserId();

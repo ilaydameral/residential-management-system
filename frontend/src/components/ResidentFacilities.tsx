@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   cancelFacilityReservation,
   createFacilityReservation,
-  getFacilities,
   getFacilityAvailability,
   getMyFacilityReservations,
   getMyUnits,
+  getResidentFacilities,
 } from '../api'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
@@ -130,7 +130,7 @@ export function ResidentFacilities() {
     setError(null)
     try {
       const [facList, resList, unitList] = await Promise.all([
-        getFacilities({ isActive: true }),
+        getResidentFacilities(),
         getMyFacilityReservations(),
         getMyUnits(),
       ])
@@ -380,10 +380,17 @@ export function ResidentFacilities() {
                   <div className="facility-card-footer">
                     <button
                       type="button"
-                      className="btn btn-primary w-full"
+                      className="row-primary-action"
                       onClick={() => handleOpenFacilityDetail(facility)}
                     >
-                      Rezervasyon Yap / Detay
+                      Detay
+                    </button>
+                    <button
+                      type="button"
+                      className="row-primary-action primary"
+                      onClick={() => handleOpenFacilityDetail(facility)}
+                    >
+                      Rezervasyon Yap
                     </button>
                   </div>
                 </article>

@@ -1483,6 +1483,13 @@ export async function getFacilities(params?: {
   return handleResponse<CommonFacility[]>(response)
 }
 
+export async function getResidentFacilities(): Promise<CommonFacility[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facilities`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility[]>(response)
+}
+
 export async function getFacility(id: number): Promise<CommonFacility> {
   const response = await safeFetch(`${API_BASE_URL}/api/facilities/${id}`, {
     headers: getAuthHeaders(),

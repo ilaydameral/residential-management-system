@@ -259,6 +259,33 @@ public class FacilityService : IFacilityService
 
     // --- RESIDENT - AVAILABILITY & BOOKING ---
 
+    public async Task<List<CommonFacilityDto>> GetResidentFacilitiesAsync(int residentUserId)
+    {
+        var utcNow = DateTime.UtcNow;
+
+        var facilities = await _context.CommonFacilities
+            .Include(f => f.Property)
+            .Include(f => f.Building)
+            .AsNoTracking()
+            .Where(f => f.IsActive &&
+                _context.UnitOccupancies.Any(occupancy =>
+                    occupancy.UserId == residentUserId &&
+                    occupancy.IsActive &&
+                    occupancy.StartDate <= utcNow &&
+                    (!occupancy.EndDate.HasValue || occupancy.EndDate.Value >= utcNow) &&
+                    occupancy.Unit.IsActive &&
+                    occupancy.Unit.Building.IsActive &&
+                    occupancy.Unit.Building.Property.IsActive &&
+                    occupancy.OccupancyType.IsActive &&
+                    occupancy.Unit.Building.PropertyId == f.PropertyId &&
+                    (!f.BuildingId.HasValue || occupancy.Unit.BuildingId == f.BuildingId.Value)))
+            .OrderBy(f => f.Property.Name)
+            .ThenBy(f => f.Name)
+            .ToListAsync();
+
+        return facilities.Select(MapFacilityToDto).ToList();
+    }
+
     public async Task<FacilityAvailabilityDto> GetFacilityAvailabilityAsync(int facilityId, DateTime date, int residentUserId)
     {
         var facility = await _context.CommonFacilities
