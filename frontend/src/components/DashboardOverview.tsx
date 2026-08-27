@@ -6,6 +6,7 @@ import { ActivityFeedWidget } from './ActivityFeedWidget'
 
 interface DashboardOverviewProps {
   onNavigate: (view: string, params?: Record<string, string>) => void
+  isAdmin: boolean
 }
 
 const SUMMARY_CARDS: Array<{
@@ -25,14 +26,15 @@ const QUICK_ACTIONS: Array<{
   label: string
   description: string
   view: string
+  adminOnly?: boolean
 }> = [
   { label: 'Yeni Yapı', description: 'Yapı yönetimine git', view: 'properties' },
   { label: 'Yeni Daire', description: 'Daire yönetimine git', view: 'units' },
   { label: 'Sakin Ata', description: 'Site sakinlerine git', view: 'residents' },
-  { label: 'Kullanıcı Ara', description: 'Kullanıcılara git', view: 'users' },
+  { label: 'Kullanıcı Ara', description: 'Kullanıcılara git', view: 'users', adminOnly: true },
 ]
 
-export default function DashboardOverview({ onNavigate }: DashboardOverviewProps) {
+export default function DashboardOverview({ onNavigate, isAdmin }: DashboardOverviewProps) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -95,7 +97,7 @@ export default function DashboardOverview({ onNavigate }: DashboardOverviewProps
           <p>Sık kullanılan yönetim ekranlarına doğrudan geçin.</p>
         </div>
         <div className="dashboard-actions-grid">
-          {QUICK_ACTIONS.map((action) => (
+          {QUICK_ACTIONS.filter((action) => !action.adminOnly || isAdmin).map((action) => (
             <button key={action.label} type="button" onClick={() => onNavigate(action.view)}>
               <strong>{action.label}</strong>
               <span>{action.description} →</span>

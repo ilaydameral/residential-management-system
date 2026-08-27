@@ -623,6 +623,10 @@ function App() {
         navigate('/dashboard', { replace: true })
         return
       }
+      if (location.pathname === MANAGEMENT_VIEW_PATHS.dataImport && !hasRole('ADMIN')) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
       if (
         location.pathname === MANAGEMENT_VIEW_PATHS.managerScope &&
         (!hasRole('MANAGER') || hasRole('ADMIN'))
@@ -1870,7 +1874,10 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'overview' && (
         <section className="section-container">
-          <DashboardOverview onNavigate={(view, params) => void handleManagementNavigation(view, params)} />
+          <DashboardOverview
+            onNavigate={(view, params) => void handleManagementNavigation(view, params)}
+            isAdmin={hasRole('ADMIN')}
+          />
         </section>
       )}
 

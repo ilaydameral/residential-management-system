@@ -10,7 +10,7 @@ namespace ResidentialManagement.Api.Controllers;
 
 [ApiController]
 [Route("api/imports")]
-[Authorize(Roles = AppRoles.AdminOrManager)]
+[Authorize(Roles = AppRoles.Admin)]
 public class DataImportController : ControllerBase
 {
     private readonly IDataImportService _importService;
