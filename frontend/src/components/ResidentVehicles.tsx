@@ -13,6 +13,8 @@ import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { useResidentUnits } from '../hooks/useResidentUnits'
 import { SaveShortcutHint } from './SaveShortcutHint'
+import { LoadingSkeleton } from './LoadingSkeleton'
+import { useToast } from '../context/ToastContext'
 
 const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
   CAR: 'Otomobil',
@@ -24,9 +26,10 @@ const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
 
 export function ResidentVehicles() {
   const { groupedUnits, loading: unitsLoading, refetch: refetchUnits } = useResidentUnits()
+  const { showToast } = useToast()
   const [vehicles, setVehicles] = useState<ResidentVehicle[]>([])
   const [loading, setLoading] = useState(true)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Drawer State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -59,8 +62,10 @@ export function ResidentVehicles() {
   const handleCloseDrawer = async () => {
     if (isSaving) return
     if (!(await requestDiscard())) return
-    setIsDrawerOpen(false)
-    setEditingVehicle(null)
+    drawerAnimation.close(() => {
+      setIsDrawerOpen(false)
+      setEditingVehicle(null)
+    })
   }
 
   const drawerRef = useDrawerAccessibility({
@@ -79,11 +84,12 @@ export function ResidentVehicles() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const vList = await getResidentVehicles()
       setVehicles(vList)
       await refetchUnits()
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Araçlar yüklenemedi.')
+      setLoadError(err instanceof Error ? err.message : 'Araçlar yüklenemedi.')
     } finally {
       setLoading(false)
     }
@@ -93,15 +99,9 @@ export function ResidentVehicles() {
     loadData()
   }, [loadData])
 
-  useEffect(() => {
-    if (!toastMessage) return
-    const timer = setTimeout(() => setToastMessage(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toastMessage])
-
   const handleOpenNewDrawer = () => {
     if (groupedUnits.length === 0) {
-      setToastMessage('Aktif daire yerleşiminiz bulunmadığı için araç kaydı oluşturamazsınız.')
+      showToast('Aktif daire yerleşiminiz bulunmadığı için araç kaydı oluşturamazsınız.', 'info')
       return
     }
 
@@ -156,14 +156,16 @@ export function ResidentVehicles() {
           color: formData.color,
         }
         await updateResidentVehicle(editingVehicle.id, updatePayload)
-        setToastMessage('Araç bilgileri güncellendi.')
+        showToast('Araç bilgileri güncellendi.')
       } else {
         await createResidentVehicle(formData)
-        setToastMessage('Araç kaydı başarıyla oluşturuldu.')
+        showToast('Araç kaydı başarıyla oluşturuldu.')
       }
 
-      setIsDrawerOpen(false)
-      setEditingVehicle(null)
+      drawerAnimation.close(() => {
+        setIsDrawerOpen(false)
+        setEditingVehicle(null)
+      })
       await loadData()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Araç işlemi başarısız.')
@@ -181,10 +183,10 @@ export function ResidentVehicles() {
     try {
       setIsTogglingStatus(true)
       await setResidentVehicleStatus(v.id, true)
-      setToastMessage(`${v.plateNumber} plakalı araç aktifleştirildi.`)
+      showToast(`${v.plateNumber} plakalı araç aktifleştirildi.`)
       await loadData()
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Durum değiştirilemedi.')
+      showToast(err instanceof Error ? err.message : 'Durum değiştirilemedi.', 'error')
     } finally {
       setIsTogglingStatus(false)
     }
@@ -195,11 +197,11 @@ export function ResidentVehicles() {
     try {
       setIsTogglingStatus(true)
       await setResidentVehicleStatus(deactivatingVehicle.id, false)
-      setToastMessage(`${deactivatingVehicle.plateNumber} plakalı araç pasife alındı.`)
+      showToast(`${deactivatingVehicle.plateNumber} plakalı araç pasife alındı.`)
       setDeactivatingVehicle(null)
       await loadData()
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Araç pasife alınamadı.')
+      showToast(err instanceof Error ? err.message : 'Araç pasife alınamadı.', 'error')
     } finally {
       setIsTogglingStatus(false)
     }
@@ -207,25 +209,6 @@ export function ResidentVehicles() {
 
   return (
     <section className="resident-view-content" aria-label="Araçlarım">
-      {/* Toast Banner */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '16px',
-          right: '16px',
-          zIndex: 50,
-          padding: '16px',
-          borderRadius: '8px',
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          fontSize: '14px',
-          color: 'var(--color-text-primary)'
-        }}>
-          {toastMessage}
-        </div>
-      )}
-
       {/* Page Header Row */}
       <div className="page-header-row" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
         <div>
@@ -248,7 +231,12 @@ export function ResidentVehicles() {
       {/* Content Surface Card */}
       <div className="management-card" style={{ padding: '20px' }}>
         {loading || unitsLoading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Araçlar yükleniyor...</div>
+          <LoadingSkeleton variant="table" rows={4} />
+        ) : loadError ? (
+          <section className="panel entity-state-panel error-state" role="alert">
+            <p className="status-message error-message">{loadError}</p>
+            <button type="button" className="secondary-button" onClick={() => void loadData()}>Tekrar Dene</button>
+          </section>
         ) : vehicles.length === 0 ? (
           <div className="panel entity-state-panel" style={{ padding: '48px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--color-surface-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', marginBottom: '8px' }}>
@@ -338,18 +326,28 @@ export function ResidentVehicles() {
       {/* New / Edit Drawer */}
       {drawerAnimation.phase !== 'closed' && (
         <>
-          <div
-            className={`drawer-backdrop ${drawerAnimation.phase === 'open' ? 'backdrop-open' : 'backdrop-closing'}`}
+          <button
+            type="button"
+            className={`drawer-backdrop drawer-${drawerAnimation.phase}`}
+            aria-label="Araç formunu kapat"
+            disabled={drawerAnimation.isClosing || isSaving}
             onClick={handleCloseDrawer}
           />
-          <div
-            ref={drawerRef as any}
+          <aside
+            ref={drawerRef}
             tabIndex={-1}
             className={`management-drawer drawer-${drawerAnimation.phase}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vehicle-drawer-title"
           >
             <div className="drawer-header">
-              <h2>{editingVehicle ? 'Araç Bilgilerini Düzenle' : 'Yeni Araç'}</h2>
-              <button type="button" className="close-button" onClick={handleCloseDrawer} disabled={isSaving}>
+              <div>
+                <p className="eyebrow">Araç Yönetimi</p>
+                <h2 id="vehicle-drawer-title" tabIndex={-1} data-drawer-initial-focus>{editingVehicle ? 'Araç Bilgilerini Düzenle' : 'Yeni Araç'}</h2>
+                <p className="drawer-description">Dairenize bağlı araç bilgilerini düzenleyin.</p>
+              </div>
+              <button type="button" className="drawer-close-button" aria-label="Kapat" onClick={handleCloseDrawer} disabled={isSaving}>
                 ✕
               </button>
             </div>
@@ -357,7 +355,7 @@ export function ResidentVehicles() {
             <form onSubmit={handleSubmit} className="drawer-form" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
                 {formError && (
-                  <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--color-danger-soft, #fce8e6)', color: 'var(--color-danger, #c5221f)', fontSize: '14px', border: '1px solid var(--color-danger-border, #f5c6cb)' }}>
+                  <div className="status-message error-message" role="alert">
                     {formError}
                   </div>
                 )}
@@ -463,7 +461,7 @@ export function ResidentVehicles() {
                 </button>
               </div>
             </form>
-          </div>
+          </aside>
         </>
       )}
 

@@ -31,6 +31,7 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { RowActionsMenu } from './RowActionsMenu'
 import { SaveShortcutHint } from './SaveShortcutHint'
+import { useToast } from '../context/ToastContext'
 
 const STATUS_BADGE_MAP: Record<string, { label: string; className: string }> = {
   PENDING: { label: 'Onay Bekliyor', className: 'status-badge warning' },
@@ -57,6 +58,7 @@ function formatDateTime(dateStr: string): string {
 
 export function ManagementFacilities() {
   const realtime = useRealtime()
+  const { showToast } = useToast()
 
   // Primary Tabs
   const [activeTab, setActiveTab] = useState<'facilities' | 'reservations' | 'maintenance'>('facilities')
@@ -70,7 +72,6 @@ export function ManagementFacilities() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Reservation & Facility Filters
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
@@ -159,13 +160,6 @@ export function ManagementFacilities() {
     onClose: () => { void closeFacilityDrawer() },
     isSaving: isSavingFacility,
   })
-
-  // Toast Auto-dismiss
-  useEffect(() => {
-    if (!toastMessage) return
-    const timer = setTimeout(() => setToastMessage(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toastMessage])
 
   // Load Data
   const loadData = useCallback(async () => {
@@ -308,10 +302,10 @@ export function ManagementFacilities() {
           cancellationLeadTimeHours: facilityFormData.cancellationLeadTimeHours,
         }
         await updateFacility(editingFacility.id, payload)
-        setToastMessage('Tesis başarıyla güncellendi.')
+        showToast('Tesis başarıyla güncellendi.')
       } else {
         await createFacility(facilityFormData)
-        setToastMessage('Yeni tesis başarıyla oluşturuldu.')
+        showToast('Yeni tesis başarıyla oluşturuldu.')
       }
 
       closeFacilityDrawerState()
@@ -332,10 +326,10 @@ export function ManagementFacilities() {
     setIsTogglingStatus(true)
     try {
       await setFacilityStatus(facility.id, true)
-      setToastMessage(`${facility.name} tesisi aktifleştirildi.`)
+      showToast(`${facility.name} tesisi aktifleştirildi.`)
       setFacilities(await getFacilities())
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Durum değiştirilemedi.')
+      showToast(err instanceof Error ? err.message : 'Durum değiştirilemedi.', 'error')
     } finally {
       setIsTogglingStatus(false)
     }
@@ -346,10 +340,10 @@ export function ManagementFacilities() {
     setIsTogglingStatus(true)
     try {
       await setFacilityStatus(deactivatingFacility.id, false)
-      setToastMessage(`${deactivatingFacility.name} tesisi pasife alındı.`)
+      showToast(`${deactivatingFacility.name} tesisi pasife alındı.`)
       setFacilities(await getFacilities())
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Tesis pasife alınamadı.')
+      showToast(err instanceof Error ? err.message : 'Tesis pasife alınamadı.', 'error')
     } finally {
       setIsTogglingStatus(false)
       setDeactivatingFacility(null)
@@ -362,10 +356,10 @@ export function ManagementFacilities() {
     setIsReviewing(true)
     try {
       await approveFacilityReservation(approvingReservation.id)
-      setToastMessage('Rezervasyon onaylandı.')
+      showToast('Rezervasyon onaylandı.')
       setReservations(await getManagementFacilityReservations())
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Rezervasyon onaylanamadı.')
+      showToast(err instanceof Error ? err.message : 'Rezervasyon onaylanamadı.', 'error')
     } finally {
       setIsReviewing(false)
       setApprovingReservation(null)
@@ -379,10 +373,10 @@ export function ManagementFacilities() {
       await rejectFacilityReservation(rejectingReservation.id, {
         rejectionReason: rejectionReason.trim() || undefined,
       })
-      setToastMessage('Rezervasyon reddedildi.')
+      showToast('Rezervasyon reddedildi.')
       setReservations(await getManagementFacilityReservations())
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Rezervasyon reddedilemedi.')
+      showToast(err instanceof Error ? err.message : 'Rezervasyon reddedilemedi.', 'error')
     } finally {
       setIsReviewing(false)
       setRejectingReservation(null)
@@ -404,7 +398,7 @@ export function ManagementFacilities() {
     setIsSavingBlock(true)
     try {
       await createMaintenanceBlock(selectedBlockFacilityId, blockFormData)
-      setToastMessage('Bakım bloğu oluşturuldu.')
+      showToast('Bakım bloğu oluşturuldu.')
       setIsBlockFormOpen(false)
       setBlockFormData({ startTime: '', endTime: '', reason: '' })
       await loadBlocks(selectedBlockFacilityId)
@@ -423,12 +417,12 @@ export function ManagementFacilities() {
   const handleDeleteBlock = async (blockId: number) => {
     try {
       await deleteMaintenanceBlock(blockId)
-      setToastMessage('Bakım bloğu silindi.')
+      showToast('Bakım bloğu silindi.')
       if (selectedBlockFacilityId) {
         await loadBlocks(selectedBlockFacilityId)
       }
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Bakım bloğu silinemedi.')
+      showToast(err instanceof Error ? err.message : 'Bakım bloğu silinemedi.', 'error')
     }
   }
 
@@ -497,12 +491,6 @@ export function ManagementFacilities() {
   return (
     <section className="central-user-view entity-management-view" aria-busy={isLoading}>
       {/* Toast Notification */}
-      {toastMessage && (
-        <div className="toast toast-success" role="alert" aria-live="polite">
-          {toastMessage}
-        </div>
-      )}
-
       {/* Tab Navigation Strip */}
       <div className="panel facility-tab-strip">
         <button
@@ -881,7 +869,7 @@ export function ManagementFacilities() {
           {isBlockFormOpen && (
             <div className="form-card bg-card p-4 rounded-lg border border-border mb-4">
               <h3 className="font-bold text-md mb-3">Yeni Bakım Bloğu Oluştur</h3>
-              {blockFormError && <div className="alert-box danger mb-3">{blockFormError}</div>}
+              {blockFormError && <div className="status-message error-message" role="alert">{blockFormError}</div>}
               <form onSubmit={handleSaveBlock} className="space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
@@ -1276,34 +1264,30 @@ export function ManagementFacilities() {
 
       {/* Rejection Dialog */}
       {rejectingReservation && (
-        <div className="management-drawer-backdrop drawer-phase-enter" onClick={() => setRejectingReservation(null)}>
-          <div className="modal-card max-w-md w-full p-4 bg-card rounded-lg border border-border" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-lg mb-2">Rezervasyon Reddi</h3>
-            <p className="text-sm text-muted mb-3">
-              {rejectingReservation.residentName} sakininin {rejectingReservation.facilityName} talebini reddetmek üzeresiniz.
-            </p>
-
-            <div className="form-group mb-4">
-              <label className="form-label">Red Gerekçesi (İsteğe Bağlı)</label>
-              <textarea
-                className="form-input text-sm"
-                rows={3}
-                placeholder="Örn: Tesis bu saat diliminde bakım nedeniyle kapalıdır."
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-              />
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <button type="button" className="secondary-button" onClick={() => setRejectingReservation(null)}>
-                İptal
-              </button>
-              <button type="button" className="danger-button" disabled={isReviewing} onClick={handleReject}>
-                {isReviewing ? 'Reddediliyor...' : 'Reddet'}
-              </button>
-            </div>
+        <ConfirmationDialog
+          title="Rezervasyon Talebini Reddet"
+          message={`${rejectingReservation.residentName} sakininin ${rejectingReservation.facilityName} talebini reddetmek istediğinizden emin misiniz?`}
+          confirmLabel="Reddet"
+          danger
+          isLoading={isReviewing}
+          onConfirm={handleReject}
+          onCancel={() => {
+            setRejectingReservation(null)
+            setRejectionReason('')
+          }}
+        >
+          <div className="confirmation-form-field">
+            <label htmlFor="reservation-rejection-reason">Red Gerekçesi (İsteğe Bağlı)</label>
+            <textarea
+              id="reservation-rejection-reason"
+              rows={3}
+              maxLength={500}
+              placeholder="Örn: Tesis bu saat diliminde bakım nedeniyle kapalıdır."
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+            />
           </div>
-        </div>
+        </ConfirmationDialog>
       )}
 
       {/* Deactivate Facility Confirmation Dialog */}

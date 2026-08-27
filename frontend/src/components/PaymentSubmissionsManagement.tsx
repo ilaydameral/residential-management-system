@@ -502,16 +502,17 @@ export function PaymentSubmissionsManagement() {
             className={`management-drawer payment-submission-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="payment-submission-drawer-title"
             style={{ width: 'min(580px, 100%)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Ödeme Yönetimi</p>
-                <h2>Ödeme Başvurusu Detayı</h2>
+                <h2 id="payment-submission-drawer-title">Ödeme Başvurusu Detayı</h2>
                 <p className="drawer-description">Sakin tarafından iletilen ödeme bildirimi ve dekont bilgileri.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDrawerOpen(false)}>×</button>
             </div>
 
             <div className="drawer-body">

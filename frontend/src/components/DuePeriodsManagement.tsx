@@ -499,15 +499,16 @@ export function DuePeriodsManagement() {
             className={`management-drawer drawer-${draftDrawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="due-period-drawer-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Aidat Yönetimi</p>
-                <h2>Yeni Taslak Aidat Dönemi</h2>
+                <h2 id="due-period-drawer-title">Yeni Taslak Aidat Dönemi</h2>
                 <p className="drawer-description">Aidat tanımına bağlı yeni dönem borçlandırma taslağı hazırlayın.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDraftDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDraftDrawerOpen(false)}>×</button>
             </div>
 
             <form className="property-form drawer-form" onSubmit={(e) => { void handleSubmitDraft(e) }}>
@@ -731,18 +732,19 @@ export function DuePeriodsManagement() {
             className={`management-drawer drawer-${collectionDrawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="collection-drawer-title"
             style={{ width: '880px', maxWidth: '95vw' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Aidat Tahsilat Raporu</p>
-                <h2>{collectionPeriodTarget?.periodName} — Tahsilat Detayı</h2>
+                <h2 id="collection-drawer-title">{collectionPeriodTarget?.periodName} — Tahsilat Detayı</h2>
                 <p className="drawer-description">
                   {collectionPeriodTarget?.dueDefinitionTitle} · Son Ödeme: {formatDate(collectionPeriodTarget?.dueDate)}
                 </p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setCollectionPeriodTarget(null)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setCollectionPeriodTarget(null)}>×</button>
             </div>
 
             <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>

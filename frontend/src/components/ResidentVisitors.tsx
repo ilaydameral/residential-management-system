@@ -11,6 +11,8 @@ import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { useResidentUnits } from '../hooks/useResidentUnits'
 import { SaveShortcutHint } from './SaveShortcutHint'
+import { LoadingSkeleton } from './LoadingSkeleton'
+import { useToast } from '../context/ToastContext'
 import { useRealtime } from '../realtime/useRealtime'
 
 function CopyIcon() {
@@ -177,10 +179,11 @@ export function ResidentVisitorCard({
 
 export function ResidentVisitors() {
   const { groupedUnits, loading: unitsLoading, refetch: refetchUnits } = useResidentUnits()
+  const { showToast } = useToast()
   const [visitors, setVisitors] = useState<Visitor[]>([])
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming')
   const [loading, setLoading] = useState(true)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Drawer & Form State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -217,7 +220,7 @@ export function ResidentVisitors() {
   const handleCloseDrawer = async () => {
     if (isSaving) return
     if (!(await requestDiscard())) return
-    setIsDrawerOpen(false)
+    drawerAnimation.close(() => setIsDrawerOpen(false))
   }
 
   const drawerRef = useDrawerAccessibility({
@@ -236,11 +239,12 @@ export function ResidentVisitors() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const vList = await getResidentVisitors()
       setVisitors(vList)
       await refetchUnits()
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Ziyaretçiler yüklenemedi.')
+      setLoadError(err instanceof Error ? err.message : 'Ziyaretçiler yüklenemedi.')
     } finally {
       setLoading(false)
     }
@@ -260,16 +264,9 @@ export function ResidentVisitors() {
     return () => unsubscribe()
   }, [realtime, loadData])
 
-  // Toast Timer
-  useEffect(() => {
-    if (!toastMessage) return
-    const timer = setTimeout(() => setToastMessage(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toastMessage])
-
   const handleOpenDrawer = () => {
     if (groupedUnits.length === 0) {
-      setToastMessage('Aktif daire yerleşiminiz bulunmadığı için ziyaretçi kaydı oluşturamazsınız.')
+      showToast('Aktif daire yerleşiminiz bulunmadığı için ziyaretçi kaydı oluşturamazsınız.', 'info')
       return
     }
 
@@ -335,9 +332,9 @@ export function ResidentVisitors() {
       })
 
       // Immediate success transition
-      setIsDrawerOpen(false)
+      drawerAnimation.close(() => setIsDrawerOpen(false))
       setCreatedVisitor(created)
-      setToastMessage('Ziyaretçi kaydı başarıyla oluşturuldu.')
+      showToast('Ziyaretçi kaydı başarıyla oluşturuldu.')
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Ziyaretçi oluşturulamadı.')
     } finally {
@@ -357,11 +354,11 @@ export function ResidentVisitors() {
     try {
       setIsCanceling(true)
       await cancelVisitor(cancelingVisitor.id)
-      setToastMessage('Ziyaretçi kaydı iptal edildi.')
+      showToast('Ziyaretçi kaydı iptal edildi.')
       setCancelingVisitor(null)
       await loadData()
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Ziyaretçi iptal edilemedi.')
+      showToast(err instanceof Error ? err.message : 'Ziyaretçi iptal edilemedi.', 'error')
     } finally {
       setIsCanceling(false)
     }
@@ -370,14 +367,14 @@ export function ResidentVisitors() {
   const copyModalAccessCode = (code: string) => {
     navigator.clipboard.writeText(code)
     setCopiedModalPin(true)
-    setToastMessage('Giriş kodu kopyalandı.')
+    showToast('Giriş kodu kopyalandı.', 'info')
     setTimeout(() => setCopiedModalPin(false), 2000)
   }
 
   const copyCardAccessCode = (id: number, code: string) => {
     navigator.clipboard.writeText(code)
     setCopiedCardPinId(id)
-    setToastMessage('Giriş kodu kopyalandı.')
+    showToast('Giriş kodu kopyalandı.', 'info')
     setTimeout(() => setCopiedCardPinId(null), 2000)
   }
 
@@ -393,25 +390,6 @@ export function ResidentVisitors() {
 
   return (
     <section className="resident-view-content" aria-label="Ziyaretçiler">
-      {/* Toast Banner */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '16px',
-          right: '16px',
-          zIndex: 50,
-          padding: '16px',
-          borderRadius: '8px',
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-          fontSize: '14px',
-          color: 'var(--color-text-primary)'
-        }}>
-          {toastMessage}
-        </div>
-      )}
-
       {/* Page Header Row */}
       <div className="page-header-row" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
         <div>
@@ -455,7 +433,12 @@ export function ResidentVisitors() {
 
       {/* Visitor Cards List */}
       {loading || unitsLoading ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Ziyaretçiler yükleniyor...</div>
+        <LoadingSkeleton variant="table" rows={4} />
+      ) : loadError ? (
+        <section className="panel entity-state-panel error-state" role="alert">
+          <p className="status-message error-message">{loadError}</p>
+          <button type="button" className="secondary-button" onClick={() => void loadData()}>Tekrar Dene</button>
+        </section>
       ) : displayedVisitors.length === 0 ? (
         <div className="panel entity-state-panel" style={{ padding: '48px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--color-surface-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', marginBottom: '8px' }}>
@@ -488,46 +471,30 @@ export function ResidentVisitors() {
 
       {/* Created Access Code Dialog */}
       {createdVisitor && (
-        <div className="modal-backdrop" style={{ zIndex: 50 }}>
-          <div className="modal-card" style={{ maxWidth: '440px', width: '100%', padding: '24px', background: 'var(--color-surface)', borderRadius: '16px', border: '1px solid var(--color-border)', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--color-success-soft, #e6f4ea)', color: 'var(--color-success, #137333)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontSize: '20px', fontWeight: 'bold' }}>
-                ✓
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: '0 0 4px' }}>Ziyaretçi Kaydı Oluşturuldu</h3>
-              <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: 0 }}>
-                {createdVisitor.visitorName} için oluşturulan 6 haneli giriş kodunu ziyaretçiniz ile paylaşabilirsiniz.
-              </p>
-            </div>
-
-            <div style={{ padding: '16px', background: 'var(--color-surface-secondary)', borderRadius: '12px', border: '1px solid var(--color-border)', textAlign: 'center' }}>
-              <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Giriş Kodu (PIN)</span>
-              <div style={{ fontSize: '28px', fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '0.15em', color: 'var(--color-primary)' }}>
-                {createdVisitor.accessCode.replace(/(\d{3})(\d{3})/, '$1 $2')}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="secondary-button"
-                style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                onClick={() => copyModalAccessCode(createdVisitor.accessCode)}
-              >
-                {copiedModalPin ? <CheckIcon /> : <CopyIcon />}
-                <span>{copiedModalPin ? 'Kopyalandı!' : 'Kodu Kopyala'}</span>
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                style={{ flex: 1 }}
-                onClick={() => setCreatedVisitor(null)}
-              >
-                Tamam
-              </button>
-            </div>
+        <ConfirmationDialog
+          title="Ziyaretçi Kaydı Oluşturuldu"
+          message={`${createdVisitor.visitorName} için oluşturulan 6 haneli giriş kodunu ziyaretçiniz ile paylaşabilirsiniz.`}
+          confirmLabel="Tamam"
+          showCancel={false}
+          onConfirm={() => setCreatedVisitor(null)}
+          onCancel={() => setCreatedVisitor(null)}
+        >
+          <div className="access-code-dialog-content">
+            <span>Giriş Kodu (PIN)</span>
+            <strong>{createdVisitor.accessCode.replace(/(\d{3})(\d{3})/, '$1 $2')}</strong>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => copyModalAccessCode(createdVisitor.accessCode)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.stopPropagation()
+              }}
+            >
+              {copiedModalPin ? <CheckIcon /> : <CopyIcon />}
+              <span>{copiedModalPin ? 'Kopyalandı!' : 'Kodu Kopyala'}</span>
+            </button>
           </div>
-        </div>
+        </ConfirmationDialog>
       )}
 
       {/* Cancel Confirmation Dialog */}
@@ -546,18 +513,28 @@ export function ResidentVisitors() {
       {/* New Visitor Drawer */}
       {drawerAnimation.phase !== 'closed' && (
         <>
-          <div
-            className={`drawer-backdrop ${drawerAnimation.phase === 'open' ? 'backdrop-open' : 'backdrop-closing'}`}
+          <button
+            type="button"
+            className={`drawer-backdrop drawer-${drawerAnimation.phase}`}
+            aria-label="Ziyaretçi formunu kapat"
+            disabled={drawerAnimation.isClosing || isSaving}
             onClick={handleCloseDrawer}
           />
-          <div
-            ref={drawerRef as any}
+          <aside
+            ref={drawerRef}
             tabIndex={-1}
             className={`management-drawer drawer-${drawerAnimation.phase}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="visitor-drawer-title"
           >
             <div className="drawer-header">
-              <h2>Yeni Ziyaretçi</h2>
-              <button type="button" className="close-button" onClick={handleCloseDrawer} disabled={isSaving}>
+              <div>
+                <p className="eyebrow">Ziyaretçi Yönetimi</p>
+                <h2 id="visitor-drawer-title" tabIndex={-1} data-drawer-initial-focus>Yeni Ziyaretçi</h2>
+                <p className="drawer-description">Ziyaretçinin kimlik ve beklenen ziyaret bilgilerini girin.</p>
+              </div>
+              <button type="button" className="drawer-close-button" aria-label="Kapat" onClick={handleCloseDrawer} disabled={isSaving}>
                 ✕
               </button>
             </div>
@@ -565,7 +542,7 @@ export function ResidentVisitors() {
             <form onSubmit={handleSubmit} className="drawer-form" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
                 {formError && (
-                  <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--color-danger-soft, #fce8e6)', color: 'var(--color-danger, #c5221f)', fontSize: '14px', border: '1px solid var(--color-danger-border, #f5c6cb)' }}>
+                  <div className="status-message error-message" role="alert">
                     {formError}
                   </div>
                 )}
@@ -705,11 +682,11 @@ export function ResidentVisitors() {
                   className="primary-button"
                   disabled={isSaving || groupedUnits.length === 0}
                 >
-                  {isSaving ? 'Kaydedilizce...' : 'Ziyaretçi Oluştur'}
+                  {isSaving ? 'Kaydediliyor...' : 'Ziyaretçi Oluştur'}
                 </button>
               </div>
             </form>
-          </div>
+          </aside>
         </>
       )}
 

@@ -432,15 +432,16 @@ export function DueDefinitionsManagement() {
             className={`management-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="due-definition-drawer-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Aidat Yönetimi</p>
-                <h2>{editingDefinition ? 'Aidat Tanımını Düzenle' : 'Yeni Aidat Tanımı'}</h2>
+                <h2 id="due-definition-drawer-title">{editingDefinition ? 'Aidat Tanımını Düzenle' : 'Yeni Aidat Tanımı'}</h2>
                 <p className="drawer-description">Aidat şablon tutarlarını ve kapsamını tanımlayın.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDrawerOpen(false)}>×</button>
             </div>
 
             <form className="property-form drawer-form" onSubmit={(e) => { void handleSubmitForm(e) }}>

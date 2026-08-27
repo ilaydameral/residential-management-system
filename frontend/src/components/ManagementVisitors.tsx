@@ -9,6 +9,8 @@ import {
 import type { Visitor, PagedVisitorResult, Property, Building, VisitorType } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { useRealtime } from '../realtime/useRealtime'
+import { LoadingSkeleton } from './LoadingSkeleton'
+import { useToast } from '../context/ToastContext'
 
 const VISITOR_TYPE_LABELS: Record<VisitorType, string> = {
   GUEST: 'Misafir',
@@ -34,6 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export function ManagementVisitors() {
+  const { showToast } = useToast()
   const [data, setData] = useState<PagedVisitorResult>({
     items: [],
     page: 1,
@@ -44,7 +47,7 @@ export function ManagementVisitors() {
   const [properties, setProperties] = useState<Property[]>([])
   const [buildings, setBuildings] = useState<Building[]>([])
   const [loading, setLoading] = useState(true)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Operational Action State
   const [checkingInVisitor, setCheckingInVisitor] = useState<Visitor | null>(null)
@@ -63,6 +66,7 @@ export function ManagementVisitors() {
   const loadVisitors = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const res = await getManagementVisitors({
         search: search || undefined,
         propertyId: selectedPropertyId || undefined,
@@ -75,7 +79,7 @@ export function ManagementVisitors() {
       })
       setData(res)
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Ziyaretçiler yüklenemedi.')
+      setLoadError(err instanceof Error ? err.message : 'Ziyaretçiler yüklenemedi.')
     } finally {
       setLoading(false)
     }
@@ -111,22 +115,16 @@ export function ManagementVisitors() {
     return () => unsubscribe()
   }, [realtime, loadVisitors])
 
-  useEffect(() => {
-    if (!toastMessage) return
-    const timer = setTimeout(() => setToastMessage(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toastMessage])
-
   const handleConfirmCheckIn = async () => {
     if (!checkingInVisitor) return
     try {
       setIsProcessing(true)
       await checkInVisitor(checkingInVisitor.id)
-      setToastMessage(`${checkingInVisitor.visitorName} için giriş kaydı oluşturuldu.`)
+      showToast(`${checkingInVisitor.visitorName} için giriş kaydı oluşturuldu.`)
       setCheckingInVisitor(null)
       await loadVisitors()
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Giriş işlemi başarısız.')
+      showToast(err instanceof Error ? err.message : 'Giriş işlemi başarısız.', 'error')
     } finally {
       setIsProcessing(false)
     }
@@ -137,11 +135,11 @@ export function ManagementVisitors() {
     try {
       setIsProcessing(true)
       await checkOutVisitor(checkingOutVisitor.id)
-      setToastMessage(`${checkingOutVisitor.visitorName} için çıkış kaydı oluşturuldu.`)
+      showToast(`${checkingOutVisitor.visitorName} için çıkış kaydı oluşturuldu.`)
       setCheckingOutVisitor(null)
       await loadVisitors()
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Çıkış işlemi başarısız.')
+      showToast(err instanceof Error ? err.message : 'Çıkış işlemi başarısız.', 'error')
     } finally {
       setIsProcessing(false)
     }
@@ -151,6 +149,16 @@ export function ManagementVisitors() {
     ? buildings.filter(b => b.propertyId === selectedPropertyId)
     : buildings
 
+  const hasActiveFilters = Boolean(search || selectedPropertyId || selectedBuildingId || selectedStatus || dateFrom || dateTo)
+  const handleClearFilters = () => {
+    setSearch('')
+    setSelectedPropertyId('')
+    setSelectedBuildingId('')
+    setSelectedStatus('')
+    setDateFrom('')
+    setPage(1)
+  }
+
   // Operational Counts for Today
   const expectedCount = data.items.filter(v => v.status === 'EXPECTED').length
   const checkedInCount = data.items.filter(v => v.status === 'CHECKED_IN').length
@@ -158,13 +166,6 @@ export function ManagementVisitors() {
 
   return (
     <div className="management-visitors-container">
-      {/* Toast Banner */}
-      {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 p-4 rounded-lg bg-surface border border-border shadow-lg text-sm text-primary animate-in fade-in slide-in-from-top-2">
-          {toastMessage}
-        </div>
-      )}
-
       {/* Page Header */}
       <div className="page-header-row">
         <div>
@@ -305,19 +306,12 @@ export function ManagementVisitors() {
             />
           </div>
 
-          {(Boolean(search) || Boolean(selectedPropertyId) || Boolean(selectedBuildingId) || Boolean(selectedStatus) || Boolean(dateFrom)) && (
+          {hasActiveFilters && (
             <button
               type="button"
               className="ghost-button"
               style={{ fontSize: '13px' }}
-              onClick={() => {
-                setSearch('')
-                setSelectedPropertyId('')
-                setSelectedBuildingId('')
-                setSelectedStatus('')
-                setDateFrom('')
-                setPage(1)
-              }}
+              onClick={handleClearFilters}
             >
               Filtreleri Temizle
             </button>
@@ -327,13 +321,18 @@ export function ManagementVisitors() {
 
       {/* Table Section */}
       {loading ? (
-        <div className="panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-secondary)' }}>
-          Ziyaretçiler yükleniyor...
-        </div>
+        <LoadingSkeleton variant="table" rows={5} />
+      ) : loadError ? (
+        <section className="panel entity-state-panel error-state" role="alert">
+          <p className="status-message error-message">{loadError}</p>
+          <button type="button" className="secondary-button" onClick={() => void loadVisitors()}>Tekrar Dene</button>
+        </section>
       ) : data.items.length === 0 ? (
-        <div className="panel" style={{ textAlign: 'center', padding: '48px' }}>
-          <p className="text-muted">Kayıtlı ziyaretçi bulunamadı.</p>
-        </div>
+        <section className="panel entity-state-panel actionable-empty-state">
+          <h2>{hasActiveFilters ? 'Filtrelere uygun ziyaretçi bulunamadı' : 'Kayıtlı ziyaretçi bulunamadı'}</h2>
+          <p>{hasActiveFilters ? 'Arama ölçütlerini değiştirin veya filtreleri temizleyin.' : 'Sakinlerin oluşturduğu ziyaretçi kayıtları burada görüntülenecek.'}</p>
+          {hasActiveFilters && <button type="button" className="secondary-button" onClick={handleClearFilters}>Filtreleri Temizle</button>}
+        </section>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="table-responsive management-card" style={{ padding: 0, overflowX: 'auto' }}>

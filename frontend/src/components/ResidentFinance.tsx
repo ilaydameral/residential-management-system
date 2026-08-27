@@ -846,16 +846,17 @@ export function ResidentFinance() {
             className={`management-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="resident-charge-drawer-title"
             style={{ width: 'min(520px, 100%)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Borç Detayı</p>
-                <h2>{detailCharge.title}</h2>
+                <h2 id="resident-charge-drawer-title">{detailCharge.title}</h2>
                 <p className="drawer-description">{detailCharge.propertyName} · {detailCharge.buildingName} · No: {detailCharge.unitNumber}</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDetailDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDetailDrawerOpen(false)}>×</button>
             </div>
 
             <div className="drawer-form" style={{ gap: '14px', display: 'flex', flexDirection: 'column' }}>

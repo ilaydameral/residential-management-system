@@ -740,15 +740,16 @@ export function ExpensesManagement() {
             className={`management-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="expense-drawer-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Gider Yönetimi</p>
-                <h2>{editingExpense ? 'Gider Kaydını Düzenle' : 'Yeni Gider Kaydı'}</h2>
+                <h2 id="expense-drawer-title">{editingExpense ? 'Gider Kaydını Düzenle' : 'Yeni Gider Kaydı'}</h2>
                 <p className="drawer-description">Ortak alan gider tutarlarını ve fatura bilgilerini kaydedin.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDrawerOpen(false)}>×</button>
             </div>
 
             <form className="property-form drawer-form" onSubmit={(e) => { void handleSubmitForm(e) }}>

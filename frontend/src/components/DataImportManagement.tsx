@@ -1058,7 +1058,7 @@ export function DataImportManagement() {
                 <p className="eyebrow">Veri Aktarımı Geçmişi</p>
                 <h2 id="history-drawer-title">Parti Detayları (#{selectedHistoryBatch.id})</h2>
               </div>
-              <button type="button" className="close-button" onClick={handleCloseHistoryDrawer}>
+              <button type="button" className="drawer-close-button" aria-label="Kapat" onClick={handleCloseHistoryDrawer}>
                 ✕
               </button>
             </div>

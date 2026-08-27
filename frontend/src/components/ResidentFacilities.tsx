@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   cancelFacilityReservation,
   createFacilityReservation,
@@ -8,6 +8,8 @@ import {
   getMyUnits,
 } from '../api'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
+import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
+import { useToast } from '../context/ToastContext'
 import { useRealtime } from '../realtime/useRealtime'
 import type {
   CommonFacility,
@@ -82,6 +84,7 @@ function formatTimeRange(startStr: string, endStr: string): string {
 
 export function ResidentFacilities() {
   const realtime = useRealtime()
+  const { showToast } = useToast()
 
   // State
   const [facilities, setFacilities] = useState<CommonFacility[]>([])
@@ -92,7 +95,6 @@ export function ResidentFacilities() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Booking / Detail Drawer
   const [selectedFacility, setSelectedFacility] = useState<CommonFacility | null>(null)
@@ -110,15 +112,17 @@ export function ResidentFacilities() {
   const [cancellingReservation, setCancellingReservation] = useState<FacilityReservation | null>(null)
   const [isCancelling, setIsCancelling] = useState(false)
 
-  const drawerRef = useRef<HTMLDivElement>(null)
-  const { shouldRender: shouldRenderDrawer, phase: drawerPhase } = useAnimatedDrawer(isDrawerOpen)
-
-  // Toast Auto-dismiss
-  useEffect(() => {
-    if (!toastMessage) return
-    const timer = setTimeout(() => setToastMessage(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toastMessage])
+  const drawerAnimation = useAnimatedDrawer(isDrawerOpen)
+  const closeDrawer = () => {
+    if (isSubmittingBooking) return
+    setIsDrawerOpen(false)
+  }
+  const drawerRef = useDrawerAccessibility({
+    isOpen: drawerAnimation.shouldRender && !drawerAnimation.isClosing,
+    onClose: closeDrawer,
+    enableSaveShortcut: false,
+    isSaving: isSubmittingBooking,
+  })
 
   // Load Data
   const loadData = useCallback(async () => {
@@ -219,9 +223,9 @@ export function ResidentFacilities() {
       const res = await createFacilityReservation(payload)
 
       if (res.status === 'APPROVED') {
-        setToastMessage('Rezervasyonunuz başarıyla oluşturuldu ve onaylandı.')
+        showToast('Rezervasyonunuz başarıyla oluşturuldu ve onaylandı.')
       } else {
-        setToastMessage('Rezervasyon talebiniz yönetici onayına gönderildi.')
+        showToast('Rezervasyon talebiniz yönetici onayına gönderildi.')
       }
 
       setSelectedSlot(null)
@@ -253,13 +257,13 @@ export function ResidentFacilities() {
     setIsCancelling(true)
     try {
       await cancelFacilityReservation(cancellingReservation.id)
-      setToastMessage('Rezervasyon başarıyla iptal edildi.')
+      showToast('Rezervasyon başarıyla iptal edildi.')
       setMyReservations(await getMyFacilityReservations())
       if (selectedFacility) {
         void fetchAvailability(selectedFacility.id, selectedDate)
       }
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Rezervasyon iptal edilemedi.')
+      showToast(err instanceof Error ? err.message : 'Rezervasyon iptal edilemedi.', 'error')
     } finally {
       setIsCancelling(false)
       setCancellingReservation(null)
@@ -279,13 +283,6 @@ export function ResidentFacilities() {
 
   return (
     <section className="resident-view-content" aria-label="Ortak Alanlar">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="toast toast-success" role="alert" aria-live="polite">
-          {toastMessage}
-        </div>
-      )}
-
       {/* Page Header */}
       <header className="resident-view-header">
         <p className="eyebrow">SAKİN PORTALI</p>
@@ -322,12 +319,10 @@ export function ResidentFacilities() {
         {isLoading ? (
           <LoadingSkeleton variant="dashboard" />
         ) : error ? (
-          <div className="state-card danger" role="alert">
-            <p>{error}</p>
-            <button type="button" className="btn btn-secondary mt-3" onClick={() => void loadData()}>
-              Yeniden Dene
-            </button>
-          </div>
+          <section className="entity-state-panel error-state" role="alert">
+            <p className="status-message error-message">{error}</p>
+            <button type="button" className="secondary-button" onClick={() => void loadData()}>Tekrar Dene</button>
+          </section>
         ) : activeTab === 'facilities' ? (
           /* FACILITIES BROWSER */
           facilities.length === 0 ? (
@@ -479,13 +474,22 @@ export function ResidentFacilities() {
       </div>
 
       {/* FACILITY DETAIL & BOOKING DRAWER */}
-      {shouldRenderDrawer && selectedFacility && (
-        <div className={`management-drawer-backdrop drawer-phase-${drawerPhase}`} onClick={() => setIsDrawerOpen(false)}>
-          <div
+      {drawerAnimation.shouldRender && selectedFacility && (
+        <>
+          <button
+            type="button"
+            className={`drawer-backdrop drawer-${drawerAnimation.phase}`}
+            aria-label="Tesis detayını kapat"
+            disabled={drawerAnimation.isClosing || isSubmittingBooking}
+            onClick={closeDrawer}
+          />
+          <aside
             ref={drawerRef}
-            className={`management-drawer drawer-phase-${drawerPhase}`}
+            tabIndex={-1}
+            className={`management-drawer drawer-${drawerAnimation.phase}`}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
+            aria-modal="true"
             aria-labelledby="facility-drawer-title"
           >
             <div className="drawer-header">
@@ -501,9 +505,10 @@ export function ResidentFacilities() {
               </div>
               <button
                 type="button"
-                className="drawer-close-btn"
-                onClick={() => setIsDrawerOpen(false)}
+                className="drawer-close-button"
+                onClick={closeDrawer}
                 aria-label="Kapat"
+                disabled={isSubmittingBooking}
               >
                 ✕
               </button>
@@ -576,7 +581,7 @@ export function ResidentFacilities() {
 
               {/* Booking Error Banner */}
               {bookingError && (
-                <div className="alert-box danger" role="alert">
+                <div className="status-message error-message" role="alert">
                   {bookingError}
                 </div>
               )}
@@ -669,8 +674,8 @@ export function ResidentFacilities() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          </aside>
+        </>
       )}
 
       {/* Cancellation Confirmation Dialog */}

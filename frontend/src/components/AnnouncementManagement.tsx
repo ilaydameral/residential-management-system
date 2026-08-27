@@ -536,6 +536,7 @@ export function AnnouncementManagement() {
           />
           <aside
             ref={createDrawerRef as any}
+            tabIndex={-1}
             className={`management-drawer announcement-drawer drawer-container drawer-${createPhase}`}
             role="dialog"
             aria-modal="true"
@@ -547,7 +548,7 @@ export function AnnouncementManagement() {
                 <p className="eyebrow">Duyuru Yönetimi</p>
                 <h3>Yeni Duyuru Oluştur</h3>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => void handleCloseCreateWithGuard()}>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCloseCreateWithGuard()}>
                 ✕
               </button>
             </div>
@@ -659,6 +660,7 @@ export function AnnouncementManagement() {
           />
           <aside
             ref={detailDrawerRef as any}
+            tabIndex={-1}
             className={`management-drawer announcement-drawer drawer-container drawer-${detailPhase}`}
             role="dialog"
             aria-modal="true"
@@ -689,7 +691,7 @@ export function AnnouncementManagement() {
                 </div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>{selectedAnnouncement.title}</h3>
               </div>
-              <button className="drawer-close-button" type="button" onClick={closeDetailDrawer}>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={closeDetailDrawer}>
                 ✕
               </button>
             </div>

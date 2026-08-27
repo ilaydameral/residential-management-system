@@ -5,6 +5,7 @@ import {
   getBuildings,
 } from '../api'
 import type { PagedResidentVehicleResult, Property, Building, VehicleType } from '../types'
+import { LoadingSkeleton } from './LoadingSkeleton'
 
 const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
   CAR: 'Otomobil',
@@ -25,7 +26,7 @@ export function ManagementVehicles() {
   const [properties, setProperties] = useState<Property[]>([])
   const [buildings, setBuildings] = useState<Building[]>([])
   const [loading, setLoading] = useState(true)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Filters
   const [plateNumber, setPlateNumber] = useState('')
@@ -38,6 +39,7 @@ export function ManagementVehicles() {
   const loadVehicles = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const res = await getManagementVehicles({
         plateNumber: plateNumber || undefined,
         propertyId: selectedPropertyId || undefined,
@@ -49,7 +51,7 @@ export function ManagementVehicles() {
       })
       setData(res)
     } catch (err) {
-      setToastMessage(err instanceof Error ? err.message : 'Araçlar yüklenemedi.')
+      setLoadError(err instanceof Error ? err.message : 'Araçlar yüklenemedi.')
     } finally {
       setLoading(false)
     }
@@ -75,12 +77,6 @@ export function ManagementVehicles() {
     loadMeta()
   }, [])
 
-  useEffect(() => {
-    if (!toastMessage) return
-    const timer = setTimeout(() => setToastMessage(null), 4000)
-    return () => clearTimeout(timer)
-  }, [toastMessage])
-
   const filteredBuildings = selectedPropertyId
     ? buildings.filter(b => b.propertyId === selectedPropertyId)
     : buildings
@@ -100,13 +96,6 @@ export function ManagementVehicles() {
 
   return (
     <div className="management-vehicles-container">
-      {/* Toast Banner */}
-      {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 p-4 rounded-lg bg-surface border border-border shadow-lg text-sm text-primary animate-in fade-in slide-in-from-top-2">
-          {toastMessage}
-        </div>
-      )}
-
       {/* Header */}
       <div className="page-header-row">
         <div>
@@ -222,13 +211,18 @@ export function ManagementVehicles() {
 
       {/* Table Section */}
       {loading ? (
-        <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          Araçlar yükleniyor...
-        </div>
+        <LoadingSkeleton variant="table" rows={5} />
+      ) : loadError ? (
+        <section className="panel entity-state-panel error-state" role="alert">
+          <p className="status-message error-message">{loadError}</p>
+          <button type="button" className="secondary-button" onClick={() => void loadVehicles()}>Tekrar Dene</button>
+        </section>
       ) : data.items.length === 0 ? (
-        <div className="management-card" style={{ padding: '48px', textAlign: 'center', borderStyle: 'dashed' }}>
-          <p className="text-muted">Kayıtlı araç bulunamadı.</p>
-        </div>
+        <section className="panel entity-state-panel actionable-empty-state">
+          <h2>{hasActiveFilters ? 'Filtrelere uygun araç bulunamadı' : 'Kayıtlı araç bulunamadı'}</h2>
+          <p>{hasActiveFilters ? 'Arama ölçütlerini değiştirin veya filtreleri temizleyin.' : 'Sakinlerin kaydettiği araçlar burada görüntülenecek.'}</p>
+          {hasActiveFilters && <button type="button" className="secondary-button" onClick={handleClearFilters}>Filtreleri Temizle</button>}
+        </section>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="table-responsive management-card" style={{ padding: 0, overflowX: 'auto' }}>
