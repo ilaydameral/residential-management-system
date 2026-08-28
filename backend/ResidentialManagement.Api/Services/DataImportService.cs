@@ -95,8 +95,7 @@ public class DataImportService : IDataImportService
         bool isAdmin)
     {
         var normalizedType = importType?.Trim().ToUpperInvariant() ?? string.Empty;
-        var validTypes = new[] { "PROPERTIES", "BUILDINGS", "UNITS", "USERS", "OCCUPANCIES", "DUE_CHARGES", "EXPENSES" };
-        if (!validTypes.Contains(normalizedType))
+        if (!ImportTypePolicies.TryGet(normalizedType, out _))
         {
             throw new BadRequestException($"Geçersiz içe aktarım türü: '{importType}'.");
         }
@@ -1431,6 +1430,11 @@ public class DataImportService : IDataImportService
             SkippedRows = b.SkippedRows,
             CreatedByUserId = b.CreatedByUserId,
             CreatedByFullName = createdByFullName,
+            TargetPropertyId = b.TargetPropertyId,
+            TargetPropertyName = b.TargetProperty?.Name,
+            TargetBuildingId = b.TargetBuildingId,
+            TargetBuildingName = b.TargetBuilding?.Name,
+            TargetBuildingCode = b.TargetBuilding?.Code,
             CreatedAt = b.CreatedAt,
             ValidatedAt = b.ValidatedAt,
             CompletedAt = b.CompletedAt,

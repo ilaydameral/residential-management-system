@@ -24,7 +24,22 @@ public class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBatch>
             .HasForeignKey(ib => ib.CreatedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(ib => ib.TargetProperty)
+            .WithMany()
+            .HasForeignKey(ib => ib.TargetPropertyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(ib => ib.TargetBuilding)
+            .WithMany()
+            .HasForeignKey(ib => ib.TargetBuildingId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(ib => ib.RowVersion)
+            .IsRowVersion();
+
         builder.HasIndex(ib => ib.CreatedByUserId);
+        builder.HasIndex(ib => ib.TargetPropertyId);
+        builder.HasIndex(ib => ib.TargetBuildingId);
         builder.HasIndex(ib => ib.Status);
         builder.HasIndex(ib => ib.CreatedAt);
         builder.HasIndex(ib => ib.FileHashSha256);

@@ -15,6 +15,11 @@ public class ImportBatchDto
     public int SkippedRows { get; set; }
     public int CreatedByUserId { get; set; }
     public string CreatedByFullName { get; set; } = string.Empty;
+    public int? TargetPropertyId { get; set; }
+    public string? TargetPropertyName { get; set; }
+    public int? TargetBuildingId { get; set; }
+    public string? TargetBuildingName { get; set; }
+    public string? TargetBuildingCode { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ValidatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
