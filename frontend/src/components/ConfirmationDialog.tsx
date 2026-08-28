@@ -5,6 +5,7 @@ interface ConfirmationDialogProps {
   message: string
   confirmLabel: string
   cancelLabel?: string
+  showCancel?: boolean
   danger?: boolean
   isLoading?: boolean
   confirmDisabled?: boolean
@@ -18,6 +19,7 @@ export function ConfirmationDialog({
   message,
   confirmLabel,
   cancelLabel = 'Vazgeç',
+  showCancel = true,
   danger = false,
   isLoading = false,
   confirmDisabled = false,
@@ -29,6 +31,7 @@ export function ConfirmationDialog({
   const descriptionId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const confirmButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -37,13 +40,13 @@ export function ConfirmationDialog({
       : null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    cancelButtonRef.current?.focus()
+    ;(showCancel ? cancelButtonRef.current : confirmButtonRef.current)?.focus()
 
     return () => {
       document.body.style.overflow = previousOverflow
       previousFocusRef.current?.focus()
     }
-  }, [])
+  }, [showCancel])
 
   const handleBackdrop = (event: MouseEvent<HTMLDivElement>) => {
     if (!isLoading && event.target === event.currentTarget) onCancel()
@@ -103,10 +106,13 @@ export function ConfirmationDialog({
         <p id={descriptionId}>{message}</p>
         {children}
         <div className="confirmation-actions">
-          <button ref={cancelButtonRef} className="secondary-button" type="button" onClick={onCancel} disabled={isLoading}>
-            {cancelLabel}
-          </button>
+          {showCancel && (
+            <button ref={cancelButtonRef} className="secondary-button" type="button" onClick={onCancel} disabled={isLoading}>
+              {cancelLabel}
+            </button>
+          )}
           <button
+            ref={confirmButtonRef}
             className={danger ? 'action-button danger-btn' : 'primary-button'}
             type="button"
             onClick={onConfirm}

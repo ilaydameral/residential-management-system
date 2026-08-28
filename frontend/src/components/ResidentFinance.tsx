@@ -10,6 +10,7 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import type {
   PaymentSubmission,
   ResidentFinanceSummaryDto,
@@ -323,16 +324,13 @@ export function ResidentFinance() {
   }
 
   return (
-    <div className="section-container entity-management-view">
-      {/* Page Action Header */}
-      <div className="entity-page-actions">
-        <div>
-          <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--color-text-primary)' }}>Finans</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-            Borçlarınızı, ödeme durumunuzu ve gönderdiğiniz ödeme bildirimlerini takip edin.
-          </p>
-        </div>
-      </div>
+    <div className="section-container entity-management-view resident-finance-view">
+      <PageHeader
+        className="resident-page-header"
+        eyebrow="Sakin Portalı"
+        title="Finans"
+        subtitle="Borçlarınızı, ödeme durumunuzu ve gönderdiğiniz ödeme bildirimlerini takip edin."
+      />
 
       {/* Finance Summary Cards */}
       {isLoading ? (
@@ -383,7 +381,7 @@ export function ResidentFinance() {
             Daire Borçlarım
           </h3>
 
-          <div className="detail-tabs" style={{ padding: '3px' }}>
+          <div className="detail-tabs resident-finance-tabs" style={{ padding: '3px' }}>
             <button
               type="button"
               className={chargeFilter === 'open' ? 'active' : ''}
@@ -848,16 +846,17 @@ export function ResidentFinance() {
             className={`management-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="resident-charge-drawer-title"
             style={{ width: 'min(520px, 100%)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Borç Detayı</p>
-                <h2>{detailCharge.title}</h2>
+                <h2 id="resident-charge-drawer-title">{detailCharge.title}</h2>
                 <p className="drawer-description">{detailCharge.propertyName} · {detailCharge.buildingName} · No: {detailCharge.unitNumber}</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDetailDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDetailDrawerOpen(false)}>×</button>
             </div>
 
             <div className="drawer-form" style={{ gap: '14px', display: 'flex', flexDirection: 'column' }}>

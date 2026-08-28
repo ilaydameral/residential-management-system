@@ -43,6 +43,7 @@ public class ExceptionHandlingMiddleware
             UnauthorizedException => (int)HttpStatusCode.Unauthorized,
             ForbiddenException => (int)HttpStatusCode.Forbidden,
             BadRequestException => (int)HttpStatusCode.BadRequest,
+            ConflictException => (int)HttpStatusCode.Conflict,
             InvalidOperationException => (int)HttpStatusCode.Conflict,
             KeyNotFoundException => (int)HttpStatusCode.NotFound,
             _ => (int)HttpStatusCode.InternalServerError

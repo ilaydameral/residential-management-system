@@ -331,10 +331,10 @@ export function DataImportManagement() {
   }
 
   return (
-    <div className="section-container entity-management-view">
+    <div className="section-container entity-management-view data-import-management">
       {/* Navigation Tabs */}
       <div className="entity-page-actions" style={{ marginBottom: '1.25rem', justifyContent: 'flex-start' }}>
-        <div className="management-tabs" style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="management-tabs data-import-tabs">
           <button
             type="button"
             className={`secondary-button ${activeTab === 'new-import' ? 'active' : ''}`}
@@ -353,7 +353,7 @@ export function DataImportManagement() {
       </div>
 
       {activeTab === 'new-import' && (
-        <div className="panel" style={{ padding: '1.5rem' }}>
+        <div className="panel data-import-workflow-panel">
           {/* Step Indicator */}
           <div
             className="import-step-bar"
@@ -407,7 +407,7 @@ export function DataImportManagement() {
           {currentStep === 1 && (
             <div>
               <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Aktarılacak Veri Türünü Seçin</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div className="data-import-type-grid">
                 {IMPORT_TYPE_OPTIONS.map((opt) => {
                   const isDisabled = Boolean(opt.adminOnly && !isAdmin)
                   const isSelected = selectedType === opt.key
@@ -458,7 +458,7 @@ export function DataImportManagement() {
           {/* STEP 2: Dosya Yükleme */}
           {currentStep === 2 && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div className="data-import-step-header">
                 <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Dosya Yükleme ({IMPORT_TYPE_OPTIONS.find((t) => t.key === selectedType)?.label})</h2>
                 <button type="button" className="secondary-button" onClick={() => setCurrentStep(1)}>
                   ← Tür Değiştir
@@ -469,6 +469,7 @@ export function DataImportManagement() {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
+                className="data-import-drop-zone"
                 style={{
                   border: isDragOver ? '2px dashed var(--primary-color)' : '2px dashed var(--border-color)',
                   background: isDragOver ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-hover)',
@@ -507,8 +508,8 @@ export function DataImportManagement() {
 
               {selectedFile && (
                 <div className="panel" style={{ padding: '1rem', marginBottom: '1.5rem', background: 'var(--bg-card)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
+                  <div className="data-import-file-row">
+                    <div className="data-import-file-copy">
                       <strong>{selectedFile.name}</strong>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                         {(selectedFile.size / 1024).toFixed(1)} KB | Format: {selectedFile.name.split('.').pop()?.toUpperCase()}
@@ -527,7 +528,7 @@ export function DataImportManagement() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+              <div className="data-import-actions">
                 <button
                   type="button"
                   className="primary-button"
@@ -543,7 +544,7 @@ export function DataImportManagement() {
           {/* STEP 3: Sütun Eşleme */}
           {currentStep === 3 && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div className="data-import-step-header">
                 <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Sütun Eşleme</h2>
                 <span className="status-badge info">Parti ID: #{uploadedBatch?.id}</span>
               </div>
@@ -562,7 +563,7 @@ export function DataImportManagement() {
                     </div>
                   )}
 
-                  <div className="panel" style={{ padding: '1rem', marginBottom: '1.5rem' }}>
+                  <div className="panel data-import-table-panel" style={{ padding: '1rem', marginBottom: '1.5rem' }}>
                     <table className="management-table">
                       <thead>
                         <tr>
@@ -611,7 +612,7 @@ export function DataImportManagement() {
                     </table>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <div className="data-import-actions">
                     <button
                       type="button"
                       className="primary-button"
@@ -629,7 +630,7 @@ export function DataImportManagement() {
           {/* STEP 4: Önizleme & Kuru Çalışma */}
           {currentStep === 4 && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div className="data-import-step-header">
                 <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Aktarım Önizlemesi & Doğrulama</h2>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button type="button" className="secondary-button" onClick={() => setCurrentStep(3)}>
@@ -684,7 +685,7 @@ export function DataImportManagement() {
                   )}
 
                   {/* Filter Tabs */}
-                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <div className="data-import-preview-filters">
                     {[
                       { key: 'all', label: 'Tümü' },
                       { key: 'CREATE', label: 'Eklenecek' },
@@ -763,7 +764,7 @@ export function DataImportManagement() {
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <div className="data-import-actions">
                     <button
                       type="button"
                       className="primary-button"
@@ -806,7 +807,7 @@ export function DataImportManagement() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+              <div className="data-import-actions centered">
                 <button type="button" className="secondary-button" onClick={handleResetFlow}>
                   Yeni Aktarım Başlat
                 </button>
@@ -1058,7 +1059,7 @@ export function DataImportManagement() {
                 <p className="eyebrow">Veri Aktarımı Geçmişi</p>
                 <h2 id="history-drawer-title">Parti Detayları (#{selectedHistoryBatch.id})</h2>
               </div>
-              <button type="button" className="close-button" onClick={handleCloseHistoryDrawer}>
+              <button type="button" className="drawer-close-button" aria-label="Kapat" onClick={handleCloseHistoryDrawer}>
                 ✕
               </button>
             </div>

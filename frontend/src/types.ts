@@ -925,3 +925,232 @@ export interface GlobalSearchResponse {
   maintenanceRequests: GlobalSearchItem[]
   announcements: GlobalSearchItem[]
 }
+
+// ============================================================================
+// Phase 12: Common Area Reservations DTOs
+// ============================================================================
+
+export interface CommonFacility {
+  id: number
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  name: string
+  description: string | null
+  locationHint: string | null
+  capacity: number
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  requiresManagerApproval: boolean
+  maxActiveReservationsPerResident: number
+  cancellationLeadTimeHours: number
+  isActive: boolean
+  createdAt: string
+}
+
+export interface CreateCommonFacilityPayload {
+  propertyId: number
+  buildingId?: number | null
+  name: string
+  description?: string
+  locationHint?: string
+  capacity: number
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  requiresManagerApproval: boolean
+  maxActiveReservationsPerResident: number
+  cancellationLeadTimeHours: number
+}
+
+export interface UpdateCommonFacilityPayload {
+  name: string
+  description?: string
+  locationHint?: string
+  capacity: number
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  requiresManagerApproval: boolean
+  maxActiveReservationsPerResident: number
+  cancellationLeadTimeHours: number
+}
+
+export interface FacilityReservation {
+  id: number
+  facilityId: number
+  facilityName: string
+  residentUserId: number
+  residentName: string
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  startTime: string
+  endTime: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED'
+  note?: string | null
+  reviewedByName?: string | null
+  reviewedAt?: string | null
+  rejectionReason?: string | null
+  createdAt: string
+}
+
+export interface CreateReservationPayload {
+  facilityId: number
+  unitId: number
+  startTime: string
+  endTime: string
+  note?: string
+}
+
+export interface ReviewReservationPayload {
+  rejectionReason?: string
+}
+
+export interface FacilityMaintenanceBlock {
+  id: number
+  facilityId: number
+  facilityName: string
+  startTime: string
+  endTime: string
+  reason: string
+  createdByName: string
+  createdAt: string
+}
+
+export interface CreateMaintenanceBlockPayload {
+  startTime: string
+  endTime: string
+  reason: string
+}
+
+export interface TimeSlot {
+  startTime: string
+  endTime: string
+  status: 'AVAILABLE' | 'BOOKED' | 'BLOCKED' | 'PAST'
+  reason?: string | null
+}
+
+export interface FacilityAvailability {
+  facilityId: number
+  facilityName: string
+  date: string
+  openingTime: string
+  closingTime: string
+  slotDurationMinutes: number
+  slots: TimeSlot[]
+}
+
+export interface FacilityReservationUpdatedEvent {
+  reservationId: number
+  facilityId: number
+  status: string
+  updatedAt: string
+}
+
+export interface FacilityAvailabilityInvalidatedEvent {
+  facilityId: number
+  date: string
+}
+
+// ============================================================================
+// Phase 12: Visitor & Resident Vehicle DTOs
+// ============================================================================
+
+export type VisitorType = 'GUEST' | 'SERVICE_PROVIDER' | 'DELIVERY' | 'COMMERCIAL'
+export type VisitorStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED' | 'EXPIRED'
+
+export interface CreateVisitorPayload {
+  unitId: number
+  visitorName: string
+  visitorPhone?: string
+  visitorType: VisitorType
+  vehiclePlate?: string
+  expectedArrival: string
+  expectedDeparture: string
+}
+
+export interface Visitor {
+  id: number
+  hostUserId: number
+  hostUserName: string
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  propertyName: string
+  propertyId: number
+  buildingId: number
+  visitorName: string
+  visitorPhone?: string | null
+  visitorType: VisitorType
+  vehiclePlate?: string | null
+  expectedArrival: string
+  expectedDeparture: string
+  accessCode: string
+  status: VisitorStatus
+  checkedInAt?: string | null
+  checkedInByUserName?: string | null
+  checkedOutAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PagedVisitorResult {
+  items: Visitor[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+export interface VisitorStatusChangedEvent {
+  visitorId: number
+  unitId: number
+  status: VisitorStatus
+  updatedAt: string
+}
+
+export type VehicleType = 'CAR' | 'MOTORCYCLE' | 'ELECTRIC_VEHICLE' | 'SUV' | 'OTHER'
+
+export interface CreateResidentVehiclePayload {
+  unitId: number
+  plateNumber: string
+  vehicleType: VehicleType
+  brandModel?: string
+  color?: string
+}
+
+export interface UpdateResidentVehiclePayload {
+  vehicleType: VehicleType
+  brandModel?: string
+  color?: string
+}
+
+export interface ResidentVehicle {
+  id: number
+  residentUserId: number
+  residentUserName: string
+  unitId: number
+  unitNumber: string
+  buildingName: string
+  propertyName: string
+  propertyId: number
+  buildingId: number
+  plateNumber: string
+  vehicleType: VehicleType
+  brandModel?: string | null
+  color?: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PagedResidentVehicleResult {
+  items: ResidentVehicle[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}

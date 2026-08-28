@@ -4,6 +4,8 @@ import { NAV_CATEGORIES, type NavCategoryId } from './navConfig'
 interface NavigationRailProps {
   activeCategory: NavCategoryId
   onSelectCategory: (categoryId: NavCategoryId) => void
+  onCategoryMouseEnter?: (categoryId: NavCategoryId) => void
+  onCategoryMouseLeave?: () => void
   userRoles: string[]
   user?: any
   onToggleUserMenu?: () => void
@@ -14,6 +16,8 @@ interface NavigationRailProps {
 export function NavigationRail({
   activeCategory,
   onSelectCategory,
+  onCategoryMouseEnter,
+  onCategoryMouseLeave,
   userRoles,
   user,
   onToggleUserMenu,
@@ -99,6 +103,8 @@ export function NavigationRail({
               type="button"
               className={`nav-rail-btn ${isActive ? 'active' : ''}`}
               onClick={() => onSelectCategory(cat.id)}
+              onMouseEnter={() => onCategoryMouseEnter?.(cat.id)}
+              onMouseLeave={() => onCategoryMouseLeave?.()}
               aria-label={cat.label}
               title={cat.label}
             >

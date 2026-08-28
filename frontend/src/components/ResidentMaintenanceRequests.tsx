@@ -20,11 +20,11 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  OPEN: { label: 'Açık', className: 'status-badge info' },
-  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge warning' },
-  RESOLVED: { label: 'Çözüldü', className: 'status-badge success' },
-  CLOSED: { label: 'Kapandı', className: 'status-badge secondary' },
-  CANCELLED: { label: 'İptal Edildi', className: 'status-badge danger' },
+  OPEN: { label: 'Açık', className: 'status-badge warning' },
+  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge info' },
+  RESOLVED: { label: 'Çözüldü', className: 'status-badge active' },
+  CLOSED: { label: 'Kapandı', className: 'status-badge inactive' },
+  CANCELLED: { label: 'İptal Edildi', className: 'status-badge secondary' },
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
@@ -327,7 +327,7 @@ export function ResidentMaintenanceRequests() {
           onClick={() => setIsCreateOpen(true)}
           style={{ width: 'auto', flex: '0 0 auto', padding: '10px 18px', whiteSpace: 'nowrap' }}
         >
-          + Yeni Talep
+          Yeni Talep
         </button>
       </header>
 
@@ -495,7 +495,7 @@ export function ResidentMaintenanceRequests() {
                 <h2>Yeni Bakım Talebi</h2>
                 <p className="drawer-description">Sorununuzu bildirin, teknik ekibimiz en kısa sürede ilgilensin.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => void handleCloseCreateWithGuard()}>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCloseCreateWithGuard()}>
                 ✕
               </button>
             </div>
@@ -650,7 +650,7 @@ export function ResidentMaintenanceRequests() {
                 </div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>{selectedRequest.title}</h3>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDetailOpen(false)}>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDetailOpen(false)}>
                 ✕
               </button>
             </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { GlobalSearchItem } from '../../types'
 import { NavigationRail } from './NavigationRail'
@@ -17,6 +17,7 @@ interface ManagementShellProps {
   onSelectSearchResult: (item: GlobalSearchItem) => void
   isSearchOpen: boolean
   onLogout: () => void
+  mainContentRef?: RefObject<HTMLElement | null>
   children: ReactNode
 }
 
@@ -39,22 +40,126 @@ export function ManagementShell({
   onSelectSearchResult,
   isSearchOpen,
   onLogout,
+  mainContentRef,
   children,
 }: ManagementShellProps) {
   const location = useLocation()
-  const [activeCategory, setActiveCategory] = useState<NavCategoryId>(() => getCategoryForView(activeView))
+  const [selectedCategory, setSelectedCategory] = useState<NavCategoryId>(() => getCategoryForView(activeView))
+  const [hoveredCategory, setHoveredCategory] = useState<NavCategoryId | null>(null)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('nav_secondary_collapsed') === 'true'
+      return localStorage.getItem('nav_sidebar_collapsed') === 'true'
     }
     return false
   })
+  const [isHoverExpanded, setIsHoverExpanded] = useState<boolean>(false)
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false)
   const [activeMenuAnchor, setActiveMenuAnchor] = useState<'topbar' | 'sidebar' | 'rail' | null>(null)
+
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const categoryHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const railTriggerRef = useRef<HTMLButtonElement | null>(null)
   const sidebarTriggerRef = useRef<HTMLButtonElement | null>(null)
   const topbarTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const sidebarAreaRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+      if (categoryHoverTimerRef.current) clearTimeout(categoryHoverTimerRef.current)
+    }
+  }, [])
+
+  // Close manually open sidebar on outside click
+  useEffect(() => {
+    if (isCollapsed) return
+
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null
+      if (!target) return
+      if (
+        target instanceof Element &&
+        target.closest('.management-drawer, .management-drawer-backdrop, .confirmation-overlay, .modal-card, .user-menu-popover')
+      ) {
+        return
+      }
+      if (sidebarAreaRef.current && !sidebarAreaRef.current.contains(target)) {
+        setIsCollapsed(true)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('nav_sidebar_collapsed', 'true')
+        }
+        setIsHoverExpanded(false)
+        setHoveredCategory(null)
+      }
+    }
+
+    document.addEventListener('click', handleOutsideClick)
+    return () => {
+      document.removeEventListener('click', handleOutsideClick)
+    }
+  }, [isCollapsed])
+
+  // Sync selectedCategory when activeView changes via routing / search
+  useEffect(() => {
+    const cat = getCategoryForView(activeView)
+    setSelectedCategory(cat)
+    setHoveredCategory(null)
+  }, [activeView, location.pathname])
+
+  const handleCategoryMouseEnter = (catId: NavCategoryId) => {
+    if (categoryHoverTimerRef.current) {
+      clearTimeout(categoryHoverTimerRef.current)
+      categoryHoverTimerRef.current = null
+    }
+
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+
+    if (isCollapsed) {
+      setIsHoverExpanded(true)
+    }
+
+    // Hover-intent delay (~100ms)
+    categoryHoverTimerRef.current = setTimeout(() => {
+      setHoveredCategory(catId)
+    }, 100)
+  }
+
+  const handleCategoryMouseLeave = () => {
+    if (categoryHoverTimerRef.current) {
+      clearTimeout(categoryHoverTimerRef.current)
+      categoryHoverTimerRef.current = null
+    }
+  }
+
+  const handleSidebarAreaMouseEnter = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+    if (isCollapsed) {
+      setIsHoverExpanded(true)
+    }
+  }
+
+  const handleSidebarAreaMouseLeave = () => {
+    if (categoryHoverTimerRef.current) {
+      clearTimeout(categoryHoverTimerRef.current)
+      categoryHoverTimerRef.current = null
+    }
+
+    if (isCollapsed) {
+      hoverTimerRef.current = setTimeout(() => {
+        setIsHoverExpanded(false)
+        setHoveredCategory(null)
+      }, 120)
+    } else {
+      setHoveredCategory(null)
+    }
+  }
 
   const toggleUserMenu = (anchor: 'topbar' | 'sidebar' | 'rail') => {
     onCloseSearch()
@@ -73,26 +178,27 @@ export function ManagementShell({
       ? sidebarTriggerRef
       : railTriggerRef
 
-  // Sync activeCategory when activeView changes via routing / search
-  useEffect(() => {
-    const cat = getCategoryForView(activeView)
-    setActiveCategory(cat)
-  }, [activeView, location.pathname])
-
   const handleToggleCollapse = () => {
     setIsCollapsed((prev) => {
       const next = !prev
       if (typeof window !== 'undefined') {
-        localStorage.setItem('nav_secondary_collapsed', String(next))
+        localStorage.setItem('nav_sidebar_collapsed', String(next))
       }
       return next
     })
+    setIsHoverExpanded(false)
+    setHoveredCategory(null)
   }
 
   const handleSelectCategory = (catId: NavCategoryId) => {
-    setActiveCategory(catId)
+    setSelectedCategory(catId)
+    setHoveredCategory(null)
+
     if (isCollapsed) {
       setIsCollapsed(false)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nav_sidebar_collapsed', 'false')
+      }
     }
 
     const catObj = NAV_CATEGORIES.find((c) => c.id === catId)
@@ -115,35 +221,59 @@ export function ManagementShell({
     }
   }
 
-  return (
-    <div className={`management-shell-layout ${isCollapsed ? 'secondary-collapsed' : ''}`}>
-      {/* Primary 64px Icon Rail */}
-      <NavigationRail
-        activeCategory={activeCategory}
-        onSelectCategory={handleSelectCategory}
-        userRoles={userRoles}
-        user={user}
-        onToggleUserMenu={() => toggleUserMenu('rail')}
-        isUserMenuOpen={activeMenuAnchor === 'rail'}
-        triggerRef={railTriggerRef}
-      />
+  const handleSelectView = (viewId: string) => {
+    if (hoveredCategory) {
+      setSelectedCategory(hoveredCategory)
+      setHoveredCategory(null)
+    }
+    onNavigateToView(viewId)
+    setIsMobileOpen(false)
+  }
 
-      {/* Secondary 230px Contextual Sidebar */}
-      <SecondarySidebar
-        activeCategory={activeCategory}
-        activeView={activeView}
-        onSelectView={(v) => {
-          onNavigateToView(v)
-          setIsMobileOpen(false)
-        }}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={handleToggleCollapse}
-        userRoles={userRoles}
-        user={user}
-        onToggleUserMenu={() => toggleUserMenu('sidebar')}
-        isUserMenuOpen={activeMenuAnchor === 'sidebar'}
-        sidebarTriggerRef={sidebarTriggerRef}
-      />
+  const activeCategory = hoveredCategory ?? selectedCategory
+  const isEffectiveCollapsed = isCollapsed && !isHoverExpanded
+  const isHoverOverlay = isCollapsed && isHoverExpanded
+
+  return (
+    <div
+      className={`management-shell-layout ${
+        isCollapsed ? 'secondary-collapsed' : ''
+      } ${isHoverOverlay ? 'hover-overlay-active' : ''}`}
+    >
+      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
+      {/* Primary 64px Icon Rail + Secondary 230px Sidebar Area */}
+      <div
+        ref={sidebarAreaRef}
+        className="shell-sidebar-area"
+        onMouseEnter={handleSidebarAreaMouseEnter}
+        onMouseLeave={handleSidebarAreaMouseLeave}
+      >
+        <NavigationRail
+          activeCategory={activeCategory}
+          onSelectCategory={handleSelectCategory}
+          onCategoryMouseEnter={handleCategoryMouseEnter}
+          onCategoryMouseLeave={handleCategoryMouseLeave}
+          userRoles={userRoles}
+          user={user}
+          onToggleUserMenu={() => toggleUserMenu('rail')}
+          isUserMenuOpen={activeMenuAnchor === 'rail'}
+          triggerRef={railTriggerRef}
+        />
+
+        <SecondarySidebar
+          activeCategory={activeCategory}
+          activeView={activeView}
+          onSelectView={handleSelectView}
+          isCollapsed={isEffectiveCollapsed}
+          isHoverOverlay={isHoverOverlay}
+          onToggleCollapse={handleToggleCollapse}
+          userRoles={userRoles}
+          user={user}
+          onToggleUserMenu={() => toggleUserMenu('sidebar')}
+          isUserMenuOpen={activeMenuAnchor === 'sidebar'}
+          sidebarTriggerRef={sidebarTriggerRef}
+        />
+      </div>
 
       {/* Main Content Area + Top Utility Bar */}
       <div className="shell-main">
@@ -164,8 +294,10 @@ export function ManagementShell({
           topbarTriggerRef={topbarTriggerRef}
         />
 
-        <main id="main-content" className="shell-content">
-          {children}
+        <main id="main-content" ref={mainContentRef} tabIndex={-1} className="shell-content">
+          <div className="shell-page-content">
+            {children}
+          </div>
         </main>
       </div>
 

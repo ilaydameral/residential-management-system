@@ -44,6 +44,9 @@ import { PaymentSubmissionsManagement } from './components/PaymentSubmissionsMan
 import { DataImportManagement } from './components/DataImportManagement'
 import { AnnouncementManagement } from './components/AnnouncementManagement'
 import { MaintenanceRequestManagement } from './components/MaintenanceRequestManagement'
+import { ManagementFacilities } from './components/ManagementFacilities'
+import { ManagementVisitors } from './components/ManagementVisitors'
+import { ManagementVehicles } from './components/ManagementVehicles'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -51,6 +54,7 @@ import { HeaderSettingsButton } from './components/HeaderSettingsButton'
 import { ManagementShell } from './components/nav/ManagementShell'
 import type { GlobalSearchItem } from './types'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
+import { PageHeader } from './components/PageHeader'
 import { NotificationCenter } from './components/NotificationCenter'
 import { RealtimeProvider } from './realtime/RealtimeProvider'
 import { OccupancyManagement } from './components/OccupancyManagement'
@@ -151,6 +155,9 @@ export type ManagementView =
   | 'dataImport'
   | 'announcements'
   | 'maintenanceRequests'
+  | 'facilities'
+  | 'visitors'
+  | 'vehicles'
   | 'account'
   | 'settings'
 
@@ -177,6 +184,9 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'expenses', label: 'Giderler & Borçlandırma' },
   { id: 'paymentSubmissions', label: 'Ödeme Dekont Onayları' },
   { id: 'dataImport', label: 'Veri Aktarımı' },
+  { id: 'facilities', label: 'Ortak Alanlar' },
+  { id: 'visitors', label: 'Ziyaretçiler' },
+  { id: 'vehicles', label: 'Araç Dizini' },
   { id: 'announcements', label: 'Duyurular' },
   { id: 'maintenanceRequests', label: 'Talepler' },
   { id: 'account', label: 'Hesabım' },
@@ -199,6 +209,9 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   expenses: '/management/finance/expenses',
   paymentSubmissions: '/management/finance/payment-submissions',
   dataImport: '/management/import',
+  facilities: '/management/facilities',
+  visitors: '/management/visitors',
+  vehicles: '/management/vehicles',
   announcements: '/management/announcements',
   maintenanceRequests: '/management/maintenance-requests',
   account: '/account',
@@ -610,6 +623,10 @@ function App() {
         navigate('/dashboard', { replace: true })
         return
       }
+      if (location.pathname === MANAGEMENT_VIEW_PATHS.dataImport && !hasRole('ADMIN')) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
       if (
         location.pathname === MANAGEMENT_VIEW_PATHS.managerScope &&
         (!hasRole('MANAGER') || hasRole('ADMIN'))
@@ -627,6 +644,12 @@ function App() {
         location.pathname === '/resident/my-units' ||
         Boolean(matchPath('/resident/my-units/:unitId', location.pathname)) ||
         location.pathname === '/resident/finance' ||
+        location.pathname === '/resident/facilities' ||
+        location.pathname.startsWith('/resident/facilities') ||
+        location.pathname === '/resident/visitors' ||
+        location.pathname.startsWith('/resident/visitors') ||
+        location.pathname === '/resident/vehicles' ||
+        location.pathname.startsWith('/resident/vehicles') ||
         location.pathname === '/resident/announcements' ||
         location.pathname === '/resident/requests' ||
         location.pathname === '/resident/maintenance-requests' ||
@@ -1000,11 +1023,19 @@ function App() {
   }
 
   if (isResidentView) {
-    return <ResidentPortal />
+    return (
+      <RealtimeProvider user={user}>
+        <ResidentPortal />
+      </RealtimeProvider>
+    )
   }
 
   if (isTechnicalStaffView) {
-    return <TechnicalStaffPortal />
+    return (
+      <RealtimeProvider user={user}>
+        <TechnicalStaffPortal />
+      </RealtimeProvider>
+    )
   }
 
   // ==========================================
@@ -1763,8 +1794,10 @@ function App() {
                           ? 'Sakinlerden gelen ödeme dekontlarını inceleyin, onaylayın veya reddedin.'
                           : activeManagementView === 'dataImport'
                             ? 'CSV ve XLSX dosyaları üzerinden toplu veri aktarımı yapın.'
-                            : activeManagementView === 'announcements'
-                              ? 'Sakinlere yönelik site ve blok duyurularını oluşturun ve yönetin.'
+                            : activeManagementView === 'facilities'
+                              ? 'Ortak alan tesislerini, rezervasyonlarını ve bakım zamanlarını yönetin.'
+                              : activeManagementView === 'announcements'
+                                ? 'Sakinlere yönelik site ve blok duyurularını oluşturun ve yönetin.'
                               : activeManagementView === 'maintenanceRequests'
                                 ? 'Sakinlerden gelen bakım taleplerini yönetin ve operasyon sürecini takip edin.'
                                 : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
@@ -1782,11 +1815,11 @@ function App() {
         onSelectSearchResult={handleSelectSearchResult}
         isSearchOpen={isSearchPaletteOpen}
         onLogout={handleLogout}
+        mainContentRef={mainContentRef}
       >
-        <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
         <div className="management-workspace">
-          <main id="main-content" ref={mainContentRef} tabIndex={-1} className="management-content">
-      {activeManagementView !== 'account' && <header className="page-header">
+          <div className="management-content">
+      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && activeManagementView !== 'units' && activeManagementView !== 'residents' && !['properties', 'buildings', 'users', 'managerAssignments', 'dueDefinitions', 'duePeriods', 'expenses', 'announcements', 'maintenanceRequests'].includes(activeManagementView) && <header className="page-header">
         <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
         <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
         <p className="page-description">
@@ -1841,7 +1874,10 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'overview' && (
         <section className="section-container">
-          <DashboardOverview onNavigate={(view, params) => void handleManagementNavigation(view, params)} />
+          <DashboardOverview
+            onNavigate={(view, params) => void handleManagementNavigation(view, params)}
+            isAdmin={hasRole('ADMIN')}
+          />
         </section>
       )}
 
@@ -1912,6 +1948,18 @@ function App() {
         <AnnouncementManagement />
       )}
 
+      {isManagementPanel && activeManagementView === 'facilities' && (
+        <ManagementFacilities />
+      )}
+
+      {isManagementPanel && activeManagementView === 'visitors' && (
+        <ManagementVisitors />
+      )}
+
+      {isManagementPanel && activeManagementView === 'vehicles' && (
+        <ManagementVehicles />
+      )}
+
       {isManagementPanel && activeManagementView === 'maintenanceRequests' && (
         <MaintenanceRequestManagement />
       )}
@@ -1933,14 +1981,17 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'properties' && (
         <section className="section-container entity-management-view">
-          <div className="entity-page-actions">
-            <p>{filteredProperties.length} yapı gösteriliyor.</p>
-            {canCreateProperty && (
+          <PageHeader
+            eyebrow="Yönetim Paneli"
+            title="Yapılar"
+            subtitle="Site, apartman ve diğer yapı kayıtlarını tek merkezden yönetin."
+            meta={`${filteredProperties.length} yapı gösteriliyor.`}
+            action={canCreateProperty ? (
               <button className="primary-button" type="button" onClick={() => void handleOpenNewProperty()}>
                 Yeni Yapı
               </button>
-            )}
-          </div>
+            ) : undefined}
+          />
 
           <section className="panel entity-toolbar" aria-label="Yapı filtreleri">
             <div className="form-field">
@@ -2065,14 +2116,17 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'buildings' && (
         <section className="section-container entity-management-view">
-          <div className="entity-page-actions">
-            <p>{filteredBuildings.length} blok gösteriliyor.</p>
-            {canCreateBuilding && (
+          <PageHeader
+            eyebrow="Yönetim Paneli"
+            title="Bloklar"
+            subtitle="Tüm yapılara bağlı blokları tek merkezden yönetin."
+            meta={`${filteredBuildings.length} blok gösteriliyor.`}
+            action={canCreateBuilding ? (
               <button className="primary-button" type="button" onClick={() => void handleOpenNewBuilding()}>
                 Yeni Blok
               </button>
-            )}
-          </div>
+            ) : undefined}
+          />
 
           <section className="panel entity-toolbar" aria-label="Blok filtreleri">
             <div className="form-field">
@@ -2312,61 +2366,129 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'units' && routeUnitId == null && (
         <section className="section-container entity-management-view">
-          <div className="entity-page-actions">
-            <p>{filteredUnits.length} daire veya bölüm gösteriliyor.</p>
+          <div className="page-header-row">
+            <div>
+              <p className="eyebrow">YÖNETİM PANELİ</p>
+              <h1>Daireler</h1>
+              <p className="page-description">
+                Tüm daire ve bağımsız bölümleri tek merkezden yönetin.
+              </p>
+              <p className="page-header-meta">
+                {filteredUnits.length} daire veya bölüm gösteriliyor.
+              </p>
+            </div>
             {canCreateUnit && (
-              <button className="primary-button" type="button" onClick={() => void handleOpenNewUnit()}>
+              <button className="primary-button header-primary-button" type="button" onClick={() => void handleOpenNewUnit()}>
                 Yeni Daire
               </button>
             )}
           </div>
 
-          <section className="panel entity-toolbar unit-toolbar" aria-label="Daire filtreleri">
-            <div className="form-field">
-              <label htmlFor="unit-search">Daire / Bölüm No</label>
-              <input id="unit-search" value={unitSearch} onChange={(event) => setUnitSearch(event.target.value)} placeholder="Numaraya göre ara" />
+          <section className="panel unit-filter-card" aria-label="Daire filtreleri">
+            <div className="unit-filter-row row-1">
+              <div className="form-field field-search">
+                <label htmlFor="unit-search">Daire / Bölüm No</label>
+                <input
+                  id="unit-search"
+                  value={unitSearch}
+                  onChange={(event) => setUnitSearch(event.target.value)}
+                  placeholder="Numaraya göre ara..."
+                />
+              </div>
+              <div className="form-field">
+                <label htmlFor="unit-property-filter">Yapı</label>
+                <select
+                  id="unit-property-filter"
+                  value={unitPropertyFilter}
+                  onChange={(event) => {
+                    setUnitPropertyFilter(event.target.value)
+                    setUnitBuildingFilter('all')
+                  }}
+                >
+                  <option value="all">Tüm yapılar</option>
+                  {properties.map((property) => (
+                    <option key={property.id} value={property.id}>{property.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="unit-building-filter">Blok / Bina</label>
+                <select
+                  id="unit-building-filter"
+                  value={unitBuildingFilter}
+                  onChange={(event) => setUnitBuildingFilter(event.target.value)}
+                >
+                  <option value="all">Tüm bloklar</option>
+                  {unitFilterBuildings.map((building) => (
+                    <option key={building.id} value={building.id}>{building.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="unit-floor-filter">Kat</label>
+                <select
+                  id="unit-floor-filter"
+                  value={unitFloorFilter}
+                  onChange={(event) => setUnitFloorFilter(event.target.value)}
+                >
+                  <option value="all">Tüm katlar</option>
+                  {unitFloorOptions.map((floor) => (
+                    <option key={floor} value={floor}>{formatFloorDisplay(floor)}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="form-field">
-              <label htmlFor="unit-property-filter">Yapı</label>
-              <select id="unit-property-filter" value={unitPropertyFilter} onChange={(event) => { setUnitPropertyFilter(event.target.value); setUnitBuildingFilter('all') }}>
-                <option value="all">Tüm yapılar</option>
-                {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
-              </select>
+
+            <div className="unit-filter-row row-2">
+              <div className="unit-filter-left-group">
+                <div className="form-field">
+                  <label htmlFor="unit-occupancy-filter">Doluluk</label>
+                  <select
+                    id="unit-occupancy-filter"
+                    value={unitOccupancyFilter}
+                    onChange={(event) => setUnitOccupancyFilter(event.target.value)}
+                  >
+                    <option value="all">Tümü</option>
+                    <option value="occupied">Dolu</option>
+                    <option value="vacant">Boş</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label htmlFor="unit-status-filter">Durum</label>
+                  <select
+                    id="unit-status-filter"
+                    value={unitStatusFilter}
+                    onChange={(event) => setUnitStatusFilter(event.target.value)}
+                  >
+                    <option value="all">Tüm durumlar</option>
+                    <option value="active">Aktif</option>
+                    <option value="inactive">Pasif</option>
+                  </select>
+                </div>
+              </div>
+              <div className="unit-filter-actions">
+                <button
+                  className={`ghost-button unit-filter-clear ${unitFilterCount > 0 ? 'has-active-filters' : ''}`}
+                  type="button"
+                  disabled={unitFilterCount === 0}
+                  onClick={() => {
+                    setUnitSearch('')
+                    setUnitPropertyFilter('all')
+                    setUnitBuildingFilter('all')
+                    setUnitFloorFilter('all')
+                    setUnitOccupancyFilter('all')
+                    setUnitStatusFilter('all')
+                  }}
+                >
+                  <span>Filtreleri Temizle</span>
+                  {unitFilterCount > 0 && (
+                    <span className="filter-count-badge" aria-label={`${unitFilterCount} aktif filtre`}>
+                      {unitFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="form-field">
-              <label htmlFor="unit-building-filter">Blok / Bina</label>
-              <select id="unit-building-filter" value={unitBuildingFilter} onChange={(event) => setUnitBuildingFilter(event.target.value)}>
-                <option value="all">Tüm bloklar</option>
-                {unitFilterBuildings.map((building) => <option key={building.id} value={building.id}>{building.name}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="unit-floor-filter">Kat</label>
-              <select id="unit-floor-filter" value={unitFloorFilter} onChange={(event) => setUnitFloorFilter(event.target.value)}>
-                <option value="all">Tüm katlar</option>
-                {unitFloorOptions.map((floor) => <option key={floor} value={floor}>{formatFloorDisplay(floor)}</option>)}
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="unit-occupancy-filter">Doluluk</label>
-              <select id="unit-occupancy-filter" value={unitOccupancyFilter} onChange={(event) => setUnitOccupancyFilter(event.target.value)}>
-                <option value="all">Tümü</option>
-                <option value="occupied">Dolu</option>
-                <option value="vacant">Boş</option>
-              </select>
-            </div>
-            <div className="form-field">
-              <label htmlFor="unit-status-filter">Durum</label>
-              <select id="unit-status-filter" value={unitStatusFilter} onChange={(event) => setUnitStatusFilter(event.target.value)}>
-                <option value="all">Tüm durumlar</option>
-                <option value="active">Aktif</option>
-                <option value="inactive">Pasif</option>
-              </select>
-            </div>
-            <button className={`secondary-button entity-filter-clear ${unitFilterCount > 0 ? 'has-active-filters' : ''}`} type="button" disabled={unitFilterCount === 0} onClick={() => { setUnitSearch(''); setUnitPropertyFilter('all'); setUnitBuildingFilter('all'); setUnitFloorFilter('all'); setUnitOccupancyFilter('all'); setUnitStatusFilter('all') }}>
-              <span>Filtreleri Temizle</span>
-              {unitFilterCount > 0 && <span className="filter-count-badge" aria-label={`${unitFilterCount} aktif filtre`}>{unitFilterCount}</span>}
-            </button>
           </section>
 
           {isLoadingCentralUnits && <LoadingSkeleton variant="table" />}
@@ -2376,27 +2498,76 @@ function App() {
               <button className="secondary-button" type="button" onClick={() => void Promise.all([loadAllUnitList(), loadAllBuildingList()])}>Tekrar Dene</button>
             </section>
           )}
-          {!isLoadingCentralUnits && !centralUnitError && allUnits.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Henüz daire bulunmuyor</h2><p>Aktif bir blok veya binaya ilk daireyi ekleyin.</p>{canCreateUnit && <button className="primary-button" type="button" onClick={() => void handleOpenNewUnit()}>Yeni Daire Ekle</button>}</section>}
-          {!isLoadingCentralUnits && !centralUnitError && allUnits.length > 0 && filteredUnits.length === 0 && <section className="panel entity-state-panel actionable-empty-state"><h2>Filtrelere uygun daire bulunamadı</h2><button className="secondary-button" type="button" onClick={() => { setUnitSearch(''); setUnitPropertyFilter('all'); setUnitBuildingFilter('all'); setUnitFloorFilter('all'); setUnitOccupancyFilter('all'); setUnitStatusFilter('all') }}>Filtreleri Temizle</button></section>}
+          {!isLoadingCentralUnits && !centralUnitError && allUnits.length === 0 && (
+            <section className="panel entity-state-panel actionable-empty-state">
+              <h2>Henüz daire bulunmuyor</h2>
+              <p>Aktif bir blok veya binaya ilk daireyi ekleyin.</p>
+              {canCreateUnit && (
+                <button className="primary-button" type="button" onClick={() => void handleOpenNewUnit()}>
+                  Yeni Daire Ekle
+                </button>
+              )}
+            </section>
+          )}
+          {!isLoadingCentralUnits && !centralUnitError && allUnits.length > 0 && filteredUnits.length === 0 && (
+            <section className="panel entity-state-panel actionable-empty-state">
+              <h2>Filtrelere uygun daire bulunamadı</h2>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setUnitSearch('')
+                  setUnitPropertyFilter('all')
+                  setUnitBuildingFilter('all')
+                  setUnitFloorFilter('all')
+                  setUnitOccupancyFilter('all')
+                  setUnitStatusFilter('all')
+                }}
+              >
+                Filtreleri Temizle
+              </button>
+            </section>
+          )}
 
           {!isLoadingCentralUnits && !centralUnitError && filteredUnits.length > 0 && (
             <section className="panel entity-table-panel">
               <div className="responsive-table-wrapper">
                 <table className="management-table unit-management-table sticky-columns-table">
-                  <thead><tr><th>Daire / Bölüm No</th><th>Yapı</th><th>Blok / Bina</th><th>Kat</th><th>Tür</th><th>Brüt Alan</th><th>Net Alan</th><th>Doluluk</th><th>Durum</th><th>İşlemler</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th className="col-unit-no">Daire / Bölüm No</th>
+                      <th className="col-property">Yapı</th>
+                      <th className="col-building">Blok / Bina</th>
+                      <th className="col-floor">Kat</th>
+                      <th className="col-type">Tür</th>
+                      <th className="col-gross">Brüt Alan</th>
+                      <th className="col-net">Net Alan</th>
+                      <th className="col-occupancy">Doluluk</th>
+                      <th className="col-status">Durum</th>
+                      <th className="col-actions">İşlemler</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {filteredUnits.map((unit) => (
                       <tr key={unit.id}>
-                        <td><strong>{formatUnitNumber(unit.unitNumber)}</strong></td>
-                        <td>{unit.propertyName}</td>
-                        <td>{unit.buildingName}</td>
-                        <td>{formatFloorDisplay(unit.floorNumber)}</td>
-                        <td>{unit.unitTypeName}</td>
-                        <td>{unit.grossArea != null ? `${unit.grossArea} m²` : '—'}</td>
-                        <td>{unit.netArea != null ? `${unit.netArea} m²` : '—'}</td>
-                        <td><span className={`occupancy-state ${unit.activeOccupancyCount > 0 ? 'occupied' : 'vacant'}`}>{unit.activeOccupancyCount > 0 ? `Dolu (${unit.activeOccupancyCount})` : 'Boş'}</span></td>
-                        <td><span className={`status-badge ${unit.isActive ? 'active' : 'inactive'}`}>{unit.isActive ? 'Aktif' : 'Pasif'}</span></td>
-                        <td>
+                        <td className="col-unit-no"><strong>{formatUnitNumber(unit.unitNumber)}</strong></td>
+                        <td className="col-property">{unit.propertyName}</td>
+                        <td className="col-building">{unit.buildingName}</td>
+                        <td className="col-floor">{formatFloorDisplay(unit.floorNumber)}</td>
+                        <td className="col-type">{unit.unitTypeName}</td>
+                        <td className="col-gross">{unit.grossArea != null ? `${unit.grossArea} m²` : '—'}</td>
+                        <td className="col-net">{unit.netArea != null ? `${unit.netArea} m²` : '—'}</td>
+                        <td className="col-occupancy">
+                          <span className={`status-badge ${unit.activeOccupancyCount > 0 ? 'active' : 'inactive'}`}>
+                            {unit.activeOccupancyCount > 0 ? `Dolu (${unit.activeOccupancyCount})` : 'Boş'}
+                          </span>
+                        </td>
+                        <td className="col-status">
+                          <span className={`status-badge ${unit.isActive ? 'active' : 'inactive'}`}>
+                            {unit.isActive ? 'Aktif' : 'Pasif'}
+                          </span>
+                        </td>
+                        <td className="col-actions">
                           <RowActionsMenu
                             label={formatUnitNumber(unit.unitNumber)}
                             primaryAction={{ label: 'Detay', onSelect: () => { void handleOpenUnitDetail(unit) } }}
@@ -3237,9 +3408,7 @@ function App() {
         </section>
       )}
 
-        {hasRole('RESIDENT') && <ResidentPortal />}
-        {hasRole('TECHNICAL_STAFF') && <TechnicalStaffPortal />}
-            </main>
+            </div>
           </div>
 
           {destructiveConfirmation && (
@@ -3267,6 +3436,22 @@ function App() {
           )}
           {unsavedChangesDialog}
         </ManagementShell>
+      </RealtimeProvider>
+    )
+  }
+
+  if (isResidentView) {
+    return (
+      <RealtimeProvider user={user}>
+        <ResidentPortal />
+      </RealtimeProvider>
+    )
+  }
+
+  if (isTechnicalStaffView) {
+    return (
+      <RealtimeProvider user={user}>
+        <TechnicalStaffPortal />
       </RealtimeProvider>
     )
   }

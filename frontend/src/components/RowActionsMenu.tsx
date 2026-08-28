@@ -17,7 +17,7 @@ export interface RowAction {
 }
 
 interface RowActionsMenuProps {
-  primaryAction: RowAction
+  primaryAction?: RowAction
   secondaryActions?: RowAction[]
   label: string
 }
@@ -39,11 +39,15 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
     const trigger = triggerRef.current
     if (!trigger) return
     const rect = trigger.getBoundingClientRect()
-    const estimatedHeight = secondaryActions.length * 40 + 12
+    const estimatedHeight = secondaryActions.length * 36 + 12
     const openAbove = window.innerHeight - rect.bottom < estimatedHeight + 12
-    setMenuStyle(openAbove
-      ? { right: window.innerWidth - rect.right, bottom: window.innerHeight - rect.top + 6 }
-      : { right: window.innerWidth - rect.right, top: rect.bottom + 6 })
+    const rightOffset = Math.max(8, window.innerWidth - rect.right)
+
+    setMenuStyle(
+      openAbove
+        ? { right: rightOffset, bottom: window.innerHeight - rect.top + 4 }
+        : { right: rightOffset, top: rect.bottom + 4 }
+    )
     initialMenuFocusRef.current = initialFocus
     setIsOpen(true)
   }
@@ -104,14 +108,16 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
 
   return (
     <div className="row-actions">
-      <button
-        className={`row-primary-action ${primaryAction.variant === 'primary' ? 'primary' : ''}`}
-        type="button"
-        disabled={primaryAction.disabled}
-        onClick={primaryAction.onSelect}
-      >
-        {primaryAction.label}
-      </button>
+      {primaryAction && (
+        <button
+          className={`row-primary-action ${primaryAction.variant === 'primary' ? 'primary' : ''}`}
+          type="button"
+          disabled={primaryAction.disabled}
+          onClick={primaryAction.onSelect}
+        >
+          {primaryAction.label}
+        </button>
+      )}
       {secondaryActions.length > 0 && (
         <>
           <button
@@ -119,6 +125,7 @@ export function RowActionsMenu({ primaryAction, secondaryActions = [], label }: 
             className="row-actions-trigger"
             type="button"
             aria-label={`${label} için diğer işlemler`}
+            title={`${label} için diğer işlemler`}
             aria-haspopup="menu"
             aria-expanded={isOpen}
             aria-controls={menuId}

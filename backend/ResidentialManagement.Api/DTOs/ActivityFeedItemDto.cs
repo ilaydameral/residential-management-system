@@ -20,3 +20,12 @@ public class ActivityFeedItemDto
     public string? TargetView { get; set; }
     public string? RouteParams { get; set; }
 }
+
+public class PagedActivityFeedDto
+{
+    public List<ActivityFeedItemDto> Items { get; set; } = new();
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalCount { get; set; }
+    public int TotalPages { get; set; }
+}

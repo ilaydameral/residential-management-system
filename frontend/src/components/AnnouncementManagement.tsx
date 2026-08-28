@@ -12,6 +12,8 @@ import {
 } from '../api'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
@@ -24,15 +26,15 @@ import type {
 } from '../types'
 
 const PRIORITY_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  NORMAL: { label: 'Normal', className: 'badge-secondary' },
-  IMPORTANT: { label: 'Önemli', className: 'badge-warning' },
-  URGENT: { label: 'Acil', className: 'badge-danger' },
+  NORMAL: { label: 'Normal', className: 'secondary' },
+  IMPORTANT: { label: 'Önemli', className: 'warning' },
+  URGENT: { label: 'Acil', className: 'danger' },
 }
 
 const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  DRAFT: { label: 'Taslak', className: 'badge-neutral' },
-  PUBLISHED: { label: 'Yayında', className: 'badge-success' },
-  CANCELLED: { label: 'İptal Edildi', className: 'badge-muted' },
+  DRAFT: { label: 'Taslak', className: 'inactive' },
+  PUBLISHED: { label: 'Yayında', className: 'active' },
+  CANCELLED: { label: 'İptal Edildi', className: 'inactive' },
 }
 
 function formatDate(dateStr: string | null): string {
@@ -323,41 +325,20 @@ export function AnnouncementManagement() {
     }
   }
 
+  const activeFilterCount = [propertyFilter !== 'all', buildingFilter !== 'all', statusFilter !== 'all', priorityFilter !== 'all', Boolean(searchQuery.trim())].filter(Boolean).length
+
   return (
     <div className="management-page">
-      {/* Compact Page Action Strip */}
-      <div className="entity-action-strip">
-        <div className="entity-action-strip-info">
-          <div
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              background: 'var(--color-surface-secondary)',
-              color: 'var(--color-primary)',
-              flexShrink: 0,
-            }}
-          >
-            <MegaphoneIcon width={20} height={20} />
-          </div>
-          <div className="entity-action-strip-text">
-            <strong style={{ fontSize: '0.95rem', display: 'block', color: 'var(--color-text-primary)' }}>
-              Duyuru Yönetimi
-            </strong>
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-              Site veya blok bazlı duyuruları oluşturun, yayınlayın ve geçmişi takip edin.
-            </span>
-          </div>
-        </div>
-        <button className="primary-button" type="button" onClick={handleOpenCreate}>
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Yeni Duyuru
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Duyurular"
+        subtitle="Sakinlere yönelik site ve blok duyurularını oluşturun ve yönetin."
+        action={(
+          <button className="primary-button" type="button" onClick={handleOpenCreate}>
+            Yeni Duyuru
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar announcement-toolbar" aria-label="Duyuru filtreleri">
@@ -449,6 +430,16 @@ export function AnnouncementManagement() {
             }}
           />
         </div>
+
+        <button
+          type="button"
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          disabled={activeFilterCount === 0}
+          onClick={() => { setPropertyFilter('all'); setBuildingFilter('all'); setStatusFilter('all'); setPriorityFilter('all'); setSearchQuery(''); setPage(1) }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Announcements Table */}
@@ -479,8 +470,8 @@ export function AnnouncementManagement() {
               </thead>
               <tbody>
                 {announcements.map((a) => {
-                  const prio = PRIORITY_LABEL_MAP[a.priority] || { label: a.priority, className: 'badge-secondary' }
-                  const status = STATUS_LABEL_MAP[a.status] || { label: a.status, className: 'badge-secondary' }
+                  const prio = PRIORITY_LABEL_MAP[a.priority] || { label: a.priority, className: 'secondary' }
+                  const status = STATUS_LABEL_MAP[a.status] || { label: a.status, className: 'secondary' }
                   return (
                     <tr key={a.id} className="clickable-row" onClick={() => handleViewDetail(a)}>
                       <td>
@@ -498,13 +489,7 @@ export function AnnouncementManagement() {
                       <td style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{formatDate(a.publishedAt)}</td>
                       <td style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>{a.createdByName}</td>
                       <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="button outline small"
-                          type="button"
-                          onClick={() => handleViewDetail(a)}
-                        >
-                          Detay
-                        </button>
+                        <RowActionsMenu label={a.title} primaryAction={{ label: 'Detay', onSelect: () => handleViewDetail(a) }} />
                       </td>
                     </tr>
                   )
@@ -551,6 +536,7 @@ export function AnnouncementManagement() {
           />
           <aside
             ref={createDrawerRef as any}
+            tabIndex={-1}
             className={`management-drawer announcement-drawer drawer-container drawer-${createPhase}`}
             role="dialog"
             aria-modal="true"
@@ -562,7 +548,7 @@ export function AnnouncementManagement() {
                 <p className="eyebrow">Duyuru Yönetimi</p>
                 <h3>Yeni Duyuru Oluştur</h3>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => void handleCloseCreateWithGuard()}>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => void handleCloseCreateWithGuard()}>
                 ✕
               </button>
             </div>
@@ -674,6 +660,7 @@ export function AnnouncementManagement() {
           />
           <aside
             ref={detailDrawerRef as any}
+            tabIndex={-1}
             className={`management-drawer announcement-drawer drawer-container drawer-${detailPhase}`}
             role="dialog"
             aria-modal="true"
@@ -704,7 +691,7 @@ export function AnnouncementManagement() {
                 </div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>{selectedAnnouncement.title}</h3>
               </div>
-              <button className="drawer-close-button" type="button" onClick={closeDetailDrawer}>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={closeDetailDrawer}>
                 ✕
               </button>
             </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getResidentAnnouncement, getResidentAnnouncements } from '../api'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
+import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import type { AnnouncementDto } from '../types'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
@@ -53,6 +54,11 @@ export function ResidentAnnouncements() {
   const detailBodyRef = useRef<HTMLDivElement>(null)
 
   const { shouldRender: shouldRenderDetail, phase: detailPhase } = useAnimatedDrawer(isDrawerOpen)
+  const detailDrawerRef = useDrawerAccessibility({
+    isOpen: shouldRenderDetail && detailPhase !== 'closing',
+    onClose: () => setIsDrawerOpen(false),
+    enableSaveShortcut: false,
+  })
 
   const loadAnnouncements = useCallback(async () => {
     setIsLoading(true)
@@ -241,6 +247,8 @@ export function ResidentAnnouncements() {
             onClick={() => setIsDrawerOpen(false)}
           />
           <aside
+            ref={detailDrawerRef}
+            tabIndex={-1}
             className={`management-drawer announcement-drawer drawer-container drawer-${detailPhase}`}
             role="dialog"
             aria-modal="true"
@@ -259,7 +267,7 @@ export function ResidentAnnouncements() {
                 </div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>{selectedAnnouncement.title}</h3>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDrawerOpen(false)}>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDrawerOpen(false)}>
                 ✕
               </button>
             </div>

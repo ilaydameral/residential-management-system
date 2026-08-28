@@ -36,6 +36,11 @@ public class AppDbContext : DbContext
     public DbSet<MaintenanceRequest> MaintenanceRequests { get; set; }
     public DbSet<MaintenanceRequestHistory> MaintenanceRequestHistories { get; set; }
     public DbSet<MaintenanceRequestAttachment> MaintenanceRequestAttachments { get; set; }
+    public DbSet<CommonFacility> CommonFacilities { get; set; }
+    public DbSet<FacilityReservation> FacilityReservations { get; set; }
+    public DbSet<FacilityMaintenanceBlock> FacilityMaintenanceBlocks { get; set; }
+    public DbSet<Visitor> Visitors { get; set; }
+    public DbSet<ResidentVehicle> ResidentVehicles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +60,11 @@ public class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new MaintenanceRequestConfiguration());
         modelBuilder.ApplyConfiguration(new MaintenanceRequestHistoryConfiguration());
         modelBuilder.ApplyConfiguration(new MaintenanceRequestAttachmentConfiguration());
+        modelBuilder.ApplyConfiguration(new CommonFacilityConfiguration());
+        modelBuilder.ApplyConfiguration(new FacilityReservationConfiguration());
+        modelBuilder.ApplyConfiguration(new FacilityMaintenanceBlockConfiguration());
+        modelBuilder.ApplyConfiguration(new VisitorConfiguration());
+        modelBuilder.ApplyConfiguration(new ResidentVehicleConfiguration());
 
         modelBuilder.Entity<OccupancyType>(entity =>
         {

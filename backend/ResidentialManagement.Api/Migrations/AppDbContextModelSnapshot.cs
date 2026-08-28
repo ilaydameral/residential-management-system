@@ -146,6 +146,83 @@ namespace ResidentialManagement.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.CommonFacility", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BuildingId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CancellationLeadTimeHours")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("int");
+
+                    b.Property<TimeSpan>("ClosingTime")
+                        .HasColumnType("time");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LocationHint")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("MaxActiveReservationsPerResident")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<TimeSpan>("OpeningTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("PropertyId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("RequiresManagerApproval")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("SlotDurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuildingId");
+
+                    b.HasIndex("PropertyId", "BuildingId", "IsActive");
+
+                    b.ToTable("CommonFacilities", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommonFacilities_CancellationLeadTime_NonNegative", "[CancellationLeadTimeHours] >= 0");
+
+                            t.HasCheckConstraint("CK_CommonFacilities_Capacity_Positive", "[Capacity] > 0");
+
+                            t.HasCheckConstraint("CK_CommonFacilities_MaxActive_Positive", "[MaxActiveReservationsPerResident] > 0");
+
+                            t.HasCheckConstraint("CK_CommonFacilities_OpeningClosingTime_Valid", "[OpeningTime] < [ClosingTime]");
+
+                            t.HasCheckConstraint("CK_CommonFacilities_SlotDuration_Positive", "[SlotDurationMinutes] > 0");
+                        });
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.DueDefinition", b =>
                 {
                     b.Property<int>("Id")
@@ -378,6 +455,114 @@ namespace ResidentialManagement.Api.Migrations
                     b.ToTable("Expenses", null, t =>
                         {
                             t.HasCheckConstraint("CK_Expenses_Amount_Positive", "[Amount] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.FacilityMaintenanceBlock", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("FacilityId", "StartTime", "EndTime");
+
+                    b.ToTable("FacilityMaintenanceBlocks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FacilityMaintenanceBlocks_StartEnd_Valid", "[StartTime] < [EndTime]");
+                        });
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.FacilityReservation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ResidentUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ReviewedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("PENDING");
+
+                    b.Property<int>("UnitId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("UnitId", "StartTime");
+
+                    b.HasIndex("ResidentUserId", "Status", "StartTime");
+
+                    b.HasIndex("FacilityId", "StartTime", "EndTime", "Status");
+
+                    b.ToTable("FacilityReservations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_FacilityReservations_StartEnd_Valid", "[StartTime] < [EndTime]");
+
+                            t.HasCheckConstraint("CK_FacilityReservations_Status_Allowed", "[Status] IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED')");
                         });
                 });
 
@@ -1207,6 +1392,60 @@ namespace ResidentialManagement.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.ResidentVehicle", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BrandModel")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PlateNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("ResidentUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UnitId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VehicleType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlateNumber")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.HasIndex("ResidentUserId", "IsActive");
+
+                    b.HasIndex("UnitId", "IsActive");
+
+                    b.ToTable("ResidentVehicles");
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Role", b =>
                 {
                     b.Property<int>("Id")
@@ -1624,6 +1863,85 @@ namespace ResidentialManagement.Api.Migrations
                     b.ToTable("UserRoles");
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.Visitor", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccessCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("CheckedInAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CheckedInByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CheckedOutAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpectedArrival")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpectedDeparture")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("HostUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("UnitId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VehiclePlate")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("VisitorName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("VisitorPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("VisitorType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccessCode")
+                        .IsUnique();
+
+                    b.HasIndex("CheckedInByUserId");
+
+                    b.HasIndex("VehiclePlate");
+
+                    b.HasIndex("HostUserId", "ExpectedArrival");
+
+                    b.HasIndex("UnitId", "Status", "ExpectedArrival");
+
+                    b.ToTable("Visitors");
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Announcement", b =>
                 {
                     b.HasOne("ResidentialManagement.Api.Entities.Building", "Building")
@@ -1657,6 +1975,24 @@ namespace ResidentialManagement.Api.Migrations
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Property");
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.CommonFacility", b =>
+                {
+                    b.HasOne("ResidentialManagement.Api.Entities.Building", "Building")
+                        .WithMany()
+                        .HasForeignKey("BuildingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ResidentialManagement.Api.Entities.Property", "Property")
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Building");
 
                     b.Navigation("Property");
                 });
@@ -1765,6 +2101,59 @@ namespace ResidentialManagement.Api.Migrations
                     b.Navigation("Property");
 
                     b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.FacilityMaintenanceBlock", b =>
+                {
+                    b.HasOne("ResidentialManagement.Api.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ResidentialManagement.Api.Entities.CommonFacility", "Facility")
+                        .WithMany("MaintenanceBlocks")
+                        .HasForeignKey("FacilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Facility");
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.FacilityReservation", b =>
+                {
+                    b.HasOne("ResidentialManagement.Api.Entities.CommonFacility", "Facility")
+                        .WithMany("Reservations")
+                        .HasForeignKey("FacilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ResidentialManagement.Api.Entities.User", "ResidentUser")
+                        .WithMany()
+                        .HasForeignKey("ResidentUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ResidentialManagement.Api.Entities.User", "ReviewedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ResidentialManagement.Api.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Facility");
+
+                    b.Navigation("ResidentUser");
+
+                    b.Navigation("ReviewedByUser");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("ResidentialManagement.Api.Entities.ImportBatch", b =>
@@ -2018,6 +2407,25 @@ namespace ResidentialManagement.Api.Migrations
                     b.Navigation("PropertyTypeLookup");
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.ResidentVehicle", b =>
+                {
+                    b.HasOne("ResidentialManagement.Api.Entities.User", "ResidentUser")
+                        .WithMany()
+                        .HasForeignKey("ResidentUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ResidentialManagement.Api.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ResidentUser");
+
+                    b.Navigation("Unit");
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Unit", b =>
                 {
                     b.HasOne("ResidentialManagement.Api.Entities.Building", "Building")
@@ -2123,9 +2531,42 @@ namespace ResidentialManagement.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.Visitor", b =>
+                {
+                    b.HasOne("ResidentialManagement.Api.Entities.User", "CheckedInByUser")
+                        .WithMany()
+                        .HasForeignKey("CheckedInByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ResidentialManagement.Api.Entities.User", "HostUser")
+                        .WithMany()
+                        .HasForeignKey("HostUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ResidentialManagement.Api.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CheckedInByUser");
+
+                    b.Navigation("HostUser");
+
+                    b.Navigation("Unit");
+                });
+
             modelBuilder.Entity("ResidentialManagement.Api.Entities.Building", b =>
                 {
                     b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("ResidentialManagement.Api.Entities.CommonFacility", b =>
+                {
+                    b.Navigation("MaintenanceBlocks");
+
+                    b.Navigation("Reservations");
                 });
 
             modelBuilder.Entity("ResidentialManagement.Api.Entities.DueDefinition", b =>

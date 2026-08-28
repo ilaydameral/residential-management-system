@@ -12,6 +12,8 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import type {
   CancelDuePeriodPayload,
   CreateDraftDuePeriodPayload,
@@ -183,6 +185,8 @@ export function DuePeriodsManagement() {
     void loadPeriods()
   }, [loadPeriods])
 
+  const activeFilterCount = [definitionFilter !== 'all', yearFilter !== 'all', monthFilter !== 'all', statusFilter !== 'all'].filter(Boolean).length
+
   // Open Create Draft Drawer
   const handleOpenDraftDrawer = () => {
     setDraftDefinitionId(dueDefinitions[0]?.id || 0)
@@ -195,6 +199,7 @@ export function DuePeriodsManagement() {
   // Submit Draft Form
   const handleSubmitDraft = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmittingDraft) return
     setDraftError('')
 
     if (!draftDefinitionId) {
@@ -240,7 +245,7 @@ export function DuePeriodsManagement() {
 
   // Confirm and Issue Due Period
   const handleConfirmIssue = async () => {
-    if (!previewPeriodTarget) return
+    if (!previewPeriodTarget || isIssuing) return
     setIsIssuing(true)
     try {
       await issueDuePeriod(previewPeriodTarget.id)
@@ -265,7 +270,7 @@ export function DuePeriodsManagement() {
   // Submit Cancel Form
   const handleSubmitCancel = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!cancelPeriodTarget) return
+    if (!cancelPeriodTarget || isCancelling) return
     setCancelError('')
 
     if (!cancellationReason.trim() || cancellationReason.trim().length < 3) {
@@ -293,17 +298,17 @@ export function DuePeriodsManagement() {
 
   return (
     <div className="section-container entity-management-view">
-      {/* Standard Entity Page Actions Header */}
-      <div className="entity-page-actions">
-        <p>{!isLoading && !listError ? `${periods.length} aidat dönemi gösteriliyor.` : 'Aidat dönemlerini görüntüleyin.'}</p>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handleOpenDraftDrawer}
-        >
-          + Yeni Taslak Dönem
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Aidat Dönemleri"
+        subtitle="Dönem bazlı aidat taslakları oluşturun ve borçlandırmaları yayınlayın."
+        meta={!isLoading && !listError ? `${periods.length} aidat dönemi gösteriliyor.` : 'Aidat dönemlerini görüntüleyin.'}
+        action={(
+          <button type="button" className="primary-button" onClick={handleOpenDraftDrawer}>
+            Yeni Taslak Dönem
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar due-toolbar" aria-label="Aidat dönemi filtreleri">
@@ -362,6 +367,15 @@ export function DuePeriodsManagement() {
             <option value="CANCELLED">İptal Edildi (CANCELLED)</option>
           </select>
         </div>
+        <button
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          type="button"
+          disabled={activeFilterCount === 0}
+          onClick={() => { setDefinitionFilter('all'); setYearFilter('all'); setMonthFilter('all'); setStatusFilter('all') }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content: Standardized Management Table */}
@@ -447,33 +461,13 @@ export function DuePeriodsManagement() {
                       </td>
                       <td className="text-right">
                         {item.status === 'ISSUED' ? (
-                          <button
-                            type="button"
-                            className="primary-button"
-                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                            onClick={() => { void handleOpenCollectionDetails(item) }}
-                          >
-                            Tahsilat Detayı
-                          </button>
+                          <RowActionsMenu label={item.periodName} primaryAction={{ label: 'Tahsilat Detayı', onSelect: () => { void handleOpenCollectionDetails(item) } }} />
                         ) : item.status === 'DRAFT' ? (
-                          <div style={{ display: 'inline-flex', gap: '6px' }}>
-                            <button
-                              type="button"
-                              className="primary-button"
-                              style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                              onClick={() => { void handleOpenIssuePreview(item) }}
-                            >
-                              Önizle ve Yayınla
-                            </button>
-                            <button
-                              type="button"
-                              className="secondary-button"
-                              style={{ padding: '4px 10px', fontSize: '0.78rem', color: 'var(--color-danger)' }}
-                              onClick={() => handleOpenCancelModal(item)}
-                            >
-                              İptal Et
-                            </button>
-                          </div>
+                          <RowActionsMenu
+                            label={item.periodName}
+                            primaryAction={{ label: 'Önizle ve Yayınla', variant: 'primary', onSelect: () => { void handleOpenIssuePreview(item) } }}
+                            secondaryActions={[{ label: 'İptal Et', danger: true, onSelect: () => handleOpenCancelModal(item) }]}
+                          />
                         ) : (
                           <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                             —
@@ -505,15 +499,16 @@ export function DuePeriodsManagement() {
             className={`management-drawer drawer-${draftDrawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="due-period-drawer-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Aidat Yönetimi</p>
-                <h2>Yeni Taslak Aidat Dönemi</h2>
+                <h2 id="due-period-drawer-title">Yeni Taslak Aidat Dönemi</h2>
                 <p className="drawer-description">Aidat tanımına bağlı yeni dönem borçlandırma taslağı hazırlayın.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDraftDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDraftDrawerOpen(false)}>×</button>
             </div>
 
             <form className="property-form drawer-form" onSubmit={(e) => { void handleSubmitDraft(e) }}>
@@ -737,18 +732,19 @@ export function DuePeriodsManagement() {
             className={`management-drawer drawer-${collectionDrawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="collection-drawer-title"
             style={{ width: '880px', maxWidth: '95vw' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Aidat Tahsilat Raporu</p>
-                <h2>{collectionPeriodTarget?.periodName} — Tahsilat Detayı</h2>
+                <h2 id="collection-drawer-title">{collectionPeriodTarget?.periodName} — Tahsilat Detayı</h2>
                 <p className="drawer-description">
                   {collectionPeriodTarget?.dueDefinitionTitle} · Son Ödeme: {formatDate(collectionPeriodTarget?.dueDate)}
                 </p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setCollectionPeriodTarget(null)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setCollectionPeriodTarget(null)}>×</button>
             </div>
 
             <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
@@ -794,19 +790,19 @@ export function DuePeriodsManagement() {
                     <span className="status-badge active" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
                       Ödeyen: {collectionDetails.summary.paidUnitCount} Daire
                     </span>
-                    <span className="status-badge warning" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                    <span className="status-badge info">
                       Kısmi Ödeyen: {collectionDetails.summary.partiallyPaidUnitCount} Daire
                     </span>
-                    <span className="status-badge inactive" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                    <span className="status-badge inactive">
                       Ödenmedi: {collectionDetails.summary.unpaidUnitCount} Daire
                     </span>
                     {collectionDetails.summary.overdueUnitCount > 0 && (
-                      <span className="status-badge inactive" style={{ padding: '4px 10px', fontSize: '0.78rem', backgroundColor: '#fef2f2', color: '#991b1b' }}>
+                      <span className="status-badge danger">
                         Gecikmiş: {collectionDetails.summary.overdueUnitCount} Daire
                       </span>
                     )}
                     {collectionDetails.summary.pendingSubmissionUnitCount > 0 && (
-                      <span className="status-badge" style={{ padding: '4px 10px', fontSize: '0.78rem', backgroundColor: '#eff6ff', color: '#1d4ed8' }}>
+                      <span className="status-badge info">
                         Bekleyen Dekont: {collectionDetails.summary.pendingSubmissionUnitCount} Daire
                       </span>
                     )}

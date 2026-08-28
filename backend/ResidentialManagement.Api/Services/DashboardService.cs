@@ -95,8 +95,15 @@ public class DashboardService : IDashboardService
 
     public async Task<List<ActivityFeedItemDto>> GetActivityFeedAsync(int limit, int userId, bool isAdmin)
     {
-        if (limit < 5) limit = 5;
-        if (limit > 30) limit = 30;
+        var paged = await GetActivityFeedPagedAsync(1, limit, userId, isAdmin);
+        return paged.Items;
+    }
+
+    public async Task<PagedActivityFeedDto> GetActivityFeedPagedAsync(int page, int pageSize, int userId, bool isAdmin)
+    {
+        if (pageSize < 5) pageSize = 5;
+        if (pageSize > 10) pageSize = 10;
+        if (page < 1) page = 1;
 
         List<int>? propFilter = null;
         List<int>? bldgFilter = null;
@@ -107,7 +114,6 @@ public class DashboardService : IDashboardService
         }
 
         var items = new List<ActivityFeedItemDto>();
-        int fetchCount = limit * 2;
 
         // 1. MAINTENANCE REQUEST HISTORY
         var maintQuery = _context.MaintenanceRequestHistories
@@ -120,8 +126,6 @@ public class DashboardService : IDashboardService
         }
 
         var maintHistories = await maintQuery
-            .OrderByDescending(h => h.CreatedAt)
-            .Take(fetchCount)
             .Select(h => new ActivityFeedItemDto
             {
                 Id = "maint_" + h.Id,
@@ -160,8 +164,6 @@ public class DashboardService : IDashboardService
         }
 
         var announcements = await annQuery
-            .OrderByDescending(a => a.PublishedAt)
-            .Take(fetchCount)
             .Select(a => new ActivityFeedItemDto
             {
                 Id = "ann_" + a.Id,
@@ -192,8 +194,6 @@ public class DashboardService : IDashboardService
         }
 
         var rawPayments = await payQuery
-            .OrderByDescending(p => p.CreatedAt)
-            .Take(fetchCount)
             .Select(p => new
             {
                 p.Id,
@@ -263,8 +263,6 @@ public class DashboardService : IDashboardService
         }
 
         var occupancies = await occQuery
-            .OrderByDescending(u => u.StartDate)
-            .Take(fetchCount)
             .Select(u => new ActivityFeedItemDto
             {
                 Id = "occ_" + u.Id,
@@ -298,8 +296,6 @@ public class DashboardService : IDashboardService
         }
 
         var mgrAssignments = await mgrQuery
-            .OrderByDescending(m => m.AssignedAt)
-            .Take(fetchCount)
             .Select(m => new ActivityFeedItemDto
             {
                 Id = "mgt_" + m.Id,
@@ -319,9 +315,28 @@ public class DashboardService : IDashboardService
 
         items.AddRange(mgrAssignments);
 
-        return items
+        var sortedItems = items
             .OrderByDescending(i => i.OccurredAt)
-            .Take(limit)
+            .ThenByDescending(i => i.Id)
             .ToList();
+
+        int totalCount = sortedItems.Count;
+        int totalPages = totalCount == 0 ? 1 : (int)Math.Ceiling((double)totalCount / pageSize);
+
+        if (page > totalPages) page = totalPages;
+
+        var pagedItems = sortedItems
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedActivityFeedDto
+        {
+            Items = pagedItems,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages
+        };
     }
 }

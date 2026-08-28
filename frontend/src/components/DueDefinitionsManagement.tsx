@@ -13,6 +13,8 @@ import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import type {
   Building,
   CreateDueDefinitionPayload,
@@ -163,6 +165,13 @@ export function DueDefinitionsManagement() {
     )
   }, [definitions, searchQuery])
 
+  const activeFilterCount = [
+    propertyFilter !== 'all',
+    buildingFilter !== 'all',
+    activeFilter !== 'all',
+    Boolean(searchQuery.trim()),
+  ].filter(Boolean).length
+
   // Open Drawer for Create
   const handleOpenCreateDrawer = () => {
     setEditingDefinition(null)
@@ -273,17 +282,17 @@ export function DueDefinitionsManagement() {
 
   return (
     <div className="section-container entity-management-view">
-      {/* Standard Entity Page Actions Header */}
-      <div className="entity-page-actions">
-        <p>{!isLoading && !listError ? `${filteredDefinitions.length} aidat tanımı gösteriliyor.` : 'Aidat tanımlarını görüntüleyin.'}</p>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handleOpenCreateDrawer}
-        >
-          + Yeni Aidat Tanımı
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Aidat Tanımları"
+        subtitle="Düzenli aidat şablonlarını ve birim tutarları yönetin."
+        meta={!isLoading && !listError ? `${filteredDefinitions.length} aidat tanımı gösteriliyor.` : 'Aidat tanımlarını görüntüleyin.'}
+        action={(
+          <button type="button" className="primary-button" onClick={handleOpenCreateDrawer}>
+            Yeni Aidat Tanımı
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar due-toolbar" aria-label="Aidat tanımı filtreleri">
@@ -339,6 +348,15 @@ export function DueDefinitionsManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        <button
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          type="button"
+          disabled={activeFilterCount === 0}
+          onClick={() => { setPropertyFilter('all'); setBuildingFilter('all'); setActiveFilter('all'); setSearchQuery('') }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content: Sleek Grid List */}
@@ -383,27 +401,15 @@ export function DueDefinitionsManagement() {
 
               {/* Status & Compact Actions */}
               <div className="due-def-action-col">
-                <span className={`status-badge ${item.isActive ? 'badge-success' : 'badge-secondary'}`}>
+                <span className={`status-badge ${item.isActive ? 'active' : 'inactive'}`}>
                   {item.isActive ? 'Aktif' : 'Pasif'}
                 </span>
 
-                <button
-                  type="button"
-                  className="secondary-button"
-                  style={{ padding: '4px 10px', fontSize: '0.78rem' }}
-                  onClick={() => handleOpenEditDrawer(item)}
-                >
-                  Düzenle
-                </button>
-
-                <button
-                  type="button"
-                  className="secondary-button due-compact-toggle-btn"
-                  onClick={() => setToggleConfirmTarget(item)}
-                  title={item.isActive ? 'Pasife Al' : 'Aktife Al'}
-                >
-                  {item.isActive ? 'Pasif' : 'Aktif'}
-                </button>
+                <RowActionsMenu
+                  label={item.title}
+                  primaryAction={{ label: 'Düzenle', onSelect: () => handleOpenEditDrawer(item) }}
+                  secondaryActions={[{ label: item.isActive ? 'Pasife Al' : 'Aktife Al', danger: item.isActive, onSelect: () => setToggleConfirmTarget(item) }]}
+                />
               </div>
             </div>
           ))}
@@ -426,15 +432,16 @@ export function DueDefinitionsManagement() {
             className={`management-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="due-definition-drawer-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Aidat Yönetimi</p>
-                <h2>{editingDefinition ? 'Aidat Tanımını Düzenle' : 'Yeni Aidat Tanımı'}</h2>
+                <h2 id="due-definition-drawer-title">{editingDefinition ? 'Aidat Tanımını Düzenle' : 'Yeni Aidat Tanımı'}</h2>
                 <p className="drawer-description">Aidat şablon tutarlarını ve kapsamını tanımlayın.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDrawerOpen(false)}>×</button>
             </div>
 
             <form className="property-form drawer-form" onSubmit={(e) => { void handleSubmitForm(e) }}>

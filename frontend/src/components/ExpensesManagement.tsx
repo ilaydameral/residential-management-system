@@ -15,6 +15,7 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import { RowActionsMenu } from './RowActionsMenu'
 import type {
   ApportionExpensePayload,
@@ -484,19 +485,27 @@ export function ExpensesManagement() {
     }, 0)
   }, [selectedUnitIds, manualAmounts])
 
+  const activeFilterCount = [
+    propertyFilter !== 'all',
+    buildingFilter !== 'all',
+    categoryFilter !== 'all',
+    statusFilter !== 'all',
+    Boolean(searchQuery.trim()),
+  ].filter(Boolean).length
+
   return (
     <div className="section-container entity-management-view">
-      {/* Standard Entity Page Actions Header */}
-      <div className="entity-page-actions">
-        <p>{!isLoading && !listError ? `${filteredExpenses.length} gider gösteriliyor.` : 'Ortak alan giderlerini yönetin.'}</p>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handleOpenCreateDrawer}
-        >
-          + Yeni Gider
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Giderler ve Borçlandırma"
+        subtitle="Gider kayıtları oluşturun ve dairelere borçlandırma modlarıyla dağıtın."
+        meta={!isLoading && !listError ? `${filteredExpenses.length} gider gösteriliyor.` : 'Ortak alan giderlerini yönetin.'}
+        action={(
+          <button type="button" className="primary-button" onClick={handleOpenCreateDrawer}>
+            Yeni Gider
+          </button>
+        )}
+      />
 
       {/* Standard Entity Toolbar */}
       <section className="panel entity-toolbar exp-toolbar" aria-label="Gider filtreleri">
@@ -567,6 +576,16 @@ export function ExpensesManagement() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+
+        <button
+          type="button"
+          className={`secondary-button entity-filter-clear ${activeFilterCount > 0 ? 'has-active-filters' : ''}`}
+          disabled={activeFilterCount === 0}
+          onClick={() => { setPropertyFilter('all'); setBuildingFilter('all'); setCategoryFilter('all'); setStatusFilter('all'); setSearchQuery('') }}
+        >
+          <span>Filtreleri Temizle</span>
+          {activeFilterCount > 0 && <span className="filter-count-badge" aria-label={`${activeFilterCount} aktif filtre`}>{activeFilterCount}</span>}
+        </button>
       </section>
 
       {/* Main Content: Standardized Management Table */}
@@ -721,15 +740,16 @@ export function ExpensesManagement() {
             className={`management-drawer drawer-${drawerAnimation.phase}`}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="expense-drawer-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="drawer-header">
               <div>
                 <p className="eyebrow">Gider Yönetimi</p>
-                <h2>{editingExpense ? 'Gider Kaydını Düzenle' : 'Yeni Gider Kaydı'}</h2>
+                <h2 id="expense-drawer-title">{editingExpense ? 'Gider Kaydını Düzenle' : 'Yeni Gider Kaydı'}</h2>
                 <p className="drawer-description">Ortak alan gider tutarlarını ve fatura bilgilerini kaydedin.</p>
               </div>
-              <button className="drawer-close-button" type="button" onClick={() => setIsDrawerOpen(false)}>×</button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setIsDrawerOpen(false)}>×</button>
             </div>
 
             <form className="property-form drawer-form" onSubmit={(e) => { void handleSubmitForm(e) }}>

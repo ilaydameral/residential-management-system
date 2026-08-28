@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './config'
-import type { ActivityFeedItemDto } from './realtime/types'
+import type { PagedActivityFeedDto } from './realtime/types'
 import type {
   ApiErrorResponse,
   GlobalSearchResponse,
@@ -76,9 +76,25 @@ import type {
   AnnouncementListResponseDto,
   CreateAnnouncementPayload,
   UpdateAnnouncementPayload,
-  MaintenanceRequestAttachmentDto,
   MaintenanceRequestDetailDto,
+  MaintenanceRequestAttachmentDto,
   MaintenanceRequestListResponseDto,
+  CommonFacility,
+  CreateCommonFacilityPayload,
+  UpdateCommonFacilityPayload,
+  FacilityReservation,
+  CreateReservationPayload,
+  ReviewReservationPayload,
+  FacilityMaintenanceBlock,
+  CreateMaintenanceBlockPayload,
+  FacilityAvailability,
+  Visitor,
+  CreateVisitorPayload,
+  PagedVisitorResult,
+  ResidentVehicle,
+  CreateResidentVehiclePayload,
+  UpdateResidentVehiclePayload,
+  PagedResidentVehicleResult,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -504,11 +520,26 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   return handleResponse<DashboardSummary>(response)
 }
 
-export async function getActivityFeed(limit: number = 10): Promise<ActivityFeedItemDto[]> {
-  const response = await safeFetch(`${API_BASE_URL}/api/dashboard/activity-feed?limit=${limit}`, {
+export async function getActivityFeed(page: number = 1, pageSize: number = 6): Promise<PagedActivityFeedDto> {
+  const response = await safeFetch(`${API_BASE_URL}/api/dashboard/activity-feed?page=${page}&pageSize=${pageSize}`, {
     headers: getAuthHeaders(),
   })
-  return handleResponse<ActivityFeedItemDto[]>(response)
+  const data = await handleResponse<any>(response)
+
+  if (Array.isArray(data)) {
+    const totalCount = data.length
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+    const pagedItems = data.slice((page - 1) * pageSize, page * pageSize)
+    return {
+      items: pagedItems,
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+    }
+  }
+
+  return data as PagedActivityFeedDto
 }
 
 // Manager Assignments API
@@ -1429,4 +1460,325 @@ export async function globalSearch(query: string, limit = 5, signal?: AbortSigna
     }
   )
   return handleResponse<GlobalSearchResponse>(response)
+}
+
+// ============================================================================
+// Phase 12: Common Area Reservations API
+// ============================================================================
+
+export async function getFacilities(params?: {
+  propertyId?: number
+  buildingId?: number
+  isActive?: boolean
+}): Promise<CommonFacility[]> {
+  const query = new URLSearchParams()
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.isActive !== undefined) query.append('isActive', params.isActive.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility[]>(response)
+}
+
+export async function getResidentFacilities(): Promise<CommonFacility[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facilities`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility[]>(response)
+}
+
+export async function getFacility(id: number): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function createFacility(payload: CreateCommonFacilityPayload): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function updateFacility(id: number, payload: UpdateCommonFacilityPayload): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function setFacilityStatus(id: number, isActive: boolean): Promise<CommonFacility> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${id}/status?isActive=${isActive}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<CommonFacility>(response)
+}
+
+export async function getMaintenanceBlocks(facilityId: number): Promise<FacilityMaintenanceBlock[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${facilityId}/maintenance-blocks`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityMaintenanceBlock[]>(response)
+}
+
+export async function createMaintenanceBlock(
+  facilityId: number,
+  payload: CreateMaintenanceBlockPayload
+): Promise<FacilityMaintenanceBlock> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/${facilityId}/maintenance-blocks`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<FacilityMaintenanceBlock>(response)
+}
+
+export async function deleteMaintenanceBlock(blockId: number): Promise<void> {
+  const response = await safeFetch(`${API_BASE_URL}/api/facilities/maintenance-blocks/${blockId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) {
+    await handleResponse(response)
+  }
+}
+
+export async function getFacilityAvailability(facilityId: number, date: string): Promise<FacilityAvailability> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facilities/${facilityId}/availability?date=${date}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityAvailability>(response)
+}
+
+export async function createFacilityReservation(payload: CreateReservationPayload): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facility-reservations`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<FacilityReservation>(response)
+}
+
+export async function cancelFacilityReservation(id: number): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facility-reservations/${id}/cancel`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation>(response)
+}
+
+export async function getMyFacilityReservations(): Promise<FacilityReservation[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/facility-reservations/my`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation[]>(response)
+}
+
+export async function getManagementFacilityReservations(params?: {
+  facilityId?: number
+  propertyId?: number
+  buildingId?: number
+  status?: string
+  dateFrom?: string
+  dateTo?: string
+}): Promise<FacilityReservation[]> {
+  const query = new URLSearchParams()
+  if (params?.facilityId) query.append('facilityId', params.facilityId.toString())
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.status) query.append('status', params.status)
+  if (params?.dateFrom) query.append('dateFrom', params.dateFrom)
+  if (params?.dateTo) query.append('dateTo', params.dateTo)
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/management/facility-reservations${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation[]>(response)
+}
+
+export async function approveFacilityReservation(id: number): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/management/facility-reservations/${id}/approve`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityReservation>(response)
+}
+
+export async function rejectFacilityReservation(
+  id: number,
+  payload?: ReviewReservationPayload
+): Promise<FacilityReservation> {
+  const response = await safeFetch(`${API_BASE_URL}/api/management/facility-reservations/${id}/reject`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload || {}),
+  })
+  return handleResponse<FacilityReservation>(response)
+}
+
+// ============================================================================
+// Phase 12: Visitor & Vehicle Management API
+// ============================================================================
+
+export async function getResidentVisitors(params?: {
+  status?: string
+  upcomingOnly?: boolean
+}): Promise<Visitor[]> {
+  const query = new URLSearchParams()
+  if (params?.status) query.append('status', params.status)
+  if (params?.upcomingOnly !== undefined) query.append('upcomingOnly', params.upcomingOnly.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/visitors${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Visitor[]>(response)
+}
+
+export async function getResidentVisitor(id: number): Promise<Visitor> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/visitors/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Visitor>(response)
+}
+
+export async function createVisitor(payload: CreateVisitorPayload): Promise<Visitor> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/visitors`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<Visitor>(response)
+}
+
+export async function cancelVisitor(id: number): Promise<Visitor> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/visitors/${id}/cancel`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Visitor>(response)
+}
+
+export async function getManagementVisitors(params?: {
+  propertyId?: number
+  buildingId?: number
+  unitId?: number
+  status?: string
+  search?: string
+  vehiclePlate?: string
+  dateFrom?: string
+  dateTo?: string
+  page?: number
+  pageSize?: number
+}): Promise<PagedVisitorResult> {
+  const query = new URLSearchParams()
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.unitId) query.append('unitId', params.unitId.toString())
+  if (params?.status) query.append('status', params.status)
+  if (params?.search) query.append('search', params.search)
+  if (params?.vehiclePlate) query.append('vehiclePlate', params.vehiclePlate)
+  if (params?.dateFrom) query.append('dateFrom', params.dateFrom)
+  if (params?.dateTo) query.append('dateTo', params.dateTo)
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/management/visitors${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<PagedVisitorResult>(response)
+}
+
+export async function getManagementVisitor(id: number): Promise<Visitor> {
+  const response = await safeFetch(`${API_BASE_URL}/api/management/visitors/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Visitor>(response)
+}
+
+export async function checkInVisitor(id: number): Promise<Visitor> {
+  const response = await safeFetch(`${API_BASE_URL}/api/management/visitors/${id}/check-in`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Visitor>(response)
+}
+
+export async function checkOutVisitor(id: number): Promise<Visitor> {
+  const response = await safeFetch(`${API_BASE_URL}/api/management/visitors/${id}/check-out`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<Visitor>(response)
+}
+
+export async function getResidentVehicles(): Promise<ResidentVehicle[]> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/vehicles`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ResidentVehicle[]>(response)
+}
+
+export async function createResidentVehicle(payload: CreateResidentVehiclePayload): Promise<ResidentVehicle> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/vehicles`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ResidentVehicle>(response)
+}
+
+export async function updateResidentVehicle(id: number, payload: UpdateResidentVehiclePayload): Promise<ResidentVehicle> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/vehicles/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ResidentVehicle>(response)
+}
+
+export async function setResidentVehicleStatus(id: number, isActive: boolean): Promise<ResidentVehicle> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/vehicles/${id}/status?isActive=${isActive}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<ResidentVehicle>(response)
+}
+
+export async function getManagementVehicles(params?: {
+  propertyId?: number
+  buildingId?: number
+  unitId?: number
+  plateNumber?: string
+  vehicleType?: string
+  isActive?: boolean
+  page?: number
+  pageSize?: number
+}): Promise<PagedResidentVehicleResult> {
+  const query = new URLSearchParams()
+  if (params?.propertyId) query.append('propertyId', params.propertyId.toString())
+  if (params?.buildingId) query.append('buildingId', params.buildingId.toString())
+  if (params?.unitId) query.append('unitId', params.unitId.toString())
+  if (params?.plateNumber) query.append('plateNumber', params.plateNumber)
+  if (params?.vehicleType) query.append('vehicleType', params.vehicleType)
+  if (params?.isActive !== undefined) query.append('isActive', params.isActive.toString())
+  if (params?.page) query.append('page', params.page.toString())
+  if (params?.pageSize) query.append('pageSize', params.pageSize.toString())
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/management/vehicles${queryString}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<PagedResidentVehicleResult>(response)
 }

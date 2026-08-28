@@ -15,6 +15,7 @@ import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { ManagedUser, Role } from '../types'
 import { RowActionsMenu } from './RowActionsMenu'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { SaveShortcutHint } from './SaveShortcutHint'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
@@ -354,10 +355,13 @@ export function CentralUserManagement({ onDirtyChange, onViewUnits }: CentralUse
 
   return (
     <section className="central-user-view entity-management-view" aria-busy={isLoading || isDetailLoading}>
-      <div className="entity-page-actions">
-        <p>{!isLoading && !loadError ? `${filteredUsers.length} kullanıcı gösteriliyor.` : 'Sistem kullanıcılarını merkezi olarak görüntüleyin.'}</p>
-        {isAdmin && <button className="primary-button" type="button" onClick={() => void openCreate()} disabled={roles.length === 0}>Yeni Kullanıcı</button>}
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Kullanıcılar"
+        subtitle="Sistem kullanıcılarını, hesap durumlarını ve rollerini tek merkezden yönetin."
+        meta={!isLoading && !loadError ? `${filteredUsers.length} kullanıcı gösteriliyor.` : 'Sistem kullanıcılarını merkezi olarak görüntüleyin.'}
+        action={isAdmin ? <button className="primary-button" type="button" onClick={() => void openCreate()} disabled={roles.length === 0}>Yeni Kullanıcı</button> : undefined}
+      />
 
       <section className="panel entity-toolbar user-toolbar" aria-label="Kullanıcı filtreleri">
         <div className="form-field"><label htmlFor="managed-user-search">Kullanıcı Ara</label><input id="managed-user-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad veya e-posta" /></div>

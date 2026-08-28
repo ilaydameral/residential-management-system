@@ -14,6 +14,8 @@ import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type { Building, ManagedUser, ManagerAssignment, Property } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
+import { PageHeader } from './PageHeader'
+import { RowActionsMenu } from './RowActionsMenu'
 import { SaveShortcutHint } from './SaveShortcutHint'
 
 interface ManagerAssignmentManagementProps {
@@ -221,12 +223,17 @@ export function ManagerAssignmentManagement({ onDirtyChange }: ManagerAssignment
 
   return (
     <section className="manager-assignment-view entity-management-view" aria-busy={isLoading}>
-      <div className="entity-page-actions">
-        <p>{!isLoading && !loadError ? `${filteredAssignments.length} atama gösteriliyor.` : 'Yönetici sorumluluklarını merkezi olarak yönetin.'}</p>
-        <button className="primary-button" type="button" onClick={openCreate} disabled={isLoading || managers.length === 0 || properties.length === 0}>
-          Yeni Atama
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Yönetim Paneli"
+        title="Yönetici Atamaları"
+        subtitle="Site yöneticilerinin yapı ve blok sorumluluklarını yönetin."
+        meta={!isLoading && !loadError ? `${filteredAssignments.length} atama gösteriliyor.` : 'Yönetici sorumluluklarını merkezi olarak yönetin.'}
+        action={(
+          <button className="primary-button" type="button" onClick={openCreate} disabled={isLoading || managers.length === 0 || properties.length === 0}>
+            Yeni Atama
+          </button>
+        )}
+      />
 
       <section className="panel entity-toolbar manager-assignment-toolbar" aria-label="Yönetici ataması filtreleri">
         <div className="form-field">
@@ -267,7 +274,7 @@ export function ManagerAssignmentManagement({ onDirtyChange }: ManagerAssignment
                   <td><strong>{formatDateTime(assignment.assignedAt)}</strong><span className="table-secondary-text">Atayan: {assignment.assignedByFullName}</span></td>
                   <td><span className={`status-badge ${assignment.isActive ? 'active' : 'inactive'}`}>{assignment.isActive ? 'Aktif' : 'Geçmiş'}</span></td>
                   <td className="manager-assignment-end-cell">{assignment.isActive ? '—' : <div className="manager-assignment-end-details"><strong>{formatDateTime(assignment.endedAt)}</strong><span className="table-secondary-text">{assignment.endedByFullName ? `Sonlandıran: ${assignment.endedByFullName}` : 'Sistem tarafından sonlandırıldı'}</span>{assignment.endReason && <span className="table-secondary-text end-reason">Neden: {assignment.endReason}</span>}</div>}</td>
-                  <td className="manager-assignment-actions-cell">{assignment.isActive ? <button className="action-button danger-btn" type="button" onClick={() => { setActionError(''); setEndReason(''); setEndingAssignment(assignment) }}>Sonlandır</button> : <span className="table-secondary-text">İşlem yok</span>}</td>
+                  <td className="manager-assignment-actions-cell">{assignment.isActive ? <RowActionsMenu label={assignment.managerFullName} secondaryActions={[{ label: 'Sonlandır', danger: true, onSelect: () => { setActionError(''); setEndReason(''); setEndingAssignment(assignment) } }]} /> : <span className="table-secondary-text">İşlem yok</span>}</td>
                 </tr>
               ))}</tbody>
             </table>

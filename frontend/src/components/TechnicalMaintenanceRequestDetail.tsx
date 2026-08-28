@@ -13,18 +13,18 @@ import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
 const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
-  OPEN: { label: 'Açık', className: 'status-badge info' },
-  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge warning' },
-  RESOLVED: { label: 'Çözüldü', className: 'status-badge success' },
-  CLOSED: { label: 'Kapandı', className: 'status-badge secondary' },
-  CANCELLED: { label: 'İptal Edildi', className: 'status-badge danger' },
+  OPEN: { label: 'Açık', className: 'status-badge warning' },
+  IN_PROGRESS: { label: 'İşlemde', className: 'status-badge info' },
+  RESOLVED: { label: 'Çözüldü', className: 'status-badge active' },
+  CLOSED: { label: 'Kapandı', className: 'status-badge inactive' },
+  CANCELLED: { label: 'İptal Edildi', className: 'status-badge secondary' },
 }
 
 const PRIORITY_LABEL_MAP: Record<string, { label: string; className: string }> = {
   LOW: { label: 'Düşük', className: 'status-badge muted' },
   NORMAL: { label: 'Normal', className: 'status-badge secondary' },
-  IMPORTANT: { label: 'Önemli', className: 'status-badge secondary' },
-  URGENT: { label: 'Acil', className: 'status-badge secondary' },
+  IMPORTANT: { label: 'Önemli', className: 'status-badge warning' },
+  URGENT: { label: 'Acil', className: 'status-badge danger' },
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
@@ -270,9 +270,9 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
   const locationStr = formatUnitLocation(request.propertyName, request.buildingName, request.unitNumber)
 
   return (
-    <div className="management-page">
+    <div className="management-page technical-request-detail-page">
       {/* Page Header Area */}
-      <div style={{ marginBottom: '24px' }}>
+      <div className="technical-detail-header">
         {/* Back Button */}
         <div style={{ marginBottom: '10px' }}>
           <button
@@ -296,13 +296,13 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
         </div>
 
         {/* Title + Metadata (Left) & Lifecycle Action (Right) */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ flex: '1 1 300px' }}>
+        <div className="technical-detail-title-row">
+          <div className="technical-detail-title-copy">
             <p className="eyebrow" style={{ margin: 0 }}>TEKNİK PERSONEL PORTALI</p>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '2px 0 8px 0', color: 'var(--color-text-primary)', lineHeight: 1.25 }}>
               {request.title}
             </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'nowrap' }}>
+            <div className="technical-detail-meta-row">
               <code
                 style={{
                   background: 'var(--color-neutral-soft)',
@@ -340,7 +340,7 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
 
           {/* Right: Lifecycle action button (Primary project style) */}
           {request.status !== 'CLOSED' && request.status !== 'CANCELLED' && request.status !== 'RESOLVED' && (
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px' }}>
+            <div className="technical-detail-actions">
               {request.status === 'OPEN' && (
                 <button
                   className="primary-button"
@@ -376,15 +376,15 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
       </div>
 
       {/* Main Two-Column Layout (Left ~65%, Right ~35%, Gap 20px) */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start' }}>
+      <div className="technical-detail-layout">
         {/* Left Column (~64-66%): Talep Bilgileri, Açıklama, Ekler, Çalışma Notu */}
-        <div style={{ flex: '2 1 620px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="technical-detail-main-column">
           {/* SECTION 1: Talep Bilgileri */}
           <section className="panel" style={{ padding: '20px 24px' }}>
             <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '16px', borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '8px' }}>
               Talep Bilgileri
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+            <div className="technical-detail-metadata-grid">
               <div>
                 <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '3px' }}>Site / Blok / Daire</span>
                 <strong style={{ fontSize: '0.92rem', color: 'var(--color-text-primary)' }}>{locationStr}</strong>
@@ -439,6 +439,7 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
                 {request.attachments.map((att) => (
                   <div
                     key={att.id}
+                    className="technical-detail-attachment"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -449,7 +450,7 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
                       border: '1px solid var(--color-border)',
                     }}
                   >
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '12px' }}>
+                    <div className="technical-detail-attachment-copy">
                       <strong style={{ fontSize: '0.88rem', display: 'block', color: 'var(--color-text-primary)' }}>{att.originalFileName}</strong>
                       <small style={{ color: 'var(--color-text-muted)' }}>
                         {formatFileSize(att.fileSizeBytes)} • Yükleyen: {att.uploadedByName}
@@ -503,7 +504,7 @@ export function TechnicalMaintenanceRequestDetail({ requestId, onBack }: Technic
         </div>
 
         {/* Right Column (~34-36%): SECTION 5: Talep Geçmişi Timeline */}
-        <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+        <div className="technical-detail-history-column">
           <section className="panel" style={{ padding: '20px 24px', position: 'sticky', top: '20px' }}>
             <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '16px', borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '8px' }}>
               Talep Geçmişi
