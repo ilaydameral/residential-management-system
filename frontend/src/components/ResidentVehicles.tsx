@@ -15,6 +15,7 @@ import { useResidentUnits } from '../hooks/useResidentUnits'
 import { SaveShortcutHint } from './SaveShortcutHint'
 import { LoadingSkeleton } from './LoadingSkeleton'
 import { useToast } from '../context/ToastContext'
+import { PageHeader } from './PageHeader'
 
 const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
   CAR: 'Otomobil',
@@ -208,25 +209,18 @@ export function ResidentVehicles() {
   }
 
   return (
-    <section className="resident-view-content" aria-label="Araçlarım">
-      {/* Page Header Row */}
-      <div className="page-header-row" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
-        <div>
-          <p className="eyebrow" style={{ margin: '0 0 4px 0' }}>SAKİN PORTALI</p>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--color-text-primary)', margin: 0 }}>Araçlarım</h1>
-          <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
-            Dairelerinize tanımlı araç bilgilerinizi görüntüleyin ve yeni araç kaydı ekleyin.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handleOpenNewDrawer}
-          style={{ width: 'auto', flex: '0 0 auto', padding: '10px 18px', whiteSpace: 'nowrap' }}
-        >
-          Yeni Araç
-        </button>
-      </div>
+    <section className="resident-view-content resident-vehicles-view" aria-label="Araçlarım">
+      <PageHeader
+        className="resident-page-header"
+        eyebrow="Sakin Portalı"
+        title="Araçlarım"
+        subtitle="Dairelerinize tanımlı araç bilgilerinizi görüntüleyin ve yeni araç kaydı ekleyin."
+        action={(
+          <button type="button" className="primary-button" onClick={handleOpenNewDrawer}>
+            Yeni Araç
+          </button>
+        )}
+      />
 
       {/* Content Surface Card */}
       <div className="management-card" style={{ padding: '20px' }}>
@@ -248,7 +242,7 @@ export function ResidentVehicles() {
             </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="responsive-table-wrapper resident-vehicles-table-wrapper">
             <table className="management-table" style={{ width: '100%' }}>
               <thead>
                 <tr>

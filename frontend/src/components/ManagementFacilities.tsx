@@ -489,7 +489,7 @@ export function ManagementFacilities() {
   const pendingCount = useMemo(() => reservations.filter((r) => r.status === 'PENDING').length, [reservations])
 
   return (
-    <section className="central-user-view entity-management-view" aria-busy={isLoading}>
+    <section className="central-user-view entity-management-view management-facilities-view" aria-busy={isLoading}>
       {/* Toast Notification */}
       {/* Tab Navigation Strip */}
       <div className="panel facility-tab-strip">

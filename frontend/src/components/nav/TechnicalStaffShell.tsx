@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useLocation } from 'react-router-dom'
 import { NotificationCenter } from '../NotificationCenter'
 import { ThemeToggle } from '../ThemeToggle'
@@ -11,6 +11,7 @@ interface TechnicalStaffShellProps {
   user: any
   onNavigateToPath: (path: string) => void
   onLogout: () => void
+  mainContentRef?: RefObject<HTMLElement | null>
   children: ReactNode
 }
 
@@ -27,6 +28,7 @@ export function TechnicalStaffShell({
   user,
   onNavigateToPath,
   onLogout,
+  mainContentRef,
   children,
 }: TechnicalStaffShellProps) {
   const location = useLocation()
@@ -200,6 +202,7 @@ export function TechnicalStaffShell({
         isCollapsed ? 'secondary-collapsed' : ''
       } ${isHoverOverlay ? 'hover-overlay-active' : ''}`}
     >
+      <a className="skip-link" href="#technical-main-content">Ana içeriğe geç</a>
       {/* Primary 64px Icon Rail + Secondary 230px Sidebar Area */}
       <div
         ref={sidebarAreaRef}
@@ -330,7 +333,7 @@ export function TechnicalStaffShell({
           </div>
         </header>
 
-        <main id="technical-main-content" className="shell-content">
+        <main id="technical-main-content" ref={mainContentRef} tabIndex={-1} className="shell-content">
           <div className="shell-page-content">
             {children}
           </div>

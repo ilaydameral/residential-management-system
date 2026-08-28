@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { GlobalSearchItem } from '../../types'
 import { NavigationRail } from './NavigationRail'
@@ -17,6 +17,7 @@ interface ManagementShellProps {
   onSelectSearchResult: (item: GlobalSearchItem) => void
   isSearchOpen: boolean
   onLogout: () => void
+  mainContentRef?: RefObject<HTMLElement | null>
   children: ReactNode
 }
 
@@ -39,6 +40,7 @@ export function ManagementShell({
   onSelectSearchResult,
   isSearchOpen,
   onLogout,
+  mainContentRef,
   children,
 }: ManagementShellProps) {
   const location = useLocation()
@@ -238,6 +240,7 @@ export function ManagementShell({
         isCollapsed ? 'secondary-collapsed' : ''
       } ${isHoverOverlay ? 'hover-overlay-active' : ''}`}
     >
+      <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
       {/* Primary 64px Icon Rail + Secondary 230px Sidebar Area */}
       <div
         ref={sidebarAreaRef}
@@ -291,7 +294,7 @@ export function ManagementShell({
           topbarTriggerRef={topbarTriggerRef}
         />
 
-        <main id="main-content" className="shell-content">
+        <main id="main-content" ref={mainContentRef} tabIndex={-1} className="shell-content">
           <div className="shell-page-content">
             {children}
           </div>

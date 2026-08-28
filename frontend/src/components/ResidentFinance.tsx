@@ -324,7 +324,7 @@ export function ResidentFinance() {
   }
 
   return (
-    <div className="section-container entity-management-view">
+    <div className="section-container entity-management-view resident-finance-view">
       <PageHeader
         className="resident-page-header"
         eyebrow="Sakin Portalı"
@@ -381,7 +381,7 @@ export function ResidentFinance() {
             Daire Borçlarım
           </h3>
 
-          <div className="detail-tabs" style={{ padding: '3px' }}>
+          <div className="detail-tabs resident-finance-tabs" style={{ padding: '3px' }}>
             <button
               type="button"
               className={chargeFilter === 'open' ? 'active' : ''}

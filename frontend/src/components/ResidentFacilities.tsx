@@ -306,7 +306,7 @@ export function ResidentFacilities() {
   )
 
   return (
-    <section className="resident-view-content" aria-label="Ortak Alanlar">
+    <section className="resident-view-content resident-facilities-view" aria-label="Ortak Alanlar">
       {/* Page Header */}
       <header className="resident-view-header">
         <p className="eyebrow">SAKİN PORTALI</p>

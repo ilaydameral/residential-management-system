@@ -45,6 +45,7 @@ export function TechnicalStaffPortal() {
       user={user}
       onNavigateToPath={(path) => { void navigateWithGuard(path) }}
       onLogout={() => setIsLogoutDialogOpen(true)}
+      mainContentRef={mainContentRef}
     >
       <div className="technical-portal-body">
         {detailRequestId && !isNaN(detailRequestId) ? (

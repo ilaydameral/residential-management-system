@@ -215,6 +215,7 @@ export function ResidentShell({
         isCollapsed ? 'secondary-collapsed' : ''
       } ${isHoverOverlay ? 'hover-overlay-active' : ''}`}
     >
+      <a className="skip-link" href="#resident-main-content">Ana içeriğe geç</a>
       {/* Primary 64px Icon Rail + Secondary 230px Sidebar Area */}
       <div
         ref={sidebarAreaRef}
@@ -345,7 +346,7 @@ export function ResidentShell({
           </div>
         </header>
 
-        <main id="resident-main-content" className="shell-content">
+        <main id="resident-main-content" tabIndex={-1} className="shell-content">
           <div className="shell-page-content">
             {children}
           </div>

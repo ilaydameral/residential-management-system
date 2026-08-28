@@ -1815,10 +1815,10 @@ function App() {
         onSelectSearchResult={handleSelectSearchResult}
         isSearchOpen={isSearchPaletteOpen}
         onLogout={handleLogout}
+        mainContentRef={mainContentRef}
       >
-        <a className="skip-link" href="#main-content">Ana içeriğe geç</a>
         <div className="management-workspace">
-          <main id="main-content" ref={mainContentRef} tabIndex={-1} className="management-content">
+          <div className="management-content">
       {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && activeManagementView !== 'units' && activeManagementView !== 'residents' && !['properties', 'buildings', 'users', 'managerAssignments', 'dueDefinitions', 'duePeriods', 'expenses', 'announcements', 'maintenanceRequests'].includes(activeManagementView) && <header className="page-header">
         <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
         <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
@@ -3408,9 +3408,7 @@ function App() {
         </section>
       )}
 
-        {hasRole('RESIDENT') && <ResidentPortal />}
-        {hasRole('TECHNICAL_STAFF') && <TechnicalStaffPortal />}
-            </main>
+            </div>
           </div>
 
           {destructiveConfirmation && (
@@ -3438,6 +3436,22 @@ function App() {
           )}
           {unsavedChangesDialog}
         </ManagementShell>
+      </RealtimeProvider>
+    )
+  }
+
+  if (isResidentView) {
+    return (
+      <RealtimeProvider user={user}>
+        <ResidentPortal />
+      </RealtimeProvider>
+    )
+  }
+
+  if (isTechnicalStaffView) {
+    return (
+      <RealtimeProvider user={user}>
+        <TechnicalStaffPortal />
       </RealtimeProvider>
     )
   }
