@@ -1,4 +1,6 @@
+using System.Data;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using ResidentialManagement.Api.Data;
 using ResidentialManagement.Api.DTOs;
@@ -10,12 +12,24 @@ namespace ResidentialManagement.Api.Services;
 public class DataImportService : IDataImportService
 {
     private sealed record ValidatedImportTarget(Property? Property, Building? Building);
+    private sealed class ImportRowExecutionException : Exception
+    {
+        public ImportRowExecutionException(int rowNumber, string message) : base(message)
+        {
+            RowNumber = rowNumber;
+        }
+
+        public int RowNumber { get; }
+    }
 
     private readonly AppDbContext _context;
     private readonly IImportFileStorageService _storageService;
     private readonly IImportFileParser _fileParser;
     private readonly IManagerScopeService _managerScopeService;
     private readonly IPasswordService _passwordService;
+    private readonly IBuildingService _buildingService;
+    private readonly IUnitService _unitService;
+    private readonly ILogger<DataImportService> _logger;
 
     private static readonly Dictionary<string, List<TargetFieldOptionDto>> TargetFieldsRegistry = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -81,13 +95,19 @@ public class DataImportService : IDataImportService
         IImportFileStorageService storageService,
         IImportFileParser fileParser,
         IManagerScopeService managerScopeService,
-        IPasswordService passwordService)
+        IPasswordService passwordService,
+        IBuildingService buildingService,
+        IUnitService unitService,
+        ILogger<DataImportService> logger)
     {
         _context = context;
         _storageService = storageService;
         _fileParser = fileParser;
         _managerScopeService = managerScopeService;
         _passwordService = passwordService;
+        _buildingService = buildingService;
+        _unitService = unitService;
+        _logger = logger;
     }
 
     public async Task<ImportUploadResponseDto> UploadFileAsync(
@@ -371,6 +391,7 @@ public class DataImportService : IDataImportService
         var address = GetValue(mappedValues, "AddressLine");
         var city = GetValue(mappedValues, "City");
         var district = GetValue(mappedValues, "District");
+        var propTypeCode = GetValue(mappedValues, "PropertyTypeCode");
 
         if (string.IsNullOrWhiteSpace(name))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "Name", Message = "Taşınmaz adı zorunludur." });
@@ -381,6 +402,17 @@ public class DataImportService : IDataImportService
         if (string.IsNullOrWhiteSpace(district))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "District", Message = "İlçe alanı zorunludur." });
 
+        if (!string.IsNullOrWhiteSpace(propTypeCode))
+        {
+            var lookup = await _context.PropertyTypes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(pt => pt.Code.ToLower() == propTypeCode.ToLower() || pt.Name.ToLower() == propTypeCode.ToLower());
+            if (lookup is null || !lookup.IsActive)
+            {
+                errors.Add(new ValidationErrorItemDto { Code = "REFERENCE_NOT_FOUND", Field = "PropertyTypeCode", Message = $"'{propTypeCode}' kodlu aktif bir taşınmaz tipi bulunamadı." });
+            }
+        }
+
         if (errors.Count > 0)
         {
             return ("ERROR", "INVALID");
@@ -388,7 +420,7 @@ public class DataImportService : IDataImportService
 
         var existingProp = await _context.Properties
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Name.ToLower() == name!.ToLower() && p.IsActive);
+            .FirstOrDefaultAsync(p => p.Name.ToLower() == name!.ToLower());
 
         if (existingProp != null)
         {
@@ -416,8 +448,12 @@ public class DataImportService : IDataImportService
 
         if (string.IsNullOrWhiteSpace(name))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "Name", Message = "Blok adı zorunludur." });
+        else if (name.Length > 150)
+            errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "Name", Message = "Blok adı en fazla 150 karakter olabilir." });
         if (string.IsNullOrWhiteSpace(code))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "Code", Message = "Blok kodu zorunludur." });
+        else if (code.Length > 50)
+            errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "Code", Message = "Blok kodu en fazla 50 karakter olabilir." });
         if (string.IsNullOrWhiteSpace(floorStr))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "FloorCount", Message = "Kat sayısı zorunludur." });
 
@@ -443,9 +479,30 @@ public class DataImportService : IDataImportService
             return ("ERROR", "INVALID");
         }
 
+        var isSingleApartment = await _context.Properties
+            .AsNoTracking()
+            .Where(p => p.Id == prop.Id)
+            .Select(p => p.PropertyTypeLookup != null && p.PropertyTypeLookup.Code == "SINGLE_APARTMENT" ||
+                         p.PropertyType == "SINGLE_APARTMENT" ||
+                         p.PropertyType == "Tek Apartman" ||
+                         p.PropertyType == "Apartman")
+            .FirstAsync();
+
+        if (isSingleApartment && await _context.Buildings.AnyAsync(b => b.PropertyId == prop.Id))
+        {
+            errors.Add(new ValidationErrorItemDto
+            {
+                Code = "DOMAIN_CONFLICT",
+                Field = "PropertyName",
+                Message = "Tek apartman türündeki bir yapı altında en fazla bir bina bulunabilir."
+            });
+            return ("ERROR", "INVALID");
+        }
+
+        var normalizedCode = NormalizeBuildingCode(code!);
         var existingBuilding = await _context.Buildings
             .AsNoTracking()
-            .FirstOrDefaultAsync(b => b.PropertyId == prop.Id && b.Code.ToLower() == code!.ToLower() && b.IsActive);
+            .FirstOrDefaultAsync(b => b.PropertyId == prop.Id && b.Code == normalizedCode);
 
         if (existingBuilding != null)
         {
@@ -467,17 +524,20 @@ public class DataImportService : IDataImportService
         var unitTypeCode = GetValue(mappedValues, "UnitTypeCode");
         var grossStr = GetValue(mappedValues, "GrossArea");
         var netStr = GetValue(mappedValues, "NetArea");
+        var floorStr = GetValue(mappedValues, "FloorNumber");
 
         if (string.IsNullOrWhiteSpace(unitNumber))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "UnitNumber", Message = "Daire No zorunludur." });
+        else if (unitNumber.Length > 50)
+            errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "UnitNumber", Message = "Daire numarası en fazla 50 karakter olabilir." });
         if (string.IsNullOrWhiteSpace(unitTypeCode))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "UnitTypeCode", Message = "Daire tipi kodu zorunludur." });
 
         decimal? grossArea = null;
         if (!string.IsNullOrWhiteSpace(grossStr))
         {
-            if (!decimal.TryParse(grossStr, out var g) || g <= 0)
-                errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "GrossArea", Message = "Brüt alan pozitif sayı olmalıdır." });
+            if (!decimal.TryParse(grossStr, out var g) || g <= 0 || g > 999999.99m)
+                errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "GrossArea", Message = "Brüt alan 0,01 ile 999999,99 arasında olmalıdır." });
             else
                 grossArea = g;
         }
@@ -485,8 +545,8 @@ public class DataImportService : IDataImportService
         decimal? netArea = null;
         if (!string.IsNullOrWhiteSpace(netStr))
         {
-            if (!decimal.TryParse(netStr, out var n) || n <= 0)
-                errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "NetArea", Message = "Net alan pozitif sayı olmalıdır." });
+            if (!decimal.TryParse(netStr, out var n) || n <= 0 || n > 999999.99m)
+                errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "NetArea", Message = "Net alan 0,01 ile 999999,99 arasında olmalıdır." });
             else
                 netArea = n;
         }
@@ -502,6 +562,22 @@ public class DataImportService : IDataImportService
         }
 
         var building = target.Building!;
+
+        var floorNumber = 0;
+        if (!string.IsNullOrWhiteSpace(floorStr) && !int.TryParse(floorStr, out floorNumber))
+        {
+            errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "FloorNumber", Message = "Kat numarası tam sayı olmalıdır." });
+        }
+        else if (floorNumber > building.FloorCount)
+        {
+            errors.Add(new ValidationErrorItemDto { Code = "INVALID_VALUE", Field = "FloorNumber", Message = $"Kat numarası bina kat sayısından ({building.FloorCount}) büyük olamaz." });
+        }
+
+        if (errors.Count > 0)
+        {
+            return ("ERROR", "INVALID");
+        }
+
         if (!MatchesOptionalTargetValue(propName, target.Property!.Name))
         {
             errors.Add(new ValidationErrorItemDto
@@ -536,7 +612,7 @@ public class DataImportService : IDataImportService
 
         var existingUnit = await _context.Units
             .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.BuildingId == building.Id && u.UnitNumber.ToLower() == unitNumber!.ToLower() && u.IsActive);
+            .FirstOrDefaultAsync(u => u.BuildingId == building.Id && u.UnitNumber.ToLower() == unitNumber!.ToLower());
 
         if (existingUnit != null)
         {
@@ -678,6 +754,12 @@ public class DataImportService : IDataImportService
             return ("ERROR", "INVALID");
         }
 
+        if (!user.IsActive)
+        {
+            errors.Add(new ValidationErrorItemDto { Code = "INACTIVE_REFERENCE", Field = "UserNameOrEmail", Message = $"'{userNameOrEmail}' kullanıcısı pasif olduğu için ikamet kaydı oluşturulamaz." });
+            return ("ERROR", "INVALID");
+        }
+
         var occType = await _context.OccupancyTypes
             .AsNoTracking()
             .FirstOrDefaultAsync(ot => ot.Code.ToLower() == occTypeCode!.ToLower() && ot.IsActive);
@@ -688,13 +770,22 @@ public class DataImportService : IDataImportService
             return ("ERROR", "INVALID");
         }
 
+        var normalizedStartDate = NormalizeUtc(startDate);
+        DateTime? normalizedEndDate = endDate.HasValue ? NormalizeUtc(endDate.Value) : null;
+        var requestedEndDate = normalizedEndDate ?? DateTime.MaxValue;
+
         var collision = await _context.UnitOccupancies
             .AsNoTracking()
-            .AnyAsync(uo => uo.IsActive && (uo.UnitId == unit.Id || uo.UserId == user.Id) && uo.OccupancyTypeId == occType.Id);
+            .AnyAsync(uo =>
+                uo.UserId == user.Id &&
+                uo.UnitId == unit.Id &&
+                uo.OccupancyTypeId == occType.Id &&
+                uo.StartDate <= requestedEndDate &&
+                (!uo.EndDate.HasValue || uo.EndDate.Value >= normalizedStartDate));
 
         if (collision)
         {
-            errors.Add(new ValidationErrorItemDto { Code = "DUPLICATE", Field = "UserNameOrEmail", Message = $"'{unitNumber}' dairesinde veya '{user.UserName}' kullanıcısında zaten aktif ikamet kaydı mevcut." });
+            errors.Add(new ValidationErrorItemDto { Code = "DUPLICATE", Field = "UserNameOrEmail", Message = $"'{unitNumber}' dairesinde '{user.UserName}' için çakışan bir ikamet dönemi zaten mevcut." });
             return ("SKIP", "SKIPPED");
         }
 
@@ -794,10 +885,28 @@ public class DataImportService : IDataImportService
             throw new ForbiddenException("Bu içe aktarım partisini onaylama yetkiniz bulunmamaktadır.");
         }
 
+        if (!ImportTypePolicies.TryGet(batch.ImportType, out var policy) || !policy.IsEndToEndSupported)
+        {
+            throw new BadRequestException($"'{batch.ImportType}' içe aktarım türü henüz desteklenmemektedir.");
+        }
+
         if (batch.Status != "READY")
         {
+            if (batch.Status is "IMPORTING" or "COMPLETED")
+            {
+                throw new ConflictException("Bu içe aktarım partisi başka bir işlem tarafından alınmış veya tamamlanmıştır.");
+            }
+
             throw new BadRequestException($"Yalnızca 'READY' statüsündeki partiler içe aktarılabilir. Mevcut statü: '{batch.Status}'.");
         }
+
+        EnsureBatchHasExecutionTarget(policy, batch);
+        var target = await ValidateImportTargetAsync(
+            policy,
+            batch.TargetPropertyId,
+            batch.TargetBuildingId,
+            currentUserId,
+            isAdmin);
 
         var createLogs = batch.RowLogs
             .Where(r => r.ActionPreview == "CREATE" && r.Status == "VALID")
@@ -816,78 +925,111 @@ public class DataImportService : IDataImportService
         }
 
         batch.Status = "IMPORTING";
-        await _context.SaveChangesAsync();
+        batch.ErrorMessage = null;
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            _context.ChangeTracker.Clear();
+            throw new ConflictException("Bu içe aktarım partisi başka bir işlem tarafından alınmıştır. Lütfen durumu yenileyin.");
+        }
 
-        var accessiblePropertyIds = await _managerScopeService.GetAccessiblePropertyIdsAsync(currentUserId, isAdmin);
-        var accessibleBuildingIds = await _managerScopeService.GetAccessibleBuildingIdsAsync(currentUserId, isAdmin);
+        int? residentRoleId = null;
+        if (batch.ImportType == "USERS")
+        {
+            residentRoleId = await _context.Roles
+                .Where(r => r.Code == "RESIDENT" && r.IsActive)
+                .Select(r => (int?)r.Id)
+                .FirstOrDefaultAsync();
 
-        var residentRole = await _context.Roles.FirstOrDefaultAsync(r => r.Code == "RESIDENT");
-        var residentRoleId = residentRole?.Id ?? 3;
+            if (!residentRoleId.HasValue)
+            {
+                await MarkBatchFailedAsync(batch.Id, "Aktarım için gerekli aktif Sakin rolü bulunamadı.");
+                throw new ConflictException("Aktarım için gerekli aktif Sakin rolü bulunamadı.");
+            }
+        }
 
         int createdCount = 0;
-        bool isStale = false;
-        string staleMessage = string.Empty;
 
         var strategy = _context.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        try
         {
-            await using var tx = await _context.Database.BeginTransactionAsync();
-
-            try
+            await strategy.ExecuteAsync(async () =>
             {
+                await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+                createdCount = 0;
+                foreach (var log in createLogs)
+                {
+                    log.Status = "VALID";
+                    log.CreatedEntityId = null;
+                }
+
+                // Scope and target state may have changed after validation/claim; check again in the execution transaction.
+                target = await ValidateImportTargetAsync(
+                    policy,
+                    batch.TargetPropertyId,
+                    batch.TargetBuildingId,
+                    currentUserId,
+                    isAdmin);
+
                 foreach (var log in createLogs)
                 {
                     var mapped = JsonSerializer.Deserialize<Dictionary<string, string>>(log.RawDataJson) ?? new();
 
-                    int? createdId = await ExecuteRowEntityCreationAsync(
-                        batch.ImportType,
-                        mapped,
-                        isAdmin,
-                        accessiblePropertyIds,
-                        accessibleBuildingIds,
-                        residentRoleId);
-
-                    if (!createdId.HasValue)
+                    try
                     {
-                        isStale = true;
-                        staleMessage = $"Satır #{log.RowNumber} için güncelliğini yitirmiş doğrulama tespiti (STALE_VALIDATION). Lütfen partiyi tekrar doğrulayın.";
-                        break;
+                        var createdId = await ExecuteRowEntityCreationAsync(
+                            batch,
+                            target,
+                            mapped,
+                            residentRoleId);
+
+                        log.Status = "IMPORTED";
+                        log.CreatedEntityId = createdId;
+                        createdCount++;
                     }
-
-                    log.Status = "IMPORTED";
-                    log.CreatedEntityId = createdId.Value;
-                    createdCount++;
+                    catch (Exception ex) when (ex is InvalidOperationException or KeyNotFoundException or BadRequestException or DbUpdateException)
+                    {
+                        throw new ImportRowExecutionException(
+                            log.RowNumber,
+                            GetControlledDomainError(ex));
+                    }
                 }
 
-                if (isStale)
-                {
-                    await tx.RollbackAsync();
-                }
-                else
-                {
-                    batch.ImportedRows = createdCount;
-                    batch.CompletedAt = DateTime.UtcNow;
-                    batch.Status = "COMPLETED";
-                    await _context.SaveChangesAsync();
-                    await tx.CommitAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                await tx.RollbackAsync();
-                isStale = true;
-                staleMessage = $"Aktarım esnasında beklenmeyen bir hata oluştu: {ex.Message}";
-            }
-        });
-
-        if (isStale)
+                batch.ImportedRows = createdCount;
+                batch.CompletedAt = DateTime.UtcNow;
+                batch.Status = "COMPLETED";
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+            });
+        }
+        catch (ImportRowExecutionException ex)
         {
-            batch.Status = "FAILED";
-            batch.ErrorMessage = staleMessage;
-            await _context.SaveChangesAsync();
-            throw new BadRequestException(staleMessage);
+            var message = $"Satır #{ex.RowNumber} güncel alan kurallarıyla çakıştığı için aktarım geri alındı: {ex.Message}";
+            await MarkBatchFailedAsync(batch.Id, message, ex.RowNumber);
+            throw new ConflictException(message);
+        }
+        catch (Exception ex) when (ex is ForbiddenException or NotFoundException or BadRequestException)
+        {
+            await MarkBatchFailedAsync(batch.Id, "Hedef kapsam veya yetki doğrulaması başarısız oldu.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Import batch {BatchId} execution failed and was rolled back.", batch.Id);
+            const string message = "Aktarım tamamlanamadı. Hiçbir veri kaydedilmedi; lütfen partiyi yeniden doğrulayın.";
+            await MarkBatchFailedAsync(batch.Id, message);
+            throw new BadRequestException(message);
         }
 
+        _context.ChangeTracker.Clear();
+        batch = await _context.ImportBatches
+            .Include(b => b.TargetProperty)
+            .Include(b => b.TargetBuilding)
+            .FirstAsync(b => b.Id == batchId);
         var user = await _context.Users.FindAsync(batch.CreatedByUserId);
         var batchDto = ToBatchDto(batch, user != null ? $"{user.FirstName} {user.LastName}".Trim() : string.Empty);
 
@@ -904,32 +1046,56 @@ public class DataImportService : IDataImportService
         };
     }
 
-    private async Task<int?> ExecuteRowEntityCreationAsync(
-        string importType,
+    private async Task<int> ExecuteRowEntityCreationAsync(
+        ImportBatch batch,
+        ValidatedImportTarget target,
         Dictionary<string, string> mapped,
-        bool isAdmin,
-        List<int> accessiblePropertyIds,
-        List<int> accessibleBuildingIds,
-        int residentRoleId)
+        int? residentRoleId)
     {
-        switch (importType)
+        EnsureExecutionTargetMetadata(batch.ImportType, target, mapped);
+
+        switch (batch.ImportType)
         {
             case "PROPERTIES":
                 {
-                    if (!isAdmin) return null;
                     var name = GetValue(mapped, "Name");
                     var address = GetValue(mapped, "AddressLine");
                     var city = GetValue(mapped, "City");
                     var district = GetValue(mapped, "District");
                     if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(address) || string.IsNullOrWhiteSpace(city) || string.IsNullOrWhiteSpace(district))
-                        return null;
+                        throw new InvalidOperationException("Zorunlu yapı alanlarından biri eksik.");
 
-                    var exists = await _context.Properties.AsNoTracking().AnyAsync(p => p.Name.ToLower() == name.ToLower() && p.IsActive);
-                    if (exists) return null;
+                    var exists = await _context.Properties.AsNoTracking().AnyAsync(p => p.Name.ToLower() == name.ToLower());
+                    if (exists) throw new InvalidOperationException("Aynı ada sahip bir yapı zaten mevcut.");
+
+                    var typeCode = GetValue(mapped, "PropertyTypeCode");
+                    int? propertyTypeId = null;
+                    string propertyTypeCode = "RESIDENTIAL_COMPLEX";
+                    if (!string.IsNullOrWhiteSpace(typeCode))
+                    {
+                        var lookup = await _context.PropertyTypes.FirstOrDefaultAsync(pt => pt.Code.ToLower() == typeCode.ToLower() || pt.Name.ToLower() == typeCode.ToLower());
+                        if (lookup is null || !lookup.IsActive)
+                        {
+                            throw new InvalidOperationException("Geçerli veya aktif bir gayrimenkul türü bulunamadı.");
+                        }
+                        propertyTypeId = lookup.Id;
+                        propertyTypeCode = lookup.Code;
+                    }
+                    else
+                    {
+                        var defaultType = await _context.PropertyTypes.FirstOrDefaultAsync(pt => pt.Code == "RESIDENTIAL_COMPLEX");
+                        if (defaultType != null)
+                        {
+                            propertyTypeId = defaultType.Id;
+                            propertyTypeCode = defaultType.Code;
+                        }
+                    }
 
                     var prop = new Property
                     {
                         Name = name,
+                        PropertyTypeId = propertyTypeId,
+                        PropertyType = propertyTypeCode,
                         AddressLine = address,
                         City = city,
                         District = district,
@@ -944,73 +1110,54 @@ public class DataImportService : IDataImportService
 
             case "BUILDINGS":
                 {
-                    var propName = GetValue(mapped, "PropertyName");
                     var name = GetValue(mapped, "Name");
                     var code = GetValue(mapped, "Code");
                     var floorStr = GetValue(mapped, "FloorCount");
-                    if (string.IsNullOrWhiteSpace(propName) || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(floorStr))
-                        return null;
-                    if (!int.TryParse(floorStr, out var floorCount) || floorCount < 1 || floorCount > 200) return null;
-
-                    var prop = await _context.Properties.AsNoTracking().FirstOrDefaultAsync(p => p.Name.ToLower() == propName.ToLower() && p.IsActive);
-                    if (prop is null) return null;
-                    if (!isAdmin && !accessiblePropertyIds.Contains(prop.Id)) return null;
-
-                    var exists = await _context.Buildings.AsNoTracking().AnyAsync(b => b.PropertyId == prop.Id && b.Code.ToLower() == code.ToLower() && b.IsActive);
-                    if (exists) return null;
-
-                    var bld = new Building
+                    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(code) ||
+                        name.Length > 150 || code.Length > 50 ||
+                        !int.TryParse(floorStr, out var floorCount) || floorCount is < 1 or > 200)
                     {
-                        PropertyId = prop.Id,
+                        throw new InvalidOperationException("Bina adı, kodu ve geçerli kat sayısı zorunludur.");
+                    }
+
+                    var created = await _buildingService.CreateBuildingAsync(new CreateBuildingDto
+                    {
+                        PropertyId = target.Property!.Id,
                         Name = name,
                         Code = code,
                         FloorCount = floorCount,
-                        Description = GetValue(mapped, "Description"),
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    _context.Buildings.Add(bld);
-                    await _context.SaveChangesAsync();
-                    return bld.Id;
+                        Description = GetValue(mapped, "Description")
+                    });
+                    return created.Id;
                 }
 
             case "UNITS":
                 {
-                    var propName = GetValue(mapped, "PropertyName");
-                    var buildingCode = GetValue(mapped, "BuildingCode");
                     var unitNumber = GetValue(mapped, "UnitNumber");
                     var unitTypeCode = GetValue(mapped, "UnitTypeCode");
-                    if (string.IsNullOrWhiteSpace(propName) || string.IsNullOrWhiteSpace(buildingCode) || string.IsNullOrWhiteSpace(unitNumber) || string.IsNullOrWhiteSpace(unitTypeCode))
-                        return null;
-
-                    var building = await _context.Buildings.AsNoTracking().Include(b => b.Property).FirstOrDefaultAsync(b => b.Property.Name.ToLower() == propName.ToLower() && b.Code.ToLower() == buildingCode.ToLower() && b.IsActive);
-                    if (building is null) return null;
-                    if (!isAdmin && !accessibleBuildingIds.Contains(building.Id)) return null;
+                    if (string.IsNullOrWhiteSpace(unitNumber) || string.IsNullOrWhiteSpace(unitTypeCode))
+                        throw new InvalidOperationException("Daire numarası ve daire türü zorunludur.");
 
                     var unitType = await _context.UnitTypes.AsNoTracking().FirstOrDefaultAsync(ut => ut.Code.ToLower() == unitTypeCode.ToLower() && ut.IsActive);
-                    if (unitType is null) return null;
+                    if (unitType is null) throw new InvalidOperationException("Aktif ve geçerli bir daire türü bulunamadı.");
 
-                    var exists = await _context.Units.AsNoTracking().AnyAsync(u => u.BuildingId == building.Id && u.UnitNumber.ToLower() == unitNumber.ToLower() && u.IsActive);
-                    if (exists) return null;
+                    if (unitNumber.Length > 50)
+                        throw new InvalidOperationException("Daire numarası en fazla 50 karakter olabilir.");
 
-                    decimal? grossArea = decimal.TryParse(GetValue(mapped, "GrossArea"), out var g) && g > 0 ? g : null;
-                    decimal? netArea = decimal.TryParse(GetValue(mapped, "NetArea"), out var n) && n > 0 ? n : null;
+                    var grossArea = ParseOptionalArea(GetValue(mapped, "GrossArea"), "Brüt alan");
+                    var netArea = ParseOptionalArea(GetValue(mapped, "NetArea"), "Net alan");
                     int floorNum = int.TryParse(GetValue(mapped, "FloorNumber"), out var fn) ? fn : 0;
 
-                    var unit = new Unit
+                    var created = await _unitService.CreateUnitAsync(new CreateUnitDto
                     {
-                        BuildingId = building.Id,
+                        BuildingId = target.Building!.Id,
                         UnitTypeId = unitType.Id,
                         UnitNumber = unitNumber,
                         FloorNumber = floorNum,
                         GrossArea = grossArea,
                         NetArea = netArea,
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    _context.Units.Add(unit);
-                    await _context.SaveChangesAsync();
-                    return unit.Id;
+                    });
+                    return created.Id;
                 }
 
             case "USERS":
@@ -1020,10 +1167,13 @@ public class DataImportService : IDataImportService
                     var firstName = GetValue(mapped, "FirstName");
                     var lastName = GetValue(mapped, "LastName");
                     if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
-                        return null;
+                        throw new InvalidOperationException("Kullanıcı adı, e-posta, ad ve soyad zorunludur.");
 
                     var exists = await _context.Users.AsNoTracking().AnyAsync(u => u.UserName.ToLower() == userName.ToLower() || u.Email.ToLower() == email.ToLower());
-                    if (exists) return null;
+                    if (exists) throw new InvalidOperationException("Aynı kullanıcı adı veya e-posta ile bir kullanıcı zaten mevcut.");
+
+                    if (!residentRoleId.HasValue)
+                        throw new InvalidOperationException("Aktif Sakin rolü bulunamadı.");
 
                     var tempPassword = $"{Guid.NewGuid():N}"[..10] + "!A1";
                     var user = new User
@@ -1043,7 +1193,7 @@ public class DataImportService : IDataImportService
                     _context.UserRoles.Add(new UserRole
                     {
                         UserId = user.Id,
-                        RoleId = residentRoleId
+                        RoleId = residentRoleId.Value
                     });
                     await _context.SaveChangesAsync();
 
@@ -1052,49 +1202,244 @@ public class DataImportService : IDataImportService
 
             case "OCCUPANCIES":
                 {
-                    var propName = GetValue(mapped, "PropertyName");
-                    var buildingCode = GetValue(mapped, "BuildingCode");
-                    var unitNumber = GetValue(mapped, "UnitNumber");
-                    var userNameOrEmail = GetValue(mapped, "UserNameOrEmail");
-                    var occTypeCode = GetValue(mapped, "OccupancyTypeCode");
-                    var startDateStr = GetValue(mapped, "StartDate");
-                    if (string.IsNullOrWhiteSpace(propName) || string.IsNullOrWhiteSpace(buildingCode) || string.IsNullOrWhiteSpace(unitNumber) || string.IsNullOrWhiteSpace(userNameOrEmail) || string.IsNullOrWhiteSpace(occTypeCode) || string.IsNullOrWhiteSpace(startDateStr))
-                        return null;
-
-                    if (!DateTime.TryParse(startDateStr, out var startDate)) return null;
-                    DateTime? endDate = DateTime.TryParse(GetValue(mapped, "EndDate"), out var ed) ? ed : null;
-
-                    var unit = await _context.Units.AsNoTracking().Include(u => u.Building).ThenInclude(b => b.Property).FirstOrDefaultAsync(u => u.Building.Property.Name.ToLower() == propName.ToLower() && u.Building.Code.ToLower() == buildingCode.ToLower() && u.UnitNumber.ToLower() == unitNumber.ToLower() && u.IsActive);
-                    if (unit is null) return null;
-                    if (!isAdmin && !accessibleBuildingIds.Contains(unit.BuildingId)) return null;
-
-                    var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserName.ToLower() == userNameOrEmail.ToLower() || u.Email.ToLower() == userNameOrEmail.ToLower());
-                    if (user is null) return null;
-
-                    var occType = await _context.OccupancyTypes.AsNoTracking().FirstOrDefaultAsync(ot => ot.Code.ToLower() == occTypeCode.ToLower() && ot.IsActive);
-                    if (occType is null) return null;
-
-                    var collision = await _context.UnitOccupancies.AsNoTracking().AnyAsync(uo => uo.IsActive && (uo.UnitId == unit.Id || uo.UserId == user.Id) && uo.OccupancyTypeId == occType.Id);
-                    if (collision) return null;
-
-                    var occ = new UnitOccupancy
-                    {
-                        UnitId = unit.Id,
-                        UserId = user.Id,
-                        OccupancyTypeId = occType.Id,
-                        StartDate = startDate,
-                        EndDate = endDate,
-                        IsActive = true,
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    _context.UnitOccupancies.Add(occ);
-                    await _context.SaveChangesAsync();
-                    return occ.Id;
+                    return await CreateImportedOccupancyAsync(target.Building!.Id, mapped);
                 }
 
             default:
-                return null;
+                throw new InvalidOperationException("Desteklenmeyen içe aktarım türü yürütülemez.");
         }
+    }
+
+    private async Task<int> CreateImportedOccupancyAsync(
+        int targetBuildingId,
+        Dictionary<string, string> mapped)
+    {
+        var unitNumber = GetValue(mapped, "UnitNumber");
+        var userNameOrEmail = GetValue(mapped, "UserNameOrEmail");
+        var occupancyTypeCode = GetValue(mapped, "OccupancyTypeCode");
+        var startDateValue = GetValue(mapped, "StartDate");
+
+        if (string.IsNullOrWhiteSpace(unitNumber) ||
+            string.IsNullOrWhiteSpace(userNameOrEmail) ||
+            string.IsNullOrWhiteSpace(occupancyTypeCode) ||
+            !DateTime.TryParse(startDateValue, out var parsedStartDate))
+        {
+            throw new InvalidOperationException("Daire, kullanıcı, ikamet türü ve geçerli başlangıç tarihi zorunludur.");
+        }
+
+        var startDate = NormalizeUtc(parsedStartDate);
+        var endDateValue = GetValue(mapped, "EndDate");
+        DateTime? endDate = null;
+        if (!string.IsNullOrWhiteSpace(endDateValue))
+        {
+            if (!DateTime.TryParse(endDateValue, out var parsedEndDate))
+            {
+                throw new InvalidOperationException("Bitiş tarihi geçerli bir tarih olmalıdır.");
+            }
+
+            endDate = NormalizeUtc(parsedEndDate);
+        }
+
+        if (endDate.HasValue && endDate.Value < startDate)
+        {
+            throw new InvalidOperationException("Bitiş tarihi başlangıç tarihinden önce olamaz.");
+        }
+
+        var unit = await _context.Units
+            .Include(u => u.Building)
+                .ThenInclude(b => b.Property)
+            .FirstOrDefaultAsync(u =>
+                u.BuildingId == targetBuildingId &&
+                u.UnitNumber.ToLower() == unitNumber.ToLower());
+
+        if (unit is null)
+        {
+            throw new KeyNotFoundException("Seçilen hedef blokta belirtilen daire bulunamadı.");
+        }
+
+        if (!unit.IsActive || !unit.Building.IsActive || !unit.Building.Property.IsActive)
+        {
+            throw new InvalidOperationException("Pasif daire, bina veya yapı için ikamet kaydı oluşturulamaz.");
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u =>
+            u.UserName.ToLower() == userNameOrEmail.ToLower() ||
+            u.Email.ToLower() == userNameOrEmail.ToLower());
+
+        if (user is null)
+        {
+            throw new KeyNotFoundException("Belirtilen kullanıcı bulunamadı.");
+        }
+
+        if (!user.IsActive)
+        {
+            throw new InvalidOperationException("Pasif kullanıcı için ikamet kaydı oluşturulamaz.");
+        }
+
+        var occupancyType = await _context.OccupancyTypes.FirstOrDefaultAsync(ot =>
+            ot.Code.ToLower() == occupancyTypeCode.ToLower());
+
+        if (occupancyType is null)
+        {
+            throw new KeyNotFoundException("Belirtilen ikamet türü bulunamadı.");
+        }
+
+        if (!occupancyType.IsActive)
+        {
+            throw new InvalidOperationException("Pasif ikamet türü kullanılamaz.");
+        }
+
+        var requestedEndDate = endDate ?? DateTime.MaxValue;
+        var hasOverlap = await _context.UnitOccupancies.AnyAsync(occupancy =>
+            occupancy.UserId == user.Id &&
+            occupancy.UnitId == unit.Id &&
+            occupancy.OccupancyTypeId == occupancyType.Id &&
+            occupancy.StartDate <= requestedEndDate &&
+            (!occupancy.EndDate.HasValue || occupancy.EndDate.Value >= startDate));
+
+        if (hasOverlap)
+        {
+            throw new InvalidOperationException("Aynı kullanıcı, daire ve ikamet türü için çakışan tarih aralığı zaten mevcut.");
+        }
+
+        var utcNow = DateTime.UtcNow;
+        var occupancy = new UnitOccupancy
+        {
+            UnitId = unit.Id,
+            UserId = user.Id,
+            OccupancyTypeId = occupancyType.Id,
+            StartDate = startDate,
+            EndDate = endDate,
+            IsActive = !endDate.HasValue || endDate.Value >= utcNow,
+            IsPrimary = false,
+            CreatedAt = utcNow
+        };
+
+        _context.UnitOccupancies.Add(occupancy);
+        await _context.SaveChangesAsync();
+        return occupancy.Id;
+    }
+
+    private async Task MarkBatchFailedAsync(int batchId, string message, int? failedRowNumber = null)
+    {
+        _context.ChangeTracker.Clear();
+
+        var failedBatch = await _context.ImportBatches
+            .Include(b => b.RowLogs)
+            .FirstOrDefaultAsync(b => b.Id == batchId);
+
+        if (failedBatch is null || failedBatch.Status == "COMPLETED")
+        {
+            return;
+        }
+
+        failedBatch.Status = "FAILED";
+        failedBatch.ImportedRows = 0;
+        failedBatch.CompletedAt = null;
+        failedBatch.ErrorMessage = message;
+
+        if (failedRowNumber.HasValue)
+        {
+            var failedRow = failedBatch.RowLogs.FirstOrDefault(r => r.RowNumber == failedRowNumber.Value);
+            if (failedRow is not null)
+            {
+                failedRow.Status = "INVALID";
+                failedRow.ActionPreview = "ERROR";
+                failedRow.CreatedEntityId = null;
+                failedRow.ErrorMessagesJson = JsonSerializer.Serialize(new[]
+                {
+                    new ValidationErrorItemDto
+                    {
+                        Code = "DOMAIN_CONFLICT",
+                        Field = string.Empty,
+                        Message = message
+                    }
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    private static void EnsureBatchHasExecutionTarget(ImportTypePolicy policy, ImportBatch batch)
+    {
+        if (policy.TargetRequirement == ImportTargetRequirement.Property && !batch.TargetPropertyId.HasValue)
+        {
+            throw new BadRequestException("Bu eski içe aktarım partisinde hedef yapı bilgisi bulunmadığı için aktarım yürütülemez.");
+        }
+
+        if (policy.TargetRequirement == ImportTargetRequirement.Building &&
+            (!batch.TargetPropertyId.HasValue || !batch.TargetBuildingId.HasValue))
+        {
+            throw new BadRequestException("Bu eski içe aktarım partisinde hedef yapı/blok bilgisi bulunmadığı için aktarım yürütülemez.");
+        }
+    }
+
+    private static void EnsureExecutionTargetMetadata(
+        string importType,
+        ValidatedImportTarget target,
+        Dictionary<string, string> mapped)
+    {
+        if (importType is not ("BUILDINGS" or "UNITS" or "OCCUPANCIES"))
+        {
+            return;
+        }
+
+        var propertyName = GetValue(mapped, "PropertyName");
+        if (!MatchesOptionalTargetValue(propertyName, target.Property!.Name))
+        {
+            throw new InvalidOperationException("Satırdaki yapı bilgisi seçilen aktarım hedefiyle eşleşmiyor.");
+        }
+
+        if (importType is "UNITS" or "OCCUPANCIES")
+        {
+            var buildingCode = GetValue(mapped, "BuildingCode");
+            if (!MatchesOptionalTargetValue(buildingCode, target.Building!.Code))
+            {
+                throw new InvalidOperationException("Satırdaki blok bilgisi seçilen aktarım hedefiyle eşleşmiyor.");
+            }
+        }
+    }
+
+    private static string GetControlledDomainError(Exception exception)
+    {
+        return exception switch
+        {
+            DbUpdateException => "Kayıt, veritabanındaki benzersizlik veya bütünlük kuralıyla çakışıyor.",
+            InvalidOperationException or KeyNotFoundException or BadRequestException => exception.Message,
+            _ => "Satır güncel alan kurallarıyla doğrulanamadı."
+        };
+    }
+
+    private static decimal? ParseOptionalArea(string? value, string fieldLabel)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!decimal.TryParse(value.Trim(), out var area) || area <= 0 || area > 999999.99m)
+        {
+            throw new InvalidOperationException($"{fieldLabel} 0,01 ile 999999,99 m² arasında geçerli bir sayı olmalıdır.");
+        }
+
+        return area;
+    }
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
+    }
+
+    private static string NormalizeBuildingCode(string code)
+    {
+        var normalized = Regex.Replace(code.Trim(), @"[\s-]+", "_");
+        return normalized.ToUpperInvariant();
     }
 
     public async Task<ImportSummaryResponseDto> GetSummaryAsync(
