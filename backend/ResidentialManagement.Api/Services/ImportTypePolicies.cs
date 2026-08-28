@@ -71,3 +71,14 @@ public static class ImportTypePolicies
         return Registry.TryGetValue(importType.Trim(), out policy!);
     }
 }
+
+public static class ImportProcessingLimits
+{
+    // Imports run synchronously today; these conservative limits keep parsing and validation bounded.
+    public const long MaxFileSizeBytes = 20L * 1024 * 1024;
+    public const int MaxRows = 5_000;
+    public const int MaxColumns = 100;
+    public const int MaxCellLength = 4_000;
+    public const long MaxXlsxExpandedBytes = 100L * 1024 * 1024;
+    public const int MaxXlsxArchiveEntries = 2_000;
+}

@@ -698,6 +698,11 @@ export interface ImportBatch {
   skippedRows: number
   createdByUserId: number
   createdByFullName: string
+  targetPropertyId: number | null
+  targetPropertyName: string | null
+  targetBuildingId: number | null
+  targetBuildingName: string | null
+  targetBuildingCode: string | null
   createdAt: string
   validatedAt: string | null
   completedAt: string | null

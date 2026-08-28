@@ -9,6 +9,8 @@ namespace ResidentialManagement.Api.Services;
 
 public class DataImportService : IDataImportService
 {
+    private sealed record ValidatedImportTarget(Property? Property, Building? Building);
+
     private readonly AppDbContext _context;
     private readonly IImportFileStorageService _storageService;
     private readonly IImportFileParser _fileParser;
@@ -31,7 +33,7 @@ public class DataImportService : IDataImportService
         {
             "BUILDINGS", new List<TargetFieldOptionDto>
             {
-                new() { Key = "PropertyName", Label = "Taşınmaz Adı", IsRequired = true },
+                new() { Key = "PropertyName", Label = "Taşınmaz Adı", IsRequired = false },
                 new() { Key = "Name", Label = "Blok Adı", IsRequired = true },
                 new() { Key = "Code", Label = "Blok Kodu", IsRequired = true },
                 new() { Key = "FloorCount", Label = "Kat Sayısı (1-200)", IsRequired = true },
@@ -41,8 +43,8 @@ public class DataImportService : IDataImportService
         {
             "UNITS", new List<TargetFieldOptionDto>
             {
-                new() { Key = "PropertyName", Label = "Taşınmaz Adı", IsRequired = true },
-                new() { Key = "BuildingCode", Label = "Blok Kodu", IsRequired = true },
+                new() { Key = "PropertyName", Label = "Taşınmaz Adı", IsRequired = false },
+                new() { Key = "BuildingCode", Label = "Blok Kodu", IsRequired = false },
                 new() { Key = "UnitNumber", Label = "Daire No", IsRequired = true },
                 new() { Key = "UnitTypeCode", Label = "Daire Tipi Kodu (APARTMENT vb.)", IsRequired = true },
                 new() { Key = "FloorNumber", Label = "Kat No", IsRequired = false },
@@ -63,8 +65,8 @@ public class DataImportService : IDataImportService
         {
             "OCCUPANCIES", new List<TargetFieldOptionDto>
             {
-                new() { Key = "PropertyName", Label = "Taşınmaz Adı", IsRequired = true },
-                new() { Key = "BuildingCode", Label = "Blok Kodu", IsRequired = true },
+                new() { Key = "PropertyName", Label = "Taşınmaz Adı", IsRequired = false },
+                new() { Key = "BuildingCode", Label = "Blok Kodu", IsRequired = false },
                 new() { Key = "UnitNumber", Label = "Daire No", IsRequired = true },
                 new() { Key = "UserNameOrEmail", Label = "Kullanıcı Adı veya E-Posta", IsRequired = true },
                 new() { Key = "OccupancyTypeCode", Label = "İkamet Türü (OWNER/TENANT)", IsRequired = true },
@@ -91,26 +93,36 @@ public class DataImportService : IDataImportService
     public async Task<ImportUploadResponseDto> UploadFileAsync(
         IFormFile file,
         string importType,
+        int? targetPropertyId,
+        int? targetBuildingId,
         int currentUserId,
         bool isAdmin)
     {
         var normalizedType = importType?.Trim().ToUpperInvariant() ?? string.Empty;
-        if (!ImportTypePolicies.TryGet(normalizedType, out _))
+        if (!ImportTypePolicies.TryGet(normalizedType, out var policy))
         {
             throw new BadRequestException($"Geçersiz içe aktarım türü: '{importType}'.");
         }
 
-        if (normalizedType == "PROPERTIES" && !isAdmin)
-        {
-            throw new ForbiddenException("Siteler/Taşınmazlar aktarımı yalnızca sistem yöneticileri (ADMIN) tarafından yapılabilir.");
-        }
+        var target = await ValidateImportTargetAsync(
+            policy,
+            targetPropertyId,
+            targetBuildingId,
+            currentUserId,
+            isAdmin);
 
         using var stream = file.OpenReadStream();
         var (storageKey, fileHashSha256, fileSizeBytes) = await _storageService.SaveImportFileAsync(stream, file.FileName);
+        var validatedTargetPropertyId = target.Property?.Id;
+        var validatedTargetBuildingId = target.Building?.Id;
 
         var existingBatch = await _context.ImportBatches
             .AsNoTracking()
-            .Where(b => b.CreatedByUserId == currentUserId && b.ImportType == normalizedType && b.FileHashSha256 == fileHashSha256)
+            .Where(b => b.CreatedByUserId == currentUserId &&
+                        b.ImportType == normalizedType &&
+                        b.TargetPropertyId == validatedTargetPropertyId &&
+                        b.TargetBuildingId == validatedTargetBuildingId &&
+                        b.FileHashSha256 == fileHashSha256)
             .OrderByDescending(b => b.CreatedAt)
             .FirstOrDefaultAsync();
 
@@ -126,6 +138,8 @@ public class DataImportService : IDataImportService
             StorageKey = storageKey,
             FileHashSha256 = fileHashSha256,
             Status = "UPLOADED",
+            TargetPropertyId = target.Property?.Id,
+            TargetBuildingId = target.Building?.Id,
             CreatedByUserId = currentUserId,
             CreatedAt = DateTime.UtcNow
         };
@@ -135,9 +149,14 @@ public class DataImportService : IDataImportService
 
         var user = await _context.Users.FindAsync(currentUserId);
 
+        var batchDto = ToBatchDto(batch, user != null ? $"{user.FirstName} {user.LastName}".Trim() : string.Empty);
+        batchDto.TargetPropertyName = target.Property?.Name;
+        batchDto.TargetBuildingName = target.Building?.Name;
+        batchDto.TargetBuildingCode = target.Building?.Code;
+
         return new ImportUploadResponseDto
         {
-            Batch = ToBatchDto(batch, user != null ? $"{user.FirstName} {user.LastName}".Trim() : string.Empty),
+            Batch = batchDto,
             IsDuplicateUpload = isDuplicateUpload,
             DuplicateWarning = duplicateWarning
         };
@@ -149,6 +168,13 @@ public class DataImportService : IDataImportService
         bool isAdmin)
     {
         var batch = await GetBatchAndCheckAccessAsync(batchId, currentUserId, isAdmin);
+
+        if (!ImportTypePolicies.TryGet(batch.ImportType, out var policy) || !policy.IsEndToEndSupported)
+        {
+            throw new BadRequestException($"'{batch.ImportType}' içe aktarım türü henüz desteklenmemektedir.");
+        }
+
+        await ValidateBatchTargetForReadAsync(policy, batch, currentUserId, isAdmin);
 
         using var stream = _storageService.OpenImportFileStream(batch.StorageKey);
         var extension = Path.GetExtension(batch.OriginalFileName);
@@ -192,10 +218,18 @@ public class DataImportService : IDataImportService
     {
         var batch = await GetBatchAndCheckAccessAsync(batchId, currentUserId, isAdmin);
 
-        if (!TargetFieldsRegistry.TryGetValue(batch.ImportType, out var allowedFields))
+        if (!ImportTypePolicies.TryGet(batch.ImportType, out var policy) || !policy.IsEndToEndSupported ||
+            !TargetFieldsRegistry.TryGetValue(batch.ImportType, out var allowedFields))
         {
             throw new BadRequestException($"'{batch.ImportType}' v1 aktarım motorunda desteklenmemektedir.");
         }
+
+        var target = await ValidateImportTargetAsync(
+            policy,
+            batch.TargetPropertyId,
+            batch.TargetBuildingId,
+            currentUserId,
+            isAdmin);
 
         var mappings = request.ColumnMappings ?? new Dictionary<string, string>();
 
@@ -220,9 +254,6 @@ public class DataImportService : IDataImportService
         var extension = Path.GetExtension(batch.OriginalFileName);
         var parseResult = _fileParser.ParseFile(stream, extension);
 
-        var accessiblePropertyIds = await _managerScopeService.GetAccessiblePropertyIdsAsync(currentUserId, isAdmin);
-        var accessibleBuildingIds = await _managerScopeService.GetAccessibleBuildingIdsAsync(currentUserId, isAdmin);
-
         var rowLogs = new List<ImportRowLog>();
 
         foreach (var parsedRow in parseResult.Rows)
@@ -246,10 +277,8 @@ public class DataImportService : IDataImportService
                 parsedRow.RowNumber,
                 mappedValues,
                 errors,
-                currentUserId,
                 isAdmin,
-                accessiblePropertyIds,
-                accessibleBuildingIds);
+                target);
 
             var rawDataJson = JsonSerializer.Serialize(mappedValues);
             var errorsJson = errors.Count > 0 ? JsonSerializer.Serialize(errors) : null;
@@ -308,18 +337,16 @@ public class DataImportService : IDataImportService
         int rowNumber,
         Dictionary<string, string> mappedValues,
         List<ValidationErrorItemDto> errors,
-        int currentUserId,
         bool isAdmin,
-        List<int> accessiblePropertyIds,
-        List<int> accessibleBuildingIds)
+        ValidatedImportTarget target)
     {
         return importType switch
         {
             "PROPERTIES" => await ValidatePropertyRowAsync(mappedValues, errors, isAdmin),
-            "BUILDINGS" => await ValidateBuildingRowAsync(mappedValues, errors, isAdmin, accessiblePropertyIds),
-            "UNITS" => await ValidateUnitRowAsync(mappedValues, errors, isAdmin, accessibleBuildingIds),
+            "BUILDINGS" => await ValidateBuildingRowAsync(mappedValues, errors, target),
+            "UNITS" => await ValidateUnitRowAsync(mappedValues, errors, target),
             "USERS" => await ValidateUserRowAsync(mappedValues, errors),
-            "OCCUPANCIES" => await ValidateOccupancyRowAsync(mappedValues, errors, isAdmin, accessibleBuildingIds),
+            "OCCUPANCIES" => await ValidateOccupancyRowAsync(mappedValues, errors, target),
             _ => ("ERROR", "INVALID")
         };
     }
@@ -380,16 +407,13 @@ public class DataImportService : IDataImportService
     private async Task<(string ActionPreview, string Status)> ValidateBuildingRowAsync(
         Dictionary<string, string> mappedValues,
         List<ValidationErrorItemDto> errors,
-        bool isAdmin,
-        List<int> accessiblePropertyIds)
+        ValidatedImportTarget target)
     {
         var propName = GetValue(mappedValues, "PropertyName");
         var name = GetValue(mappedValues, "Name");
         var code = GetValue(mappedValues, "Code");
         var floorStr = GetValue(mappedValues, "FloorCount");
 
-        if (string.IsNullOrWhiteSpace(propName))
-            errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "PropertyName", Message = "Taşınmaz adı zorunludur." });
         if (string.IsNullOrWhiteSpace(name))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "Name", Message = "Blok adı zorunludur." });
         if (string.IsNullOrWhiteSpace(code))
@@ -407,19 +431,15 @@ public class DataImportService : IDataImportService
             return ("ERROR", "INVALID");
         }
 
-        var prop = await _context.Properties
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Name.ToLower() == propName!.ToLower() && p.IsActive);
-
-        if (prop is null)
+        var prop = target.Property!;
+        if (!MatchesOptionalTargetValue(propName, prop.Name))
         {
-            errors.Add(new ValidationErrorItemDto { Code = "REFERENCE_NOT_FOUND", Field = "PropertyName", Message = $"'{propName}' isimli aktif bir taşınmaz bulunamadı." });
-            return ("ERROR", "INVALID");
-        }
-
-        if (!isAdmin && !accessiblePropertyIds.Contains(prop.Id))
-        {
-            errors.Add(new ValidationErrorItemDto { Code = "FORBIDDEN_SCOPE", Field = "PropertyName", Message = $"'{propName}' taşınmazına erişim/ekleme yetkiniz bulunmamaktadır." });
+            errors.Add(new ValidationErrorItemDto
+            {
+                Code = "TARGET_MISMATCH",
+                Field = "PropertyName",
+                Message = $"Satırdaki taşınmaz '{propName}', seçilen hedef yapı '{prop.Name}' ile eşleşmiyor."
+            });
             return ("ERROR", "INVALID");
         }
 
@@ -439,8 +459,7 @@ public class DataImportService : IDataImportService
     private async Task<(string ActionPreview, string Status)> ValidateUnitRowAsync(
         Dictionary<string, string> mappedValues,
         List<ValidationErrorItemDto> errors,
-        bool isAdmin,
-        List<int> accessibleBuildingIds)
+        ValidatedImportTarget target)
     {
         var propName = GetValue(mappedValues, "PropertyName");
         var buildingCode = GetValue(mappedValues, "BuildingCode");
@@ -449,10 +468,6 @@ public class DataImportService : IDataImportService
         var grossStr = GetValue(mappedValues, "GrossArea");
         var netStr = GetValue(mappedValues, "NetArea");
 
-        if (string.IsNullOrWhiteSpace(propName))
-            errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "PropertyName", Message = "Taşınmaz adı zorunludur." });
-        if (string.IsNullOrWhiteSpace(buildingCode))
-            errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "BuildingCode", Message = "Blok kodu zorunludur." });
         if (string.IsNullOrWhiteSpace(unitNumber))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "UnitNumber", Message = "Daire No zorunludur." });
         if (string.IsNullOrWhiteSpace(unitTypeCode))
@@ -486,20 +501,26 @@ public class DataImportService : IDataImportService
             return ("ERROR", "INVALID");
         }
 
-        var building = await _context.Buildings
-            .AsNoTracking()
-            .Include(b => b.Property)
-            .FirstOrDefaultAsync(b => b.Property.Name.ToLower() == propName!.ToLower() && b.Code.ToLower() == buildingCode!.ToLower() && b.IsActive);
-
-        if (building is null)
+        var building = target.Building!;
+        if (!MatchesOptionalTargetValue(propName, target.Property!.Name))
         {
-            errors.Add(new ValidationErrorItemDto { Code = "REFERENCE_NOT_FOUND", Field = "BuildingCode", Message = $"'{propName}' altında '{buildingCode}' kodlu bir blok bulunamadı." });
+            errors.Add(new ValidationErrorItemDto
+            {
+                Code = "TARGET_MISMATCH",
+                Field = "PropertyName",
+                Message = $"Satırdaki taşınmaz '{propName}', seçilen hedef yapı '{target.Property.Name}' ile eşleşmiyor."
+            });
             return ("ERROR", "INVALID");
         }
 
-        if (!isAdmin && !accessibleBuildingIds.Contains(building.Id))
+        if (!MatchesOptionalTargetValue(buildingCode, building.Code))
         {
-            errors.Add(new ValidationErrorItemDto { Code = "FORBIDDEN_SCOPE", Field = "BuildingCode", Message = $"'{buildingCode}' bloğuna daire ekleme yetkiniz bulunmamaktadır." });
+            errors.Add(new ValidationErrorItemDto
+            {
+                Code = "TARGET_MISMATCH",
+                Field = "BuildingCode",
+                Message = $"Satırdaki blok kodu '{buildingCode}', seçilen hedef blok '{building.Code}' ile eşleşmiyor."
+            });
             return ("ERROR", "INVALID");
         }
 
@@ -565,8 +586,7 @@ public class DataImportService : IDataImportService
     private async Task<(string ActionPreview, string Status)> ValidateOccupancyRowAsync(
         Dictionary<string, string> mappedValues,
         List<ValidationErrorItemDto> errors,
-        bool isAdmin,
-        List<int> accessibleBuildingIds)
+        ValidatedImportTarget target)
     {
         var propName = GetValue(mappedValues, "PropertyName");
         var buildingCode = GetValue(mappedValues, "BuildingCode");
@@ -576,10 +596,6 @@ public class DataImportService : IDataImportService
         var startDateStr = GetValue(mappedValues, "StartDate");
         var endDateStr = GetValue(mappedValues, "EndDate");
 
-        if (string.IsNullOrWhiteSpace(propName))
-            errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "PropertyName", Message = "Taşınmaz adı zorunludur." });
-        if (string.IsNullOrWhiteSpace(buildingCode))
-            errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "BuildingCode", Message = "Blok kodu zorunludur." });
         if (string.IsNullOrWhiteSpace(unitNumber))
             errors.Add(new ValidationErrorItemDto { Code = "REQUIRED_FIELD", Field = "UnitNumber", Message = "Daire No zorunludur." });
         if (string.IsNullOrWhiteSpace(userNameOrEmail))
@@ -618,23 +634,37 @@ public class DataImportService : IDataImportService
             return ("ERROR", "INVALID");
         }
 
-        var unit = await _context.Units
-            .AsNoTracking()
-            .Include(u => u.Building)
-                .ThenInclude(b => b.Property)
-            .FirstOrDefaultAsync(u => u.Building.Property.Name.ToLower() == propName!.ToLower() &&
-                                      u.Building.Code.ToLower() == buildingCode!.ToLower() &&
-                                      u.UnitNumber.ToLower() == unitNumber!.ToLower() && u.IsActive);
-
-        if (unit is null)
+        if (!MatchesOptionalTargetValue(propName, target.Property!.Name))
         {
-            errors.Add(new ValidationErrorItemDto { Code = "REFERENCE_NOT_FOUND", Field = "UnitNumber", Message = $"'{propName} / {buildingCode}' altında '{unitNumber}' nolu daire bulunamadı." });
+            errors.Add(new ValidationErrorItemDto
+            {
+                Code = "TARGET_MISMATCH",
+                Field = "PropertyName",
+                Message = $"Satırdaki taşınmaz '{propName}', seçilen hedef yapı '{target.Property.Name}' ile eşleşmiyor."
+            });
             return ("ERROR", "INVALID");
         }
 
-        if (!isAdmin && !accessibleBuildingIds.Contains(unit.BuildingId))
+        if (!MatchesOptionalTargetValue(buildingCode, target.Building!.Code))
         {
-            errors.Add(new ValidationErrorItemDto { Code = "FORBIDDEN_SCOPE", Field = "UnitNumber", Message = $"'{unitNumber}' nolu daireye ikamet atama yetkiniz bulunmamaktadır." });
+            errors.Add(new ValidationErrorItemDto
+            {
+                Code = "TARGET_MISMATCH",
+                Field = "BuildingCode",
+                Message = $"Satırdaki blok kodu '{buildingCode}', seçilen hedef blok '{target.Building.Code}' ile eşleşmiyor."
+            });
+            return ("ERROR", "INVALID");
+        }
+
+        var unit = await _context.Units
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.BuildingId == target.Building.Id &&
+                                      u.UnitNumber.ToLower() == unitNumber!.ToLower() &&
+                                      u.IsActive);
+
+        if (unit is null)
+        {
+            errors.Add(new ValidationErrorItemDto { Code = "REFERENCE_NOT_FOUND", Field = "UnitNumber", Message = $"Seçilen hedef blokta '{unitNumber}' nolu aktif bir daire bulunamadı." });
             return ("ERROR", "INVALID");
         }
 
@@ -680,6 +710,13 @@ public class DataImportService : IDataImportService
         bool isAdmin)
     {
         var batch = await GetBatchAndCheckAccessAsync(batchId, currentUserId, isAdmin);
+
+        if (!ImportTypePolicies.TryGet(batch.ImportType, out var policy) || !policy.IsEndToEndSupported)
+        {
+            throw new BadRequestException($"'{batch.ImportType}' içe aktarım türü henüz desteklenmemektedir.");
+        }
+
+        await ValidateBatchTargetForReadAsync(policy, batch, currentUserId, isAdmin);
 
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 50;
@@ -1365,7 +1402,10 @@ public class DataImportService : IDataImportService
         if (pageSize < 1) pageSize = 20;
         if (pageSize > 100) pageSize = 100;
 
-        var query = _context.ImportBatches.AsNoTracking();
+        IQueryable<ImportBatch> query = _context.ImportBatches
+            .AsNoTracking()
+            .Include(b => b.TargetProperty)
+            .Include(b => b.TargetBuilding);
 
         if (!isAdmin)
         {
@@ -1406,6 +1446,131 @@ public class DataImportService : IDataImportService
             PageSize = pageSize,
             Items = dtos
         };
+    }
+
+    private async Task<ValidatedImportTarget> ValidateImportTargetAsync(
+        ImportTypePolicy policy,
+        int? targetPropertyId,
+        int? targetBuildingId,
+        int currentUserId,
+        bool isAdmin)
+    {
+        if (!policy.IsEndToEndSupported)
+        {
+            throw new BadRequestException($"'{policy.ImportType}' içe aktarım türü henüz desteklenmemektedir.");
+        }
+
+        if (isAdmin)
+        {
+            if (!policy.IsAdminAllowed)
+            {
+                throw new ForbiddenException("Bu içe aktarım türü için yetkiniz bulunmamaktadır.");
+            }
+        }
+        else if (!policy.IsManagerCandidate)
+        {
+            throw new ForbiddenException("Bu içe aktarım türü yalnızca sistem yöneticileri tarafından kullanılabilir.");
+        }
+
+        if (policy.TargetRequirement == ImportTargetRequirement.None)
+        {
+            // Global imports deliberately ignore supplied scope values instead of persisting misleading targets.
+            return new ValidatedImportTarget(null, null);
+        }
+
+        if (!targetPropertyId.HasValue)
+        {
+            throw new BadRequestException("Bu içe aktarım türü için hedef yapı seçilmelidir.");
+        }
+
+        var property = await _context.Properties
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == targetPropertyId.Value);
+
+        if (property is null)
+        {
+            throw new NotFoundException($"ID'si {targetPropertyId.Value} olan hedef yapı bulunamadı.");
+        }
+
+        if (!property.IsActive)
+        {
+            throw new BadRequestException("Pasif bir yapı içe aktarım hedefi olarak kullanılamaz.");
+        }
+
+        if (policy.TargetRequirement == ImportTargetRequirement.Property)
+        {
+            if (targetBuildingId.HasValue)
+            {
+                throw new BadRequestException("Bu içe aktarım türünde hedef blok seçilmemelidir.");
+            }
+
+            if (!isAdmin && !await _managerScopeService.CanManagePropertyAsync(currentUserId, property.Id, false))
+            {
+                throw new ForbiddenException("Seçilen yapı üzerinde yeni blok oluşturma yetkiniz bulunmamaktadır.");
+            }
+
+            return new ValidatedImportTarget(property, null);
+        }
+
+        if (!targetBuildingId.HasValue)
+        {
+            throw new BadRequestException("Bu içe aktarım türü için hedef blok seçilmelidir.");
+        }
+
+        var building = await _context.Buildings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == targetBuildingId.Value);
+
+        if (building is null)
+        {
+            throw new NotFoundException($"ID'si {targetBuildingId.Value} olan hedef blok bulunamadı.");
+        }
+
+        if (building.PropertyId != property.Id)
+        {
+            throw new BadRequestException("Seçilen hedef blok, seçilen hedef yapıya ait değildir.");
+        }
+
+        if (!building.IsActive)
+        {
+            throw new BadRequestException("Pasif bir blok içe aktarım hedefi olarak kullanılamaz.");
+        }
+
+        if (!isAdmin && !await _managerScopeService.CanAccessBuildingAsync(currentUserId, building.Id, false))
+        {
+            throw new ForbiddenException("Seçilen bloğa erişim yetkiniz bulunmamaktadır.");
+        }
+
+        return new ValidatedImportTarget(property, building);
+    }
+
+    private async Task ValidateBatchTargetForReadAsync(
+        ImportTypePolicy policy,
+        ImportBatch batch,
+        int currentUserId,
+        bool isAdmin)
+    {
+        var isHistoricalUnscopedBatch =
+            policy.TargetRequirement != ImportTargetRequirement.None &&
+            !batch.TargetPropertyId.HasValue;
+
+        if (isHistoricalUnscopedBatch && isAdmin)
+        {
+            return;
+        }
+
+        await ValidateImportTargetAsync(
+            policy,
+            batch.TargetPropertyId,
+            batch.TargetBuildingId,
+            currentUserId,
+            isAdmin);
+    }
+
+    private static bool MatchesOptionalTargetValue(string? suppliedValue, string expectedValue)
+    {
+        return string.IsNullOrWhiteSpace(suppliedValue) ||
+               suppliedValue.Trim().Equals(expectedValue.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeHeader(string header)

@@ -7,6 +7,8 @@ public interface IDataImportService
     Task<ImportUploadResponseDto> UploadFileAsync(
         Microsoft.AspNetCore.Http.IFormFile file,
         string importType,
+        int? targetPropertyId,
+        int? targetBuildingId,
         int currentUserId,
         bool isAdmin);
 

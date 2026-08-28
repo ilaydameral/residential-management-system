@@ -1,5 +1,13 @@
 namespace ResidentialManagement.Api.DTOs;
 
+public class UploadImportFileRequestDto
+{
+    public string ImportType { get; set; } = string.Empty;
+    public int? TargetPropertyId { get; set; }
+    public int? TargetBuildingId { get; set; }
+    public IFormFile? File { get; set; }
+}
+
 public class ImportBatchDto
 {
     public int Id { get; set; }

@@ -6,8 +6,6 @@ namespace ResidentialManagement.Api.Services;
 public class ImportFileStorageService : IImportFileStorageService
 {
     private readonly string _storagePath;
-    private const long MaxFileSizeBytes = 20 * 1024 * 1024; // 20 MB
-
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".csv",
@@ -30,7 +28,7 @@ public class ImportFileStorageService : IImportFileStorageService
             throw new BadRequestException("İçe aktarılacak dosya boş olamaz.");
         }
 
-        if (fileStream.Length > MaxFileSizeBytes)
+        if (fileStream.Length > ImportProcessingLimits.MaxFileSizeBytes)
         {
             throw new BadRequestException("İçe aktarma dosya boyutu 20 MB sınırını aşamaz.");
         }

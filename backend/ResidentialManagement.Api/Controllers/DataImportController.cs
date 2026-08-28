@@ -33,10 +33,20 @@ public class DataImportController : ControllerBase
 
     [HttpPost("upload")]
     public async Task<ActionResult<ImportUploadResponseDto>> Upload(
-        [FromForm] string importType,
-        IFormFile file)
+        [FromForm] UploadImportFileRequestDto request)
     {
-        var result = await _importService.UploadFileAsync(file, importType, GetCurrentUserId(), IsAdmin());
+        if (request.File is null)
+        {
+            throw new BadRequestException("İçe aktarılacak dosya zorunludur.");
+        }
+
+        var result = await _importService.UploadFileAsync(
+            request.File,
+            request.ImportType,
+            request.TargetPropertyId,
+            request.TargetBuildingId,
+            GetCurrentUserId(),
+            IsAdmin());
         return Ok(result);
     }
 

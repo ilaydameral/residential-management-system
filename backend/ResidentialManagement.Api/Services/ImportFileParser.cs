@@ -1,4 +1,5 @@
 using System.Text;
+using System.IO.Compression;
 using MiniExcelLibs;
 using ResidentialManagement.Api.Exceptions;
 
@@ -39,6 +40,7 @@ public class ImportFileParser : IImportFileParser
         }
 
         var headers = csvRows[0].Select(h => h.Trim().Trim('\uFEFF')).ToList();
+        EnsureColumnLimit(headers.Count);
         var result = new ImportParseResult
         {
             Headers = headers
@@ -84,6 +86,7 @@ public class ImportFileParser : IImportFileParser
                 {
                     reader.Read(); // Consume escaped double quote ""
                     currentField.Append('"');
+                    EnsureCellLimit(currentField.Length);
                 }
                 else
                 {
@@ -92,7 +95,7 @@ public class ImportFileParser : IImportFileParser
             }
             else if (c == ',' && !inQuotes)
             {
-                currentRow.Add(currentField.ToString());
+                AddCsvField(currentRow, currentField);
                 currentField.Clear();
             }
             else if ((c == '\r' || c == '\n') && !inQuotes)
@@ -101,27 +104,28 @@ public class ImportFileParser : IImportFileParser
                 {
                     reader.Read(); // Consume \n
                 }
-                currentRow.Add(currentField.ToString());
+                AddCsvField(currentRow, currentField);
                 currentField.Clear();
 
                 if (currentRow.Any(f => !string.IsNullOrWhiteSpace(f)) || currentRow.Count > 1)
                 {
-                    rows.Add(currentRow);
+                    AddCsvRow(rows, currentRow);
                 }
                 currentRow = new List<string>();
             }
             else
             {
                 currentField.Append(c);
+                EnsureCellLimit(currentField.Length);
             }
         }
 
         if (currentField.Length > 0 || currentRow.Count > 0)
         {
-            currentRow.Add(currentField.ToString());
+            AddCsvField(currentRow, currentField);
             if (currentRow.Any(f => !string.IsNullOrWhiteSpace(f)))
             {
-                rows.Add(currentRow);
+                AddCsvRow(rows, currentRow);
             }
         }
 
@@ -130,8 +134,16 @@ public class ImportFileParser : IImportFileParser
 
     private static ImportParseResult ParseXlsx(Stream stream)
     {
+        ValidateXlsxArchive(stream);
         stream.Seek(0, SeekOrigin.Begin);
-        var rows = stream.Query(useHeaderRow: true).ToList();
+        var rows = stream.Query(useHeaderRow: true)
+            .Take(ImportProcessingLimits.MaxRows + 1)
+            .ToList();
+
+        if (rows.Count > ImportProcessingLimits.MaxRows)
+        {
+            throw new BadRequestException($"Dosya en fazla {ImportProcessingLimits.MaxRows:N0} veri satırı içerebilir.");
+        }
 
         if (rows.Count == 0)
         {
@@ -145,6 +157,7 @@ public class ImportFileParser : IImportFileParser
         }
 
         var headers = firstRow.Keys.Select(k => k.Trim()).ToList();
+        EnsureColumnLimit(headers.Count);
         var result = new ImportParseResult
         {
             Headers = headers
@@ -155,10 +168,12 @@ public class ImportFileParser : IImportFileParser
         {
             if (item is IDictionary<string, object> dict)
             {
+                EnsureColumnLimit(dict.Count);
                 var rowDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var kvp in dict)
                 {
                     var valStr = kvp.Value?.ToString()?.Trim() ?? string.Empty;
+                    EnsureCellLimit(valStr.Length);
                     rowDict[kvp.Key.Trim()] = valStr;
                 }
 
@@ -171,5 +186,71 @@ public class ImportFileParser : IImportFileParser
         }
 
         return result;
+    }
+
+    private static void ValidateXlsxArchive(Stream stream)
+    {
+        stream.Seek(0, SeekOrigin.Begin);
+        try
+        {
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+            if (archive.Entries.Count > ImportProcessingLimits.MaxXlsxArchiveEntries)
+            {
+                throw new BadRequestException("Excel dosyası güvenli arşiv girdi sınırını aşıyor.");
+            }
+
+            long expandedBytes = 0;
+            foreach (var entry in archive.Entries)
+            {
+                if (entry.Length > ImportProcessingLimits.MaxXlsxExpandedBytes - expandedBytes)
+                {
+                    throw new BadRequestException("Excel dosyasının açılmış içeriği güvenli boyut sınırını aşıyor.");
+                }
+
+                expandedBytes += entry.Length;
+            }
+        }
+        catch (InvalidDataException)
+        {
+            throw new BadRequestException("Excel dosyası geçerli veya güvenli bir XLSX arşivi değil.");
+        }
+        finally
+        {
+            stream.Seek(0, SeekOrigin.Begin);
+        }
+    }
+
+    private static void AddCsvField(List<string> row, StringBuilder field)
+    {
+        EnsureColumnLimit(row.Count + 1);
+        EnsureCellLimit(field.Length);
+        row.Add(field.ToString());
+    }
+
+    private static void AddCsvRow(List<List<string>> rows, List<string> row)
+    {
+        // The first stored row is the header and is not part of the data-row allowance.
+        if (rows.Count >= ImportProcessingLimits.MaxRows + 1)
+        {
+            throw new BadRequestException($"Dosya en fazla {ImportProcessingLimits.MaxRows:N0} veri satırı içerebilir.");
+        }
+
+        rows.Add(row);
+    }
+
+    private static void EnsureColumnLimit(int columnCount)
+    {
+        if (columnCount > ImportProcessingLimits.MaxColumns)
+        {
+            throw new BadRequestException($"Dosya en fazla {ImportProcessingLimits.MaxColumns} sütun içerebilir.");
+        }
+    }
+
+    private static void EnsureCellLimit(int cellLength)
+    {
+        if (cellLength > ImportProcessingLimits.MaxCellLength)
+        {
+            throw new BadRequestException($"Bir hücre en fazla {ImportProcessingLimits.MaxCellLength:N0} karakter içerebilir.");
+        }
     }
 }
