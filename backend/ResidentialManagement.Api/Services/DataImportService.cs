@@ -1489,6 +1489,16 @@ public class DataImportService : IDataImportService
             throw new ForbiddenException("Bu içe aktarım partisini geri alma yetkiniz bulunmamaktadır.");
         }
 
+        if (!ImportTypePolicies.TryGet(batch.ImportType, out var policy))
+        {
+            throw new BadRequestException($"'{batch.ImportType}' içe aktarım türü desteklenmemektedir.");
+        }
+
+        if (policy.RollbackPolicy == ImportRollbackPolicy.NotSupported)
+        {
+            throw new BadRequestException($"'{batch.ImportType}' içe aktarım türü için geri alma işlemi desteklenmemektedir.");
+        }
+
         if (batch.Status == "ROLLED_BACK")
         {
             throw new BadRequestException("Bu içe aktarım partisi daha önce zaten geri alınmış (ROLLED_BACK).");
@@ -1509,7 +1519,15 @@ public class DataImportService : IDataImportService
         {
             batch.Status = "ROLLED_BACK";
             batch.RolledBackAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                _context.ChangeTracker.Clear();
+                throw new ConflictException("Bu içe aktarım partisi başka bir işlem tarafından güncellenmiştir. Lütfen durumu yenileyin.");
+            }
 
             var u = await _context.Users.FindAsync(batch.CreatedByUserId);
             return new ImportRollbackResponseDto
@@ -1521,22 +1539,47 @@ public class DataImportService : IDataImportService
             };
         }
 
-        int rolledBackCount = 0;
         await CheckRollbackDependenciesAsync(batch.ImportType, createdEntityIds);
 
+        int rolledBackCount = 0;
         var strategy = _context.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        try
         {
-            await using var tx = await _context.Database.BeginTransactionAsync();
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-            rolledBackCount = await ExecuteRollbackAsync(batch.ImportType, createdEntityIds);
+                await ValidateBatchTargetForReadAsync(policy, batch, currentUserId, isAdmin);
 
-            batch.Status = "ROLLED_BACK";
-            batch.RolledBackAt = DateTime.UtcNow;
+                rolledBackCount = await ExecuteRollbackAsync(batch.ImportType, createdEntityIds);
 
-            await _context.SaveChangesAsync();
-            await tx.CommitAsync();
-        });
+                batch.Status = "ROLLED_BACK";
+                batch.RolledBackAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+            });
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            _context.ChangeTracker.Clear();
+            throw new ConflictException("Bu içe aktarım partisi başka bir işlem tarafından güncellenmiştir. Lütfen durumu yenileyin.");
+        }
+        catch (Exception ex) when (ex is BadRequestException or ForbiddenException or NotFoundException or ConflictException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Import batch {BatchId} rollback failed.", batchId);
+            throw new BadRequestException("Geri alma işlemi sırasında bir hata oluştu. Hiçbir değişiklik yapılmadı.");
+        }
+
+        _context.ChangeTracker.Clear();
+        batch = await _context.ImportBatches
+            .Include(b => b.TargetProperty)
+            .Include(b => b.TargetBuilding)
+            .FirstAsync(b => b.Id == batchId);
 
         var user = await _context.Users.FindAsync(batch.CreatedByUserId);
         return new ImportRollbackResponseDto
@@ -1557,9 +1600,16 @@ public class DataImportService : IDataImportService
                     var hasBuildings = await _context.Buildings.AsNoTracking().AnyAsync(b => createdEntityIds.Contains(b.PropertyId));
                     var hasExpenses = await _context.Expenses.AsNoTracking().AnyAsync(e => createdEntityIds.Contains(e.PropertyId));
                     var hasDues = await _context.DueDefinitions.AsNoTracking().AnyAsync(d => createdEntityIds.Contains(d.PropertyId));
-                    if (hasBuildings || hasExpenses || hasDues)
+                    var hasManagers = await _context.ManagerAssignments.AsNoTracking().AnyAsync(ma => createdEntityIds.Contains(ma.PropertyId));
+                    var hasFacilities = await _context.CommonFacilities.AsNoTracking().AnyAsync(cf => createdEntityIds.Contains(cf.PropertyId));
+                    var hasRequests = await _context.MaintenanceRequests.AsNoTracking().AnyAsync(mr => createdEntityIds.Contains(mr.PropertyId));
+                    var hasAnnouncements = await _context.Announcements.AsNoTracking().AnyAsync(a => createdEntityIds.Contains(a.PropertyId));
+                    var hasVisitors = await _context.Visitors.AsNoTracking().AnyAsync(v => createdEntityIds.Contains(v.Unit.Building.PropertyId));
+                    var hasVehicles = await _context.ResidentVehicles.AsNoTracking().AnyAsync(rv => createdEntityIds.Contains(rv.Unit.Building.PropertyId));
+
+                    if (hasBuildings || hasExpenses || hasDues || hasManagers || hasFacilities || hasRequests || hasAnnouncements || hasVisitors || hasVehicles)
                     {
-                        throw new BadRequestException("İçe aktarılan taşınmazlara bağlı blok, gider veya aidat tanımları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                        throw new BadRequestException("İçe aktarılan taşınmazlara bağlı bina, gider, aidat, yönetici, ortak alan, talep, duyuru, ziyaretçi veya araç kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
                     }
                     break;
                 }
@@ -1568,9 +1618,15 @@ public class DataImportService : IDataImportService
                 {
                     var hasUnits = await _context.Units.AsNoTracking().AnyAsync(u => createdEntityIds.Contains(u.BuildingId));
                     var hasExpenses = await _context.Expenses.AsNoTracking().AnyAsync(e => e.BuildingId.HasValue && createdEntityIds.Contains(e.BuildingId.Value));
-                    if (hasUnits || hasExpenses)
+                    var hasManagers = await _context.ManagerAssignments.AsNoTracking().AnyAsync(ma => ma.BuildingId.HasValue && createdEntityIds.Contains(ma.BuildingId.Value));
+                    var hasFacilities = await _context.CommonFacilities.AsNoTracking().AnyAsync(cf => cf.BuildingId.HasValue && createdEntityIds.Contains(cf.BuildingId.Value));
+                    var hasRequests = await _context.MaintenanceRequests.AsNoTracking().AnyAsync(mr => createdEntityIds.Contains(mr.BuildingId));
+                    var hasVisitors = await _context.Visitors.AsNoTracking().AnyAsync(v => createdEntityIds.Contains(v.Unit.BuildingId));
+                    var hasVehicles = await _context.ResidentVehicles.AsNoTracking().AnyAsync(rv => createdEntityIds.Contains(rv.Unit.BuildingId));
+
+                    if (hasUnits || hasExpenses || hasManagers || hasFacilities || hasRequests || hasVisitors || hasVehicles)
                     {
-                        throw new BadRequestException("İçe aktarılan bloklara bağlı daire veya gider kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                        throw new BadRequestException("İçe aktarılan bloklara bağlı daire, gider, yönetici ataması, ortak alan, talep, ziyaretçi veya araç kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
                     }
                     break;
                 }
@@ -1579,9 +1635,14 @@ public class DataImportService : IDataImportService
                 {
                     var hasOccupancies = await _context.UnitOccupancies.AsNoTracking().AnyAsync(uo => createdEntityIds.Contains(uo.UnitId));
                     var hasCharges = await _context.UnitCharges.AsNoTracking().AnyAsync(uc => createdEntityIds.Contains(uc.UnitId));
-                    if (hasOccupancies || hasCharges)
+                    var hasRequests = await _context.MaintenanceRequests.AsNoTracking().AnyAsync(mr => createdEntityIds.Contains(mr.UnitId));
+                    var hasVisitors = await _context.Visitors.AsNoTracking().AnyAsync(v => createdEntityIds.Contains(v.UnitId));
+                    var hasVehicles = await _context.ResidentVehicles.AsNoTracking().AnyAsync(rv => createdEntityIds.Contains(rv.UnitId));
+                    var hasReservations = await _context.FacilityReservations.AsNoTracking().AnyAsync(fr => createdEntityIds.Contains(fr.UnitId));
+
+                    if (hasOccupancies || hasCharges || hasRequests || hasVisitors || hasVehicles || hasReservations)
                     {
-                        throw new BadRequestException("İçe aktarılan dairelere bağlı ikamet veya borç kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                        throw new BadRequestException("İçe aktarılan dairelere bağlı ikamet, borç, talep, ziyaretçi, araç veya rezervasyon kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
                     }
                     break;
                 }
@@ -1589,11 +1650,21 @@ public class DataImportService : IDataImportService
             case "USERS":
                 {
                     var hasOccupancies = await _context.UnitOccupancies.AsNoTracking().AnyAsync(uo => createdEntityIds.Contains(uo.UserId));
-                    var hasSubmissions = await _context.PaymentSubmissions.AsNoTracking().AnyAsync(ps => createdEntityIds.Contains(ps.SubmittedByUserId));
+                    var hasSubmissions = await _context.PaymentSubmissions.AsNoTracking().AnyAsync(ps => createdEntityIds.Contains(ps.SubmittedByUserId) || (ps.ReviewedByUserId.HasValue && createdEntityIds.Contains(ps.ReviewedByUserId.Value)));
+                    var hasPayments = await _context.Payments.AsNoTracking().AnyAsync(p => (p.PayerUserId.HasValue && createdEntityIds.Contains(p.PayerUserId.Value)) || createdEntityIds.Contains(p.CreatedByUserId) || (p.CancelledByUserId.HasValue && createdEntityIds.Contains(p.CancelledByUserId.Value)));
                     var hasNotifications = await _context.Notifications.AsNoTracking().AnyAsync(n => createdEntityIds.Contains(n.UserId));
-                    if (hasOccupancies || hasSubmissions || hasNotifications)
+                    var hasManagers = await _context.ManagerAssignments.AsNoTracking().AnyAsync(ma => createdEntityIds.Contains(ma.ManagerUserId));
+                    var hasRequests = await _context.MaintenanceRequests.AsNoTracking().AnyAsync(mr => createdEntityIds.Contains(mr.CreatedByUserId) || (mr.AssignedToUserId.HasValue && createdEntityIds.Contains(mr.AssignedToUserId.Value)));
+                    var hasRequestHistories = await _context.MaintenanceRequestHistories.AsNoTracking().AnyAsync(mrh => createdEntityIds.Contains(mrh.ChangedByUserId));
+                    var hasReservations = await _context.FacilityReservations.AsNoTracking().AnyAsync(fr => createdEntityIds.Contains(fr.ResidentUserId) || (fr.ReviewedByUserId.HasValue && createdEntityIds.Contains(fr.ReviewedByUserId.Value)));
+                    var hasVisitors = await _context.Visitors.AsNoTracking().AnyAsync(v => createdEntityIds.Contains(v.HostUserId) || (v.CheckedInByUserId.HasValue && createdEntityIds.Contains(v.CheckedInByUserId.Value)));
+                    var hasVehicles = await _context.ResidentVehicles.AsNoTracking().AnyAsync(rv => createdEntityIds.Contains(rv.ResidentUserId));
+                    var hasAnnouncements = await _context.Announcements.AsNoTracking().AnyAsync(a => createdEntityIds.Contains(a.CreatedByUserId));
+                    var hasExtraRoles = await _context.UserRoles.AsNoTracking().AnyAsync(ur => createdEntityIds.Contains(ur.UserId) && ur.Role.Code != "RESIDENT");
+
+                    if (hasOccupancies || hasSubmissions || hasPayments || hasNotifications || hasManagers || hasRequests || hasRequestHistories || hasReservations || hasVisitors || hasVehicles || hasAnnouncements || hasExtraRoles)
                     {
-                        throw new BadRequestException("İçe aktarılan kullanıcılara ait ikamet veya finansal işlemler bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
+                        throw new BadRequestException("İçe aktarılan kullanıcılara bağlı ikamet, finansal işlem, talep, ortak alan rezervasyonu, ziyaretçi, araç veya rol kayıtları bulunduğundan geri alma engellendi (ROLLBACK_BLOCKED).");
                     }
                     break;
                 }
@@ -1644,9 +1715,18 @@ public class DataImportService : IDataImportService
 
             case "OCCUPANCIES":
                 {
+                    var utcNow = DateTime.UtcNow;
                     var items = await _context.UnitOccupancies.Where(uo => createdEntityIds.Contains(uo.Id)).ToListAsync();
-                    _context.UnitOccupancies.RemoveRange(items);
-                    count = items.Count;
+                    foreach (var item in items)
+                    {
+                        if (item.IsActive || !item.EndDate.HasValue || item.EndDate.Value > utcNow)
+                        {
+                            item.IsActive = false;
+                            item.EndDate = item.StartDate > utcNow ? item.StartDate : utcNow;
+                            item.UpdatedAt = utcNow;
+                            count++;
+                        }
+                    }
                     break;
                 }
         }
@@ -1684,17 +1764,17 @@ public class DataImportService : IDataImportService
 
             var safeData = rawData
                 .Where(kvp => !kvp.Key.Contains("password", StringComparison.OrdinalIgnoreCase))
-                .Select(kvp => $"{kvp.Key}:{kvp.Value}");
+                .Select(kvp => $"{SanitizeCsvCell(kvp.Key)}:{SanitizeCsvCell(kvp.Value)}");
             var mappedStr = string.Join("; ", safeData);
 
             foreach (var err in errors)
             {
-                sb.AppendLine($"\"{log.RowNumber}\",\"{log.ActionPreview}\",\"{EscapeCsv(err.Code)}\",\"{EscapeCsv(err.Message)}\",\"{EscapeCsv(mappedStr)}\"");
+                sb.AppendLine($"\"{log.RowNumber}\",\"{log.ActionPreview}\",\"{SanitizeCsvCell(err.Code)}\",\"{SanitizeCsvCell(err.Message)}\",\"{SanitizeCsvCell(mappedStr)}\"");
             }
 
             if (errors.Count == 0)
             {
-                sb.AppendLine($"\"{log.RowNumber}\",\"{log.ActionPreview}\",\"ERROR\",\"Hata detayı bulunamadı.\",\"{EscapeCsv(mappedStr)}\"");
+                sb.AppendLine($"\"{log.RowNumber}\",\"{log.ActionPreview}\",\"ERROR\",\"Hata detayı bulunamadı.\",\"{SanitizeCsvCell(mappedStr)}\"");
             }
         }
 
@@ -1703,10 +1783,104 @@ public class DataImportService : IDataImportService
         return (fileBytes, "text/csv; charset=utf-8", fileName);
     }
 
-    private static string EscapeCsv(string val)
+    private static string SanitizeCsvCell(string? val)
     {
         if (string.IsNullOrEmpty(val)) return string.Empty;
+
+        var trimmed = val.TrimStart();
+        if (trimmed.StartsWith("=") || trimmed.StartsWith("+") || trimmed.StartsWith("-") || trimmed.StartsWith("@"))
+        {
+            val = "'" + val;
+        }
+
         return val.Replace("\"", "\"\"");
+    }
+
+    public const int MinFileRetentionDays = 1;
+    public const int MaxFileRetentionDays = 365;
+    public const int MinPiiRetentionDays = 7;
+    public const int MaxPiiRetentionDays = 365;
+
+    public async Task<ImportRetentionResultDto> CleanupRetentionDataAsync(
+        int fileRetentionDays = 7,
+        int piiRetentionDays = 30,
+        int currentUserId = 0,
+        bool isAdmin = true)
+    {
+        if (!isAdmin)
+        {
+            throw new ForbiddenException("Veri saklama temizleme işlemi yalnızca sistem yöneticileri tarafından yürütülebilir.");
+        }
+
+        if (fileRetentionDays < MinFileRetentionDays) fileRetentionDays = MinFileRetentionDays;
+        if (fileRetentionDays > MaxFileRetentionDays) fileRetentionDays = MaxFileRetentionDays;
+
+        if (piiRetentionDays < MinPiiRetentionDays) piiRetentionDays = MinPiiRetentionDays;
+        if (piiRetentionDays > MaxPiiRetentionDays) piiRetentionDays = MaxPiiRetentionDays;
+
+        var fileCutoff = DateTime.UtcNow.AddDays(-fileRetentionDays);
+        var piiCutoff = DateTime.UtcNow.AddDays(-piiRetentionDays);
+
+        var terminalStatuses = new[] { "COMPLETED", "FAILED", "ROLLED_BACK" };
+
+        var fileEligibleBatches = await _context.ImportBatches
+            .Where(b => terminalStatuses.Contains(b.Status) &&
+                        b.CreatedAt <= fileCutoff &&
+                        b.StorageKey != null &&
+                        b.StorageKey != string.Empty &&
+                        b.StorageKey != "[CLEANED_UP]")
+            .ToListAsync();
+
+        int filesDeleted = 0;
+        foreach (var batch in fileEligibleBatches)
+        {
+            if (!string.IsNullOrWhiteSpace(batch.StorageKey))
+            {
+                _storageService.DeleteImportFile(batch.StorageKey);
+                batch.StorageKey = "[CLEANED_UP]";
+                filesDeleted++;
+            }
+        }
+
+        if (fileEligibleBatches.Count > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        var piiEligibleBatchIds = await _context.ImportBatches
+            .AsNoTracking()
+            .Where(b => terminalStatuses.Contains(b.Status) && b.CreatedAt <= piiCutoff)
+            .Select(b => b.Id)
+            .ToListAsync();
+
+        int rowLogsRedacted = 0;
+        if (piiEligibleBatchIds.Count > 0)
+        {
+            var logsToRedact = await _context.ImportRowLogs
+                .Where(rl => piiEligibleBatchIds.Contains(rl.ImportBatchId) &&
+                             rl.RawDataJson != null &&
+                             rl.RawDataJson != "[REDACTED]")
+                .ToListAsync();
+
+            foreach (var log in logsToRedact)
+            {
+                log.RawDataJson = "[REDACTED]";
+                rowLogsRedacted++;
+            }
+
+            if (logsToRedact.Count > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        return new ImportRetentionResultDto
+        {
+            EligibleBatchesEvaluated = fileEligibleBatches.Count + piiEligibleBatchIds.Count,
+            FilesDeleted = filesDeleted,
+            RowLogsRedacted = rowLogsRedacted,
+            ProcessedAt = DateTime.UtcNow
+        };
     }
 
     private async Task<ImportBatch> GetBatchAndCheckAccessAsync(int batchId, int currentUserId, bool isAdmin)

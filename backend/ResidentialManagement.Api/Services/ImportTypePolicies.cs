@@ -11,7 +11,7 @@ public enum ImportRollbackPolicy
 {
     NotSupported,
     DependencyCheckedDelete,
-    DirectDelete
+    SoftReversal
 }
 
 public sealed record ImportTypePolicy(
@@ -47,7 +47,7 @@ public static class ImportTypePolicies
             ["OCCUPANCIES"] = new(
                 "OCCUPANCIES", true, true, true,
                 ImportTargetRequirement.Building,
-                ImportRollbackPolicy.DirectDelete),
+                ImportRollbackPolicy.SoftReversal),
             ["DUE_CHARGES"] = new(
                 "DUE_CHARGES", false, true, false,
                 ImportTargetRequirement.None,

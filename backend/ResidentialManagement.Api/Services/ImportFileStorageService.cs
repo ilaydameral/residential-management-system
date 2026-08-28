@@ -14,7 +14,8 @@ public class ImportFileStorageService : IImportFileStorageService
 
     public ImportFileStorageService(IHostEnvironment environment)
     {
-        _storagePath = Path.Combine(environment.ContentRootPath, "App_Data", "imports");
+        var rawPath = Path.GetFullPath(Path.Combine(environment.ContentRootPath, "App_Data", "imports"));
+        _storagePath = rawPath.EndsWith(Path.DirectorySeparatorChar) ? rawPath : rawPath + Path.DirectorySeparatorChar;
         if (!Directory.Exists(_storagePath))
         {
             Directory.CreateDirectory(_storagePath);
@@ -61,17 +62,16 @@ public class ImportFileStorageService : IImportFileStorageService
 
         // Generate GUID storage key (original filename is never used as physical file name)
         var storageKey = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-        var fullPath = Path.Combine(_storagePath, storageKey);
+        var fullPath = Path.GetFullPath(Path.Combine(_storagePath, storageKey));
 
         // Path traversal validation
-        var canonicalPath = Path.GetFullPath(fullPath);
-        if (!canonicalPath.StartsWith(_storagePath, StringComparison.OrdinalIgnoreCase))
+        if (!fullPath.StartsWith(_storagePath, StringComparison.OrdinalIgnoreCase))
         {
             throw new BadRequestException("Geçersiz dosya yolu.");
         }
 
         using var sha256 = SHA256.Create();
-        using var targetStream = File.Create(canonicalPath);
+        using var targetStream = File.Create(fullPath);
 
         var buffer = new byte[8192];
         int read;
@@ -90,9 +90,9 @@ public class ImportFileStorageService : IImportFileStorageService
 
     public Stream OpenImportFileStream(string storageKey)
     {
-        if (string.IsNullOrWhiteSpace(storageKey))
+        if (string.IsNullOrWhiteSpace(storageKey) || storageKey == "[CLEANED_UP]")
         {
-            throw new BadRequestException("Dosya depolama anahtarı belirtilmelidir.");
+            throw new NotFoundException("İçe aktarma dosyası bulunamadı veya saklama süresi dolduğu için temizlendi.");
         }
 
         var fullPath = Path.GetFullPath(Path.Combine(_storagePath, storageKey));
@@ -111,7 +111,7 @@ public class ImportFileStorageService : IImportFileStorageService
 
     public bool DeleteImportFile(string storageKey)
     {
-        if (string.IsNullOrWhiteSpace(storageKey)) return false;
+        if (string.IsNullOrWhiteSpace(storageKey) || storageKey == "[CLEANED_UP]") return false;
 
         var fullPath = Path.GetFullPath(Path.Combine(_storagePath, storageKey));
         if (!fullPath.StartsWith(_storagePath, StringComparison.OrdinalIgnoreCase))
@@ -121,8 +121,15 @@ public class ImportFileStorageService : IImportFileStorageService
 
         if (File.Exists(fullPath))
         {
-            File.Delete(fullPath);
-            return true;
+            try
+            {
+                File.Delete(fullPath);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         return false;

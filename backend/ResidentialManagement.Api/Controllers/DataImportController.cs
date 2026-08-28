@@ -105,6 +105,15 @@ public class DataImportController : ControllerBase
         return File(fileBytes, contentType, fileName);
     }
 
+    [HttpPost("cleanup-retention")]
+    public async Task<ActionResult<ImportRetentionResultDto>> CleanupRetention(
+        [FromQuery] int fileRetentionDays = 7,
+        [FromQuery] int piiRetentionDays = 30)
+    {
+        var result = await _importService.CleanupRetentionDataAsync(fileRetentionDays, piiRetentionDays, GetCurrentUserId(), IsAdmin());
+        return Ok(result);
+    }
+
     private int GetCurrentUserId()
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);

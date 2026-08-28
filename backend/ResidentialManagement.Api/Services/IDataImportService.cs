@@ -58,4 +58,10 @@ public interface IDataImportService
         int pageSize,
         int currentUserId,
         bool isAdmin);
+
+    Task<ImportRetentionResultDto> CleanupRetentionDataAsync(
+        int fileRetentionDays = 7,
+        int piiRetentionDays = 30,
+        int currentUserId = 0,
+        bool isAdmin = true);
 }
