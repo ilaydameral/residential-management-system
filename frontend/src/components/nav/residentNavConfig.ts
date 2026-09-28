@@ -32,6 +32,7 @@ export const RESIDENT_NAV_CATEGORIES: ResidentNavCategory[] = [
       { id: 'facilities', label: 'Ortak Alanlar', path: '/resident/facilities', description: 'Ortak alan tesisleri ve rezervasyon takibi.' },
       { id: 'visitors', label: 'Ziyaretçiler', path: '/resident/visitors', description: 'Ziyaretçi kayıtları ve giriş takibi.' },
       { id: 'vehicles', label: 'Araçlarım', path: '/resident/vehicles', description: 'Kayıtlı araç dizininiz ve plakalar.' },
+      { id: 'documents', label: 'Belgeler', path: '/resident/documents', description: 'Site, bina ve dairelerinize ait belgeler.' },
     ],
   },
   {

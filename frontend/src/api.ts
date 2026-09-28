@@ -95,6 +95,7 @@ import type {
   CreateResidentVehiclePayload,
   UpdateResidentVehiclePayload,
   PagedResidentVehicleResult,
+  DocumentCategory,
   DocumentDetail,
   DocumentDownload,
   DocumentFilters,
@@ -1872,6 +1873,55 @@ export async function setDocumentStatus(
 
 export async function downloadDocument(id: number): Promise<DocumentDownload> {
   const response = await safeFetch(`${API_BASE_URL}/api/documents/${id}/download`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) await handleResponse<never>(response)
+
+  const disposition = response.headers.get('content-disposition')
+  const encodedName = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  const quotedName = disposition?.match(/filename="([^"]+)"/i)?.[1]
+  let fileName: string | null = null
+  try {
+    fileName = encodedName ? decodeURIComponent(encodedName) : quotedName ?? null
+  } catch {
+    fileName = quotedName ?? null
+  }
+
+  return { blob: await response.blob(), fileName }
+}
+
+// ============================================================================
+// Phase 13B: Resident Documents API
+// ============================================================================
+
+export async function getResidentDocuments(filters: {
+  category?: DocumentCategory
+  search?: string
+  page?: number
+  pageSize?: number
+} = {}): Promise<DocumentListResponse> {
+  const query = new URLSearchParams()
+  if (filters.category) query.set('category', filters.category)
+  if (filters.search?.trim()) query.set('search', filters.search.trim())
+  if (filters.page) query.set('page', String(filters.page))
+  if (filters.pageSize) query.set('pageSize', String(filters.pageSize))
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/documents${suffix}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DocumentListResponse>(response)
+}
+
+export async function getResidentDocument(id: number): Promise<DocumentDetail> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/documents/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DocumentDetail>(response)
+}
+
+export async function downloadResidentDocument(id: number): Promise<DocumentDownload> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/documents/${id}/download`, {
     headers: getAuthHeaders(),
   })
   if (!response.ok) await handleResponse<never>(response)
