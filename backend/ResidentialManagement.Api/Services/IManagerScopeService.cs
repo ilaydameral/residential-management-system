@@ -3,6 +3,7 @@ namespace ResidentialManagement.Api.Services;
 public interface IManagerScopeService
 {
     Task<List<int>> GetAccessiblePropertyIdsAsync(int userId, bool isAdmin);
+    Task<List<int>> GetManageablePropertyIdsAsync(int userId, bool isAdmin);
     Task<List<int>> GetAccessibleBuildingIdsAsync(int userId, bool isAdmin);
     Task<bool> CanViewPropertyAsync(int userId, int propertyId, bool isAdmin);
     Task<bool> CanManagePropertyAsync(int userId, int propertyId, bool isAdmin);

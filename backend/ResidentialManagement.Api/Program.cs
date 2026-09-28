@@ -72,6 +72,8 @@ builder.Services.AddScoped<IFacilityService, FacilityService>();
 builder.Services.AddScoped<IVisitorService, VisitorService>();
 builder.Services.AddScoped<IResidentVehicleService, ResidentVehicleService>();
 builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
+builder.Services.AddScoped<IDocumentFileStorageService, DocumentFileStorageService>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IRealtimePublisher, RealtimePublisher>();
 
 builder.Services.AddSignalR();
