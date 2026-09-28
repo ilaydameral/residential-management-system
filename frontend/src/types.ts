@@ -1159,3 +1159,91 @@ export interface PagedResidentVehicleResult {
   totalCount: number
   totalPages: number
 }
+
+export type DocumentTargetType = 'PROPERTY' | 'BUILDING' | 'UNIT'
+export type DocumentCategory =
+  | 'GENERAL'
+  | 'MANAGEMENT'
+  | 'FINANCE'
+  | 'MEETING'
+  | 'MAINTENANCE'
+  | 'LEGAL'
+  | 'TECHNICAL'
+  | 'OTHER'
+export type DocumentVisibility = 'MANAGEMENT_ONLY' | 'RESIDENTS'
+
+export interface ManagedDocument {
+  id: number
+  propertyId: number
+  propertyName: string
+  buildingId: number | null
+  buildingName: string | null
+  buildingCode: string | null
+  unitId: number | null
+  unitNumber: string | null
+  targetType: DocumentTargetType
+  title: string
+  description: string | null
+  category: DocumentCategory
+  originalFileName: string
+  contentType: string
+  fileSize: number
+  sha256: string
+  visibility: DocumentVisibility
+  isActive: boolean
+  uploadedByUserId: number
+  uploadedByName: string
+  uploadedAt: string
+  updatedAt: string | null
+  archivedAt: string | null
+  archivedByUserId: number | null
+  archivedByName: string | null
+}
+
+export type DocumentDetail = ManagedDocument
+
+export interface DocumentFilters {
+  propertyId?: number
+  buildingId?: number
+  unitId?: number
+  category?: DocumentCategory
+  visibility?: DocumentVisibility
+  isActive?: boolean
+  search?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface DocumentListResponse {
+  items: ManagedDocument[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+export interface UploadDocumentPayload {
+  propertyId: number
+  buildingId?: number | null
+  unitId?: number | null
+  title: string
+  description?: string | null
+  category: DocumentCategory
+  visibility: DocumentVisibility
+  file: File
+}
+
+export interface UpdateDocumentMetadataPayload {
+  title: string
+  description?: string | null
+  category: DocumentCategory
+  visibility: DocumentVisibility
+}
+
+export interface UpdateDocumentStatusPayload {
+  isActive: boolean
+}
+
+export interface DocumentDownload {
+  blob: Blob
+  fileName: string | null
+}
