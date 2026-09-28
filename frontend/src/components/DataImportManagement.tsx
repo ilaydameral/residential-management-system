@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState, type ChangeEvent, type DragEvent } fr
 import {
   confirmImportBatch,
   exportImportErrorsCsv,
+  getBuildings,
   getImportBatches,
   getImportColumnOptions,
   getImportPreview,
+  getProperties,
   rollbackImportBatch,
   uploadImportFile,
   validateImportBatch,
@@ -14,10 +16,12 @@ import { useToast } from '../context/ToastContext'
 import { useAnimatedDrawer } from '../hooks/useAnimatedDrawer'
 import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import type {
+  Building,
   ImportBatch,
   ImportColumnMappingOptions,
   ImportPreviewResponse,
   ImportReconciliation,
+  Property,
 } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
@@ -30,12 +34,13 @@ const IMPORT_TYPE_OPTIONS: Array<{
   label: string
   description: string
   adminOnly?: boolean
+  targetType: 'NONE' | 'PROPERTY' | 'PROPERTY_AND_BUILDING'
 }> = [
-  { key: 'PROPERTIES', label: 'Siteler / Taşınmazlar', description: 'Site ve apartman ana kayıtları', adminOnly: true },
-  { key: 'BUILDINGS', label: 'Bloklar / Binalar', description: 'Taşınmazlara bağlı blok kayıtları' },
-  { key: 'UNITS', label: 'Daireler / Bağımsız Bölümler', description: 'Bloklara bağlı daireler' },
-  { key: 'USERS', label: 'Kullanıcılar / Sakinler', description: 'Sistem sakinleri (Varsayılan Sakin rolü ile)' },
-  { key: 'OCCUPANCIES', label: 'İkamet İlişkileri', description: 'Daire-sakin ikamet eşleşmeleri' },
+  { key: 'PROPERTIES', label: 'Siteler / Taşınmazlar', description: 'Site ve apartman ana kayıtları (Sistem geneli)', adminOnly: true, targetType: 'NONE' },
+  { key: 'BUILDINGS', label: 'Bloklar / Binalar', description: 'Taşınmazlara bağlı blok kayıtları (Hedef Taşınmaz zorunlu)', targetType: 'PROPERTY' },
+  { key: 'UNITS', label: 'Daireler / Bağımsız Bölümler', description: 'Bloklara bağlı daireler (Hedef Taşınmaz ve Blok zorunlu)', targetType: 'PROPERTY_AND_BUILDING' },
+  { key: 'USERS', label: 'Kullanıcılar / Sakinler', description: 'Sistem sakinleri (Sistem geneli, Varsayılan Sakin rolü)', targetType: 'NONE' },
+  { key: 'OCCUPANCIES', label: 'İkamet İlişkileri', description: 'Daire-sakin ikamet eşleşmeleri (Hedef Taşınmaz ve Blok zorunlu)', targetType: 'PROPERTY_AND_BUILDING' },
 ]
 
 const ERROR_CODE_LABELS: Record<string, string> = {
@@ -65,9 +70,16 @@ export function DataImportManagement() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('new-import')
 
+  // Target Reference Data
+  const [properties, setProperties] = useState<Property[]>([])
+  const [buildings, setBuildings] = useState<Building[]>([])
+
   // Step 1 State
   const [currentStep, setCurrentStep] = useState<ImportStep>(1)
   const [selectedType, setSelectedType] = useState<string>('')
+  const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null)
+  const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null)
+  const [targetValidationError, setTargetValidationError] = useState<string | null>(null)
 
   // Step 2 State
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -114,6 +126,58 @@ export function DataImportManagement() {
     onClose: () => handleCloseHistoryDrawer(),
   })
 
+  // Load Properties & Buildings on Mount
+  useEffect(() => {
+    async function loadReferenceData() {
+      try {
+        const [props, blds] = await Promise.all([getProperties(true), getBuildings(true)])
+        setProperties(props)
+        setBuildings(blds)
+      } catch (err) {
+        console.error('Veri aktarımı referans verileri yüklenemedi:', err)
+      }
+    }
+    void loadReferenceData()
+  }, [])
+
+  // Format Target Snapshot string
+  const formatTargetSnapshot = (
+    importType: string,
+    targetPropertyId?: number | null,
+    targetPropertyName?: string | null,
+    targetBuildingId?: number | null,
+    targetBuildingName?: string | null,
+    targetBuildingCode?: string | null
+  ): { label: string; isMissing: boolean } => {
+    const isScoped = ['BUILDINGS', 'UNITS', 'OCCUPANCIES'].includes(importType)
+
+    if (importType === 'PROPERTIES' || importType === 'USERS') {
+      return { label: 'Sistem Geneli (Global)', isMissing: false }
+    }
+
+    if (importType === 'BUILDINGS') {
+      if (!targetPropertyName && !targetPropertyId) {
+        return { label: 'Belirtilmemiş (Eski Kayıt)', isMissing: true }
+      }
+      const propName = targetPropertyName || properties.find((p) => p.id === targetPropertyId)?.name || `Taşınmaz #${targetPropertyId}`
+      return { label: `Taşınmaz: ${propName}`, isMissing: false }
+    }
+
+    if (importType === 'UNITS' || importType === 'OCCUPANCIES') {
+      if ((!targetPropertyName && !targetPropertyId) || (!targetBuildingName && !targetBuildingId)) {
+        return { label: 'Belirtilmemiş (Eski Kayıt)', isMissing: true }
+      }
+      const propName = targetPropertyName || properties.find((p) => p.id === targetPropertyId)?.name || `Taşınmaz #${targetPropertyId}`
+      const bld = buildings.find((b) => b.id === targetBuildingId)
+      const bldName = targetBuildingName || bld?.name || `Blok #${targetBuildingId}`
+      const code = targetBuildingCode || bld?.code
+      const bldCode = code ? ` (${code})` : ''
+      return { label: `Taşınmaz: ${propName} | Blok: ${bldName}${bldCode}`, isMissing: false }
+    }
+
+    return { label: isScoped ? 'Belirtilmemiş (Eski Kayıt)' : 'Sistem Geneli', isMissing: isScoped }
+  }
+
   // Load History Batches
   const loadHistory = useCallback(async () => {
     setIsLoadingHistory(true)
@@ -138,6 +202,21 @@ export function DataImportManagement() {
       void loadHistory()
     }
   }, [activeTab, loadHistory])
+
+  // Change Import Type handler
+  const handleTypeSelect = (typeKey: string) => {
+    setSelectedType(typeKey)
+    setSelectedPropertyId(null)
+    setSelectedBuildingId(null)
+    setTargetValidationError(null)
+  }
+
+  // Change Property Selection handler
+  const handlePropertyChange = (propertyId: number | null) => {
+    setSelectedPropertyId(propertyId)
+    setSelectedBuildingId(null)
+    setTargetValidationError(null)
+  }
 
   // Drag & Drop handlers
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -181,10 +260,35 @@ export function DataImportManagement() {
   // Upload file and move to Step 3
   const handleUploadFile = async () => {
     if (!selectedFile || !selectedType) return
+
+    // Target scope validation
+    const opt = IMPORT_TYPE_OPTIONS.find((t) => t.key === selectedType)
+    if (opt?.targetType === 'PROPERTY' && !selectedPropertyId) {
+      setTargetValidationError('Lütfen aktarım yapılacağı hedef taşınmazı seçiniz.')
+      return
+    }
+
+    if (opt?.targetType === 'PROPERTY_AND_BUILDING') {
+      if (!selectedPropertyId) {
+        setTargetValidationError('Lütfen hedef taşınmazı seçiniz.')
+        return
+      }
+      if (!selectedBuildingId) {
+        setTargetValidationError('Lütfen hedef bloğu seçiniz.')
+        return
+      }
+    }
+
+    setTargetValidationError(null)
     setIsUploading(true)
     setDuplicateWarning(null)
     try {
-      const res = await uploadImportFile(selectedType, selectedFile)
+      const res = await uploadImportFile(
+        selectedType,
+        selectedFile,
+        selectedPropertyId || undefined,
+        selectedBuildingId || undefined
+      )
       setUploadedBatch(res.batch)
 
       if (res.isDuplicateUpload && res.duplicateWarning) {
@@ -290,6 +394,9 @@ export function DataImportManagement() {
   const handleResetFlow = () => {
     setCurrentStep(1)
     setSelectedType('')
+    setSelectedPropertyId(null)
+    setSelectedBuildingId(null)
+    setTargetValidationError(null)
     setSelectedFile(null)
     setDuplicateWarning(null)
     setUploadedBatch(null)
@@ -330,6 +437,13 @@ export function DataImportManagement() {
     }
   }
 
+  // Filtered Buildings by Selected Property
+  const availableBuildings = selectedPropertyId
+    ? buildings.filter((b) => b.propertyId === selectedPropertyId)
+    : []
+
+  const selectedOpt = IMPORT_TYPE_OPTIONS.find((t) => t.key === selectedType)
+
   return (
     <div className="section-container entity-management-view data-import-management">
       {/* Navigation Tabs */}
@@ -367,8 +481,8 @@ export function DataImportManagement() {
             }}
           >
             {[
-              { step: 1, label: '1. Veri Türü' },
-              { step: 2, label: '2. Dosya Seçimi' },
+              { step: 1, label: '1. Veri Türü & Hedef' },
+              { step: 2, label: '2. Dosya Yükleme' },
               { step: 3, label: '3. Sütun Eşleme' },
               { step: 4, label: '4. Önizleme & Doğrulama' },
               { step: 5, label: '5. Tamamlandı' },
@@ -403,11 +517,11 @@ export function DataImportManagement() {
             ))}
           </div>
 
-          {/* STEP 1: Veri Türü Seçimi */}
+          {/* STEP 1: Veri Türü & Hedef Kapsam Seçimi */}
           {currentStep === 1 && (
             <div>
-              <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Aktarılacak Veri Türünü Seçin</h2>
-              <div className="data-import-type-grid">
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>1. Aktarılacak Veri Türünü Seçin</h2>
+              <div className="data-import-type-grid" style={{ marginBottom: '1.5rem' }}>
                 {IMPORT_TYPE_OPTIONS.map((opt) => {
                   const isDisabled = Boolean(opt.adminOnly && !isAdmin)
                   const isSelected = selectedType === opt.key
@@ -416,7 +530,7 @@ export function DataImportManagement() {
                     <div
                       key={opt.key}
                       onClick={() => {
-                        if (!isDisabled) setSelectedType(opt.key)
+                        if (!isDisabled) handleTypeSelect(opt.key)
                       }}
                       style={{
                         padding: '1rem',
@@ -442,12 +556,126 @@ export function DataImportManagement() {
                 })}
               </div>
 
+              {/* TARGET SELECTION PANEL */}
+              {selectedType && (
+                <div className="panel" style={{ padding: '1.25rem', marginBottom: '1.5rem', background: 'var(--bg-hover)' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+                    2. Hedef Kapsam Seçimi ({selectedOpt?.label})
+                  </h3>
+
+                  {selectedOpt?.targetType === 'NONE' && (
+                    <div style={{ padding: '0.75rem 1rem', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', color: 'var(--primary-color)', fontSize: '0.9rem' }}>
+                      <strong>Kapsam: Sistem Geneli (Global)</strong> — Bu içe aktarım seçilen bir taşınmaz veya bloğa bağlı olmaksızın tüm sistem genelinde yürütülecektir.
+                    </div>
+                  )}
+
+                  {selectedOpt?.targetType === 'PROPERTY' && (
+                    <div className="form-field" style={{ margin: 0, maxWidth: '500px' }}>
+                      <label htmlFor="target-property-select" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>
+                        Hedef Taşınmaz (Site / Apartman) <span style={{ color: '#dc2626' }}>* Zorunlu</span>
+                      </label>
+                      <select
+                        id="target-property-select"
+                        value={selectedPropertyId || ''}
+                        onChange={(e) => handlePropertyChange(e.target.value ? Number(e.target.value) : null)}
+                        style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', fontSize: '0.95rem' }}
+                      >
+                        <option value="">-- Hedef Taşınmaz Seçiniz --</option>
+                        {properties.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.city})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedOpt?.targetType === 'PROPERTY_AND_BUILDING' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <label htmlFor="target-property-select" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>
+                          1. Hedef Taşınmaz (Site / Apartman) <span style={{ color: '#dc2626' }}>* Zorunlu</span>
+                        </label>
+                        <select
+                          id="target-property-select"
+                          value={selectedPropertyId || ''}
+                          onChange={(e) => handlePropertyChange(e.target.value ? Number(e.target.value) : null)}
+                          style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-card)', fontSize: '0.95rem' }}
+                        >
+                          <option value="">-- Hedef Taşınmaz Seçiniz --</option>
+                          {properties.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.city})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <label htmlFor="target-building-select" style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>
+                          2. Hedef Blok / Bina <span style={{ color: '#dc2626' }}>* Zorunlu</span>
+                        </label>
+                        <select
+                          id="target-building-select"
+                          disabled={!selectedPropertyId}
+                          value={selectedBuildingId || ''}
+                          onChange={(e) => {
+                            setSelectedBuildingId(e.target.value ? Number(e.target.value) : null)
+                            setTargetValidationError(null)
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-color)',
+                            background: !selectedPropertyId ? 'var(--bg-hover)' : 'var(--bg-card)',
+                            fontSize: '0.95rem',
+                            cursor: !selectedPropertyId ? 'not-allowed' : 'default',
+                          }}
+                        >
+                          <option value="">
+                            {!selectedPropertyId ? '-- Önce Taşınmaz Seçiniz --' : '-- Hedef Blok Seçiniz --'}
+                          </option>
+                          {availableBuildings.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name} ({b.code})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {targetValidationError && (
+                    <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: '#dc2626', fontSize: '0.9rem' }}>
+                      {targetValidationError}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
                   className="primary-button"
                   disabled={!selectedType}
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => {
+                    if (selectedOpt?.targetType === 'PROPERTY' && !selectedPropertyId) {
+                      setTargetValidationError('Lütfen hedef taşınmazı seçiniz.')
+                      return
+                    }
+                    if (selectedOpt?.targetType === 'PROPERTY_AND_BUILDING') {
+                      if (!selectedPropertyId) {
+                        setTargetValidationError('Lütfen hedef taşınmazı seçiniz.')
+                        return
+                      }
+                      if (!selectedBuildingId) {
+                        setTargetValidationError('Lütfen hedef bloğu seçiniz.')
+                        return
+                      }
+                    }
+                    setCurrentStep(2)
+                  }}
                 >
                   Devam Et →
                 </button>
@@ -458,10 +686,15 @@ export function DataImportManagement() {
           {/* STEP 2: Dosya Yükleme */}
           {currentStep === 2 && (
             <div>
-              <div className="data-import-step-header">
-                <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Dosya Yükleme ({IMPORT_TYPE_OPTIONS.find((t) => t.key === selectedType)?.label})</h2>
+              <div className="data-import-step-header" style={{ marginBottom: '1rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Dosya Yükleme ({selectedOpt?.label})</h2>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', marginTop: '0.25rem', fontWeight: 500 }}>
+                    {formatTargetSnapshot(selectedType, selectedPropertyId, null, selectedBuildingId, null, null).label}
+                  </div>
+                </div>
                 <button type="button" className="secondary-button" onClick={() => setCurrentStep(1)}>
-                  ← Tür Değiştir
+                  ← Kapsam Değiştir
                 </button>
               </div>
 
@@ -522,6 +755,12 @@ export function DataImportManagement() {
                 </div>
               )}
 
+              {targetValidationError && (
+                <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', marginBottom: '1.5rem', color: '#dc2626' }}>
+                  {targetValidationError}
+                </div>
+              )}
+
               {duplicateWarning && (
                 <div style={{ padding: '1rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', marginBottom: '1.5rem', color: '#b45309' }}>
                   <strong>Mükerrer Yükleme Uyarısı:</strong> {duplicateWarning}
@@ -544,8 +783,20 @@ export function DataImportManagement() {
           {/* STEP 3: Sütun Eşleme */}
           {currentStep === 3 && (
             <div>
-              <div className="data-import-step-header">
-                <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Sütun Eşleme</h2>
+              <div className="data-import-step-header" style={{ marginBottom: '1rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Sütun Eşleme (Parti #{uploadedBatch?.id})</h2>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', marginTop: '0.25rem', fontWeight: 500 }}>
+                    {formatTargetSnapshot(
+                      uploadedBatch?.importType || selectedType,
+                      uploadedBatch?.targetPropertyId,
+                      uploadedBatch?.targetPropertyName,
+                      uploadedBatch?.targetBuildingId,
+                      uploadedBatch?.targetBuildingName,
+                      uploadedBatch?.targetBuildingCode
+                    ).label}
+                  </div>
+                </div>
                 <span className="status-badge info">Parti ID: #{uploadedBatch?.id}</span>
               </div>
 
@@ -630,8 +881,20 @@ export function DataImportManagement() {
           {/* STEP 4: Önizleme & Kuru Çalışma */}
           {currentStep === 4 && (
             <div>
-              <div className="data-import-step-header">
-                <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Aktarım Önizlemesi & Doğrulama</h2>
+              <div className="data-import-step-header" style={{ marginBottom: '1rem' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.1rem', margin: 0 }}>Aktarım Önizlemesi & Doğrulama</h2>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--primary-color)', marginTop: '0.25rem', fontWeight: 500 }}>
+                    {formatTargetSnapshot(
+                      uploadedBatch?.importType || selectedType,
+                      uploadedBatch?.targetPropertyId,
+                      uploadedBatch?.targetPropertyName,
+                      uploadedBatch?.targetBuildingId,
+                      uploadedBatch?.targetBuildingName,
+                      uploadedBatch?.targetBuildingCode
+                    ).label}
+                  </div>
+                </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button type="button" className="secondary-button" onClick={() => setCurrentStep(3)}>
                     ← Eşlemeleri Düzenle
@@ -768,7 +1031,19 @@ export function DataImportManagement() {
                     <button
                       type="button"
                       className="primary-button"
-                      disabled={previewData.summary.status !== 'READY' || previewData.summary.validRows === 0}
+                      disabled={
+                        (previewData.summary.status !== 'READY' && previewData.summary.status !== 'VALIDATED') ||
+                        previewData.summary.validRows === 0 ||
+                        previewData.summary.invalidRows > 0 ||
+                        formatTargetSnapshot(
+                          previewData.summary.importType,
+                          previewData.summary.targetPropertyId,
+                          previewData.summary.targetPropertyName,
+                          previewData.summary.targetBuildingId,
+                          previewData.summary.targetBuildingName,
+                          previewData.summary.targetBuildingCode
+                        ).isMissing
+                      }
                       onClick={() => setShowConfirmModal(true)}
                     >
                       Aktarımı Başlat ({previewData.summary.validRows} Kayıt)
@@ -787,9 +1062,20 @@ export function DataImportManagement() {
               </div>
 
               <h2 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>Veri Aktarımı Tamamlandı!</h2>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
                 Parti #{uploadedBatch?.id} veritabanına başarıyla işlendi.
               </p>
+
+              <div style={{ display: 'inline-block', padding: '0.5rem 1rem', background: 'var(--bg-hover)', borderRadius: '6px', color: 'var(--primary-color)', fontSize: '0.9rem', marginBottom: '2rem', fontWeight: 500 }}>
+                {formatTargetSnapshot(
+                  uploadedBatch?.importType || selectedType,
+                  uploadedBatch?.targetPropertyId,
+                  uploadedBatch?.targetPropertyName,
+                  uploadedBatch?.targetBuildingId,
+                  uploadedBatch?.targetBuildingName,
+                  uploadedBatch?.targetBuildingCode
+                ).label}
+              </div>
 
               {/* Reconciliation Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', maxWidth: '700px', margin: '0 auto 2rem' }}>
@@ -909,6 +1195,7 @@ export function DataImportManagement() {
                     <th>Tarih</th>
                     <th>Dosya Adı</th>
                     <th>Veri Türü</th>
+                    <th>Hedef Kapsam</th>
                     <th>Durum</th>
                     <th>Satır (Top / Ekl / Atl / Hat)</th>
                     <th>Oluşturan</th>
@@ -918,13 +1205,22 @@ export function DataImportManagement() {
                 <tbody>
                   {historyItems.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                         Kayıtlı aktarım geçmişi bulunamadı.
                       </td>
                     </tr>
                   ) : (
                     historyItems.map((b) => {
                       const badgeInfo = STATUS_BADGE_MAP[b.status] || { label: b.status, className: 'status-badge' }
+                      const targetSnap = formatTargetSnapshot(
+                        b.importType,
+                        b.targetPropertyId,
+                        b.targetPropertyName,
+                        b.targetBuildingId,
+                        b.targetBuildingName,
+                        b.targetBuildingCode
+                      )
+
                       return (
                         <tr key={b.id}>
                           <td>
@@ -937,6 +1233,14 @@ export function DataImportManagement() {
                             <span style={{ fontWeight: 600 }}>{b.originalFileName}</span>
                           </td>
                           <td>{IMPORT_TYPE_OPTIONS.find((t) => t.key === b.importType)?.label || b.importType}</td>
+                          <td>
+                            <span
+                              className={`status-badge ${targetSnap.isMissing ? 'warning' : 'info'}`}
+                              style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                            >
+                              {targetSnap.label}
+                            </span>
+                          </td>
                           <td>
                             <span className={badgeInfo.className}>{badgeInfo.label}</span>
                           </td>
@@ -1014,7 +1318,7 @@ export function DataImportManagement() {
       {showConfirmModal && uploadedBatch && (
         <ConfirmationDialog
           title="İçe Aktarımı Onayla"
-          message={`Parti #${uploadedBatch.id} kapsamındaki ${uploadedBatch.validRows} adet geçerli kayıt veritabanına aktarılacaktır. Mevcut veriler güncellenmeyecektir. Onaylıyor musunuz?`}
+          message={`Parti #${uploadedBatch.id} kapsamındaki ${uploadedBatch.validRows} adet geçerli kayıt veritabanına aktarılacaktır. Mevcut veriler güncellenmeyecektir.\n\nHedef Kapsam: ${formatTargetSnapshot(uploadedBatch.importType, uploadedBatch.targetPropertyId, uploadedBatch.targetPropertyName, uploadedBatch.targetBuildingId, uploadedBatch.targetBuildingName, uploadedBatch.targetBuildingCode).label}\n\nOnaylıyor musunuz?`}
           confirmLabel="Evet, Aktar"
           isLoading={isConfirming}
           onCancel={() => setShowConfirmModal(false)}
@@ -1026,7 +1330,7 @@ export function DataImportManagement() {
       {showRollbackModal && selectedHistoryBatch && (
         <ConfirmationDialog
           title="İçe Aktarımı Geri Al"
-          message={`Parti #${selectedHistoryBatch.id} tarafından oluşturulmuş ${selectedHistoryBatch.importedRows} adet kayıt geri alınacaktır. Geri alma yalnızca sonradan başka kayıtlarla ilişkilendirilmemiş veriler için geçerlidir. Devam etmek istiyor musunuz?`}
+          message={`Parti #${selectedHistoryBatch.id} tarafından oluşturulmuş ${selectedHistoryBatch.importedRows} adet kayıt geri alınacaktır.\n\nHedef Kapsam: ${formatTargetSnapshot(selectedHistoryBatch.importType, selectedHistoryBatch.targetPropertyId, selectedHistoryBatch.targetPropertyName, selectedHistoryBatch.targetBuildingId, selectedHistoryBatch.targetBuildingName, selectedHistoryBatch.targetBuildingCode).label}\n\nDevam etmek istiyor musunuz?`}
           confirmLabel="Evet, Geri Al"
           danger
           isLoading={isRollingBack}
@@ -1075,6 +1379,34 @@ export function DataImportManagement() {
                     <strong>Veri Türü:</strong>{' '}
                     {IMPORT_TYPE_OPTIONS.find((t) => t.key === selectedHistoryBatch.importType)?.label || selectedHistoryBatch.importType}
                   </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <strong>Hedef Kapsam:</strong>{' '}
+                    <span
+                      className={`status-badge ${
+                        formatTargetSnapshot(
+                          selectedHistoryBatch.importType,
+                          selectedHistoryBatch.targetPropertyId,
+                          selectedHistoryBatch.targetPropertyName,
+                          selectedHistoryBatch.targetBuildingId,
+                          selectedHistoryBatch.targetBuildingName,
+                          selectedHistoryBatch.targetBuildingCode
+                        ).isMissing
+                          ? 'warning'
+                          : 'info'
+                      }`}
+                    >
+                      {
+                        formatTargetSnapshot(
+                          selectedHistoryBatch.importType,
+                          selectedHistoryBatch.targetPropertyId,
+                          selectedHistoryBatch.targetPropertyName,
+                          selectedHistoryBatch.targetBuildingId,
+                          selectedHistoryBatch.targetBuildingName,
+                          selectedHistoryBatch.targetBuildingCode
+                        ).label
+                      }
+                    </span>
+                  </div>
                   <div>
                     <strong>Durum:</strong>{' '}
                     <span className={STATUS_BADGE_MAP[selectedHistoryBatch.status]?.className || 'status-badge'}>
@@ -1099,6 +1431,19 @@ export function DataImportManagement() {
                   )}
                 </div>
               </div>
+
+              {formatTargetSnapshot(
+                selectedHistoryBatch.importType,
+                selectedHistoryBatch.targetPropertyId,
+                selectedHistoryBatch.targetPropertyName,
+                selectedHistoryBatch.targetBuildingId,
+                selectedHistoryBatch.targetBuildingName,
+                selectedHistoryBatch.targetBuildingCode
+              ).isMissing && (
+                <div style={{ padding: '0.85rem 1rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', marginBottom: '1rem', color: '#b45309', fontSize: '0.85rem' }}>
+                  <strong>Eski Kayıt Uyarısı:</strong> Bu aktarım partisi hedef kapsam takibinden önce oluşturulmuştur.
+                </div>
+              )}
 
               {selectedHistoryBatch.errorMessage && (
                 <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', marginBottom: '1rem', color: '#dc2626' }}>
