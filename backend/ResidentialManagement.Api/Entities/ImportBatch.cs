@@ -30,6 +30,12 @@ public class ImportBatch
     public int CreatedByUserId { get; set; }
     public User CreatedByUser { get; set; } = null!;
 
+    public int? TargetPropertyId { get; set; }
+    public Property? TargetProperty { get; set; }
+
+    public int? TargetBuildingId { get; set; }
+    public Building? TargetBuilding { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ValidatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
@@ -37,6 +43,9 @@ public class ImportBatch
 
     [MaxLength(1000)]
     public string? ErrorMessage { get; set; }
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     public ICollection<ImportRowLog> RowLogs { get; set; } = new List<ImportRowLog>();
 }

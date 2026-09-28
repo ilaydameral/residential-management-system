@@ -963,9 +963,16 @@ export async function cancelResidentPaymentSubmission(id: number): Promise<Payme
 }
 
 // Data Import API
-export async function uploadImportFile(importType: string, file: File): Promise<ImportUploadResponse> {
+export async function uploadImportFile(
+  importType: string,
+  file: File,
+  targetPropertyId?: number,
+  targetBuildingId?: number,
+): Promise<ImportUploadResponse> {
   const formData = new FormData()
   formData.append('importType', importType)
+  if (targetPropertyId !== undefined) formData.append('targetPropertyId', String(targetPropertyId))
+  if (targetBuildingId !== undefined) formData.append('targetBuildingId', String(targetBuildingId))
   formData.append('file', file)
 
   const response = await safeFetch(`${API_BASE_URL}/api/imports/upload`, {

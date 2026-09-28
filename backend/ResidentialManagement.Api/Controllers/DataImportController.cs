@@ -33,10 +33,20 @@ public class DataImportController : ControllerBase
 
     [HttpPost("upload")]
     public async Task<ActionResult<ImportUploadResponseDto>> Upload(
-        [FromForm] string importType,
-        IFormFile file)
+        [FromForm] UploadImportFileRequestDto request)
     {
-        var result = await _importService.UploadFileAsync(file, importType, GetCurrentUserId(), IsAdmin());
+        if (request.File is null)
+        {
+            throw new BadRequestException("İçe aktarılacak dosya zorunludur.");
+        }
+
+        var result = await _importService.UploadFileAsync(
+            request.File,
+            request.ImportType,
+            request.TargetPropertyId,
+            request.TargetBuildingId,
+            GetCurrentUserId(),
+            IsAdmin());
         return Ok(result);
     }
 
@@ -93,6 +103,15 @@ public class DataImportController : ControllerBase
     {
         var (fileBytes, contentType, fileName) = await _importService.ExportErrorsCsvAsync(id, GetCurrentUserId(), IsAdmin());
         return File(fileBytes, contentType, fileName);
+    }
+
+    [HttpPost("cleanup-retention")]
+    public async Task<ActionResult<ImportRetentionResultDto>> CleanupRetention(
+        [FromQuery] int fileRetentionDays = 7,
+        [FromQuery] int piiRetentionDays = 30)
+    {
+        var result = await _importService.CleanupRetentionDataAsync(fileRetentionDays, piiRetentionDays, GetCurrentUserId(), IsAdmin());
+        return Ok(result);
     }
 
     private int GetCurrentUserId()

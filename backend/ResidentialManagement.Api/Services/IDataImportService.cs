@@ -7,6 +7,8 @@ public interface IDataImportService
     Task<ImportUploadResponseDto> UploadFileAsync(
         Microsoft.AspNetCore.Http.IFormFile file,
         string importType,
+        int? targetPropertyId,
+        int? targetBuildingId,
         int currentUserId,
         bool isAdmin);
 
@@ -56,4 +58,10 @@ public interface IDataImportService
         int pageSize,
         int currentUserId,
         bool isAdmin);
+
+    Task<ImportRetentionResultDto> CleanupRetentionDataAsync(
+        int fileRetentionDays = 7,
+        int piiRetentionDays = 30,
+        int currentUserId = 0,
+        bool isAdmin = true);
 }
