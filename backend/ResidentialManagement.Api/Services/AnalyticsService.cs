@@ -23,11 +23,13 @@ public class AnalyticsService : IAnalyticsService
         int userId, bool isAdmin, int? propertyId, int? buildingId, DateTime? fromDate, DateTime? toDate)
     {
         var range = ResolveRange(fromDate, toDate);
+        var previousRange = ResolvePreviousRange(range);
         var scope = await ResolveScopeAsync(userId, isAdmin, propertyId, buildingId, includePropertyWideExpenses: true);
 
-        var charges = ApplyUnitChargeScope(_context.UnitCharges.AsNoTracking(), scope)
-            .Where(charge => !charge.IsCancelled &&
-                             charge.DueDate >= range.From && charge.DueDate < range.ToExclusive);
+        var scopedCharges = ApplyUnitChargeScope(_context.UnitCharges.AsNoTracking(), scope)
+            .Where(charge => !charge.IsCancelled);
+        var charges = scopedCharges
+            .Where(charge => charge.DueDate >= range.From && charge.DueDate < range.ToExclusive);
 
         var chargeBalances = charges.Select(charge => new
         {
@@ -59,15 +61,29 @@ public class AnalyticsService : IAnalyticsService
         var overdueChargeCount = chargeSummary?.OverdueChargeCount ?? 0;
         var overdueAmount = chargeSummary?.OverdueAmount ?? 0m;
 
-        var payments = ApplyPaymentScope(_context.Payments.AsNoTracking(), scope)
-            .Where(payment => !payment.IsCancelled && !payment.UnitCharge.IsCancelled &&
-                              payment.PaymentDate >= range.From && payment.PaymentDate < range.ToExclusive);
+        var scopedPayments = ApplyPaymentScope(_context.Payments.AsNoTracking(), scope)
+            .Where(payment => !payment.IsCancelled && !payment.UnitCharge.IsCancelled);
+        var payments = scopedPayments
+            .Where(payment => payment.PaymentDate >= range.From && payment.PaymentDate < range.ToExclusive);
         var totalCollected = await payments.SumAsync(payment => (decimal?)payment.Amount) ?? 0m;
 
-        var expenses = ApplyExpenseScope(_context.Expenses.AsNoTracking(), scope)
-            .Where(expense => !expense.IsCancelled &&
-                              expense.ExpenseDate >= range.From && expense.ExpenseDate < range.ToExclusive);
+        var scopedExpenses = ApplyExpenseScope(_context.Expenses.AsNoTracking(), scope)
+            .Where(expense => !expense.IsCancelled);
+        var expenses = scopedExpenses
+            .Where(expense => expense.ExpenseDate >= range.From && expense.ExpenseDate < range.ToExclusive);
         var totalExpenses = await expenses.SumAsync(expense => (decimal?)expense.Amount) ?? 0m;
+
+        var previousTotalCharged = await scopedCharges
+            .Where(charge => charge.DueDate >= previousRange.From && charge.DueDate < previousRange.ToExclusive)
+            .SumAsync(charge => (decimal?)charge.Amount) ?? 0m;
+        var previousTotalCollected = await scopedPayments
+            .Where(payment => payment.PaymentDate >= previousRange.From &&
+                              payment.PaymentDate < previousRange.ToExclusive)
+            .SumAsync(payment => (decimal?)payment.Amount) ?? 0m;
+        var previousTotalExpenses = await scopedExpenses
+            .Where(expense => expense.ExpenseDate >= previousRange.From &&
+                              expense.ExpenseDate < previousRange.ToExclusive)
+            .SumAsync(expense => (decimal?)expense.Amount) ?? 0m;
 
         var chargeTrend = await charges
             .GroupBy(charge => new { charge.DueDate.Year, charge.DueDate.Month })
@@ -126,6 +142,9 @@ public class AnalyticsService : IAnalyticsService
             OverdueAmount = overdueAmount,
             TotalExpenses = totalExpenses,
             NetCashPosition = totalCollected - totalExpenses,
+            TotalAssessedComparison = BuildComparison(totalCharged, previousTotalCharged),
+            TotalCollectedComparison = BuildComparison(totalCollected, previousTotalCollected),
+            TotalExpensesComparison = BuildComparison(totalExpenses, previousTotalExpenses),
             Trend = trend,
             ExpenseByCategory = expenseByCategory,
             OutstandingByBuilding = outstandingByBuilding
@@ -136,8 +155,10 @@ public class AnalyticsService : IAnalyticsService
         int userId, bool isAdmin, int? propertyId, int? buildingId, DateTime? fromDate, DateTime? toDate)
     {
         var range = ResolveRange(fromDate, toDate);
+        var previousRange = ResolvePreviousRange(range);
         var scope = await ResolveScopeAsync(userId, isAdmin, propertyId, buildingId);
-        var requests = ApplyMaintenanceScope(_context.MaintenanceRequests.AsNoTracking(), scope)
+        var scopedRequests = ApplyMaintenanceScope(_context.MaintenanceRequests.AsNoTracking(), scope);
+        var requests = scopedRequests
             .Where(request => request.CreatedAt >= range.From && request.CreatedAt < range.ToExclusive);
 
         var requestSummary = await requests
@@ -158,6 +179,27 @@ public class AnalyticsService : IAnalyticsService
                               (request.ResolvedAt ?? request.ClosedAt) >= request.CreatedAt)
             .AverageAsync(request => (double?)EF.Functions.DateDiffMinute(
                 request.CreatedAt, request.ResolvedAt ?? request.ClosedAt));
+
+        var previousRequests = scopedRequests
+            .Where(request => request.CreatedAt >= previousRange.From &&
+                              request.CreatedAt < previousRange.ToExclusive);
+        var previousTotalRequests = await previousRequests.CountAsync();
+        var previousAverageResolutionMinutes = await previousRequests
+            .Where(request => (request.Status == "RESOLVED" || request.Status == "CLOSED") &&
+                              (request.ResolvedAt != null || request.ClosedAt != null) &&
+                              (request.ResolvedAt ?? request.ClosedAt) >= request.CreatedAt)
+            .AverageAsync(request => (double?)EF.Functions.DateDiffMinute(
+                request.CreatedAt, request.ResolvedAt ?? request.ClosedAt));
+
+        decimal? averageResolutionHoursExact = averageResolutionMinutes.HasValue
+            ? (decimal)averageResolutionMinutes.Value / 60m
+            : null;
+        decimal? previousAverageResolutionHoursExact = previousAverageResolutionMinutes.HasValue
+            ? (decimal)previousAverageResolutionMinutes.Value / 60m
+            : null;
+        decimal? averageResolutionHours = averageResolutionHoursExact.HasValue
+            ? Math.Round(averageResolutionHoursExact.Value, 1)
+            : null;
 
         var byCategory = await requests
             .GroupBy(request => request.Category)
@@ -196,9 +238,10 @@ public class AnalyticsService : IAnalyticsService
             InProgress = requestSummary?.InProgress ?? 0,
             ResolvedOrClosed = requestSummary?.ResolvedOrClosed ?? 0,
             HighOrEmergency = requestSummary?.HighOrEmergency ?? 0,
-            AverageResolutionHours = averageResolutionMinutes.HasValue
-                ? Math.Round((decimal)averageResolutionMinutes.Value / 60m, 1)
-                : null,
+            AverageResolutionHours = averageResolutionHours,
+            TotalRequestsComparison = BuildComparison(requestSummary?.TotalRequests ?? 0, previousTotalRequests),
+            AverageResolutionHoursComparison = BuildComparison(
+                averageResolutionHoursExact, previousAverageResolutionHoursExact),
             ByCategory = byCategory,
             ByStatus = byStatus,
             Trend = trend.Select(item => new CountTrendPointDto
@@ -214,8 +257,10 @@ public class AnalyticsService : IAnalyticsService
         int userId, bool isAdmin, int? propertyId, int? buildingId, DateTime? fromDate, DateTime? toDate)
     {
         var range = ResolveRange(fromDate, toDate);
+        var previousRange = ResolvePreviousRange(range);
         var scope = await ResolveScopeAsync(userId, isAdmin, propertyId, buildingId);
-        var reservations = ApplyReservationScope(_context.FacilityReservations.AsNoTracking(), scope)
+        var scopedReservations = ApplyReservationScope(_context.FacilityReservations.AsNoTracking(), scope);
+        var reservations = scopedReservations
             .Where(reservation => reservation.StartTime >= range.From && reservation.StartTime < range.ToExclusive);
 
         var reservationSummary = await reservations
@@ -228,6 +273,19 @@ public class AnalyticsService : IAnalyticsService
                 Pending = group.Count(reservation => reservation.Status == "PENDING"),
                 CancelledOrRejected = group.Count(reservation =>
                     reservation.Status == "CANCELLED" || reservation.Status == "REJECTED"),
+                BookedMinutes = group
+                    .Where(reservation => reservation.Status == "APPROVED" || reservation.Status == "COMPLETED")
+                    .Sum(reservation => EF.Functions.DateDiffMinute(reservation.StartTime, reservation.EndTime))
+            })
+            .FirstOrDefaultAsync();
+
+        var previousReservationSummary = await scopedReservations
+            .Where(reservation => reservation.StartTime >= previousRange.From &&
+                                  reservation.StartTime < previousRange.ToExclusive)
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalReservations = group.Count(),
                 BookedMinutes = group
                     .Where(reservation => reservation.Status == "APPROVED" || reservation.Status == "COMPLETED")
                     .Sum(reservation => EF.Functions.DateDiffMinute(reservation.StartTime, reservation.EndTime))
@@ -260,6 +318,10 @@ public class AnalyticsService : IAnalyticsService
             .OrderBy(item => item.Year).ThenBy(item => item.Month).ThenBy(item => item.Day)
             .ToListAsync();
 
+        var bookedHoursExact = (reservationSummary?.BookedMinutes ?? 0) / 60m;
+        var previousBookedHoursExact = (previousReservationSummary?.BookedMinutes ?? 0) / 60m;
+        var bookedHours = Math.Round(bookedHoursExact, 1);
+
         return new FacilityAnalyticsDto
         {
             FromDate = range.From,
@@ -268,7 +330,11 @@ public class AnalyticsService : IAnalyticsService
             ApprovedOrCompleted = reservationSummary?.ApprovedOrCompleted ?? 0,
             Pending = reservationSummary?.Pending ?? 0,
             CancelledOrRejected = reservationSummary?.CancelledOrRejected ?? 0,
-            BookedHours = Math.Round((reservationSummary?.BookedMinutes ?? 0) / 60m, 1),
+            BookedHours = bookedHours,
+            TotalReservationsComparison = BuildComparison(
+                reservationSummary?.TotalReservations ?? 0,
+                previousReservationSummary?.TotalReservations ?? 0),
+            BookedHoursComparison = BuildComparison(bookedHoursExact, previousBookedHoursExact),
             ByFacility = byFacility.Select(item => new FacilityUsageBreakdownDto
             {
                 FacilityId = item.FacilityId,
@@ -339,6 +405,40 @@ public class AnalyticsService : IAnalyticsService
         if ((to - from).TotalDays >= MaxRangeDays)
             throw new BadRequestException($"Analytics tarih aralığı en fazla {MaxRangeDays} gün olabilir.");
         return new AnalyticsRange(from, to, to.AddDays(1));
+    }
+
+    private static AnalyticsRange ResolvePreviousRange(AnalyticsRange currentRange)
+    {
+        var dayCount = (currentRange.ToExclusive - currentRange.From).Days;
+        if (currentRange.From < DateTime.MinValue.AddDays(dayCount))
+            throw new BadRequestException("Seçilen tarih aralığı için önceki dönem hesaplanamıyor.");
+
+        var previousFrom = currentRange.From.AddDays(-dayCount);
+        return new AnalyticsRange(previousFrom, currentRange.From.AddDays(-1), currentRange.From);
+    }
+
+    private static AnalyticsKpiComparisonDto BuildComparison(decimal? currentValue, decimal? previousValue)
+    {
+        decimal? percentageChange = null;
+        if (currentValue.HasValue && previousValue.HasValue)
+        {
+            if (previousValue.Value > 0m)
+            {
+                percentageChange = Math.Round(
+                    (currentValue.Value - previousValue.Value) * 100m / previousValue.Value, 1);
+            }
+            else if (previousValue.Value == 0m && currentValue.Value == 0m)
+            {
+                percentageChange = 0m;
+            }
+        }
+
+        return new AnalyticsKpiComparisonDto
+        {
+            CurrentValue = currentValue,
+            PreviousValue = previousValue,
+            PercentageChange = percentageChange
+        };
     }
 
     private static IQueryable<UnitCharge> ApplyUnitChargeScope(IQueryable<UnitCharge> query, AnalyticsScope scope)

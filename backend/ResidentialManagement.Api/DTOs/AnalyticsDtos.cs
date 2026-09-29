@@ -12,6 +12,9 @@ public class FinanceAnalyticsDto
     public decimal OverdueAmount { get; set; }
     public decimal TotalExpenses { get; set; }
     public decimal NetCashPosition { get; set; }
+    public AnalyticsKpiComparisonDto TotalAssessedComparison { get; set; } = new();
+    public AnalyticsKpiComparisonDto TotalCollectedComparison { get; set; } = new();
+    public AnalyticsKpiComparisonDto TotalExpensesComparison { get; set; } = new();
     public List<FinanceTrendPointDto> Trend { get; set; } = new();
     public List<AmountBreakdownDto> ExpenseByCategory { get; set; } = new();
     public List<BuildingAmountBreakdownDto> OutstandingByBuilding { get; set; } = new();
@@ -47,6 +50,8 @@ public class MaintenanceAnalyticsDto
     public int ResolvedOrClosed { get; set; }
     public int HighOrEmergency { get; set; }
     public decimal? AverageResolutionHours { get; set; }
+    public AnalyticsKpiComparisonDto TotalRequestsComparison { get; set; } = new();
+    public AnalyticsKpiComparisonDto AverageResolutionHoursComparison { get; set; } = new();
     public List<CountBreakdownDto> ByCategory { get; set; } = new();
     public List<CountBreakdownDto> ByStatus { get; set; } = new();
     public List<CountTrendPointDto> Trend { get; set; } = new();
@@ -81,6 +86,8 @@ public class FacilityAnalyticsDto
     public int Pending { get; set; }
     public int CancelledOrRejected { get; set; }
     public decimal BookedHours { get; set; }
+    public AnalyticsKpiComparisonDto TotalReservationsComparison { get; set; } = new();
+    public AnalyticsKpiComparisonDto BookedHoursComparison { get; set; } = new();
     public List<FacilityUsageBreakdownDto> ByFacility { get; set; } = new();
     public List<CountBreakdownDto> ByStatus { get; set; } = new();
     public List<CountTrendPointDto> Trend { get; set; } = new();
@@ -92,4 +99,11 @@ public class FacilityUsageBreakdownDto
     public string FacilityName { get; set; } = string.Empty;
     public int ReservationCount { get; set; }
     public decimal BookedHours { get; set; }
+}
+
+public class AnalyticsKpiComparisonDto
+{
+    public decimal? CurrentValue { get; set; }
+    public decimal? PreviousValue { get; set; }
+    public decimal? PercentageChange { get; set; }
 }

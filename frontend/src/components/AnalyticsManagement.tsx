@@ -7,6 +7,7 @@ import {
   getProperties,
 } from '../api'
 import type {
+  AnalyticsKpiComparison,
   AnalyticsFilters,
   Building,
   FacilityAnalytics,
@@ -64,8 +65,34 @@ function formatPeriod(value: string): string {
     : { day: '2-digit', month: 'short' }).format(date)
 }
 
-function MetricCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
-  return <article className="analytics-metric-card"><span>{label}</span><strong>{value}</strong>{hint && <small>{hint}</small>}</article>
+function comparisonLabel(comparison?: AnalyticsKpiComparison): string | null {
+  if (!comparison || comparison.currentValue === null || comparison.previousValue === null) return null
+  if (comparison.percentageChange === null) {
+    return comparison.previousValue === 0 && comparison.currentValue > 0 ? 'Yeni' : null
+  }
+
+  const direction = comparison.percentageChange > 0 ? '↑' : comparison.percentageChange < 0 ? '↓' : '→'
+  const percentage = Math.abs(comparison.percentageChange).toLocaleString('tr-TR', { maximumFractionDigits: 1 })
+  return `${direction} %${percentage} önceki döneme göre`
+}
+
+function MetricCard({
+  label, value, hint, comparison,
+}: {
+  label: string
+  value: string | number
+  hint?: string
+  comparison?: AnalyticsKpiComparison
+}) {
+  const comparisonText = comparisonLabel(comparison)
+  return (
+    <article className="analytics-metric-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {comparisonText && <small className="analytics-comparison">{comparisonText}</small>}
+      {hint && <small>{hint}</small>}
+    </article>
+  )
 }
 
 function HorizontalBars({
@@ -216,6 +243,7 @@ export function AnalyticsManagement() {
         <div className="form-field"><label htmlFor="analytics-to">Bitiş</label><input id="analytics-to" type="date" value={toDate} onChange={(event) => { setToDate(event.target.value); setPreset('custom') }} /></div>
         <button className="primary-button analytics-apply-button" type="button" disabled={isLoading} onClick={applyFilters}>Uygula</button>
         {filterError && <p className="status-message error-message analytics-filter-error" role="alert">{filterError}</p>}
+        <p className="analytics-comparison-note">Karşılaştırmalar, seçilen tarih aralığından hemen önceki eşit uzunluktaki dönemle yapılır.</p>
       </section>
 
       {isLoading ? <LoadingSkeleton variant="dashboard" /> : error ? (
@@ -225,12 +253,12 @@ export function AnalyticsManagement() {
           <section className="analytics-domain-section" aria-labelledby="finance-analytics-title">
             <div className="section-heading"><p className="eyebrow">Finans</p><h2 id="finance-analytics-title">Finansal görünüm</h2><p>Seçili dönemde tahakkuk, gerçek tahsilat ve gider hareketleri.</p></div>
             <div className="analytics-metric-grid">
-              <MetricCard label="Tahakkuk" value={formatCurrency(finance.totalCharged)} />
-              <MetricCard label="Tahsilat" value={formatCurrency(finance.totalCollected)} hint="Dönemde alınan ödeme" />
+              <MetricCard label="Tahakkuk" value={formatCurrency(finance.totalCharged)} comparison={finance.totalAssessedComparison} />
+              <MetricCard label="Tahsilat" value={formatCurrency(finance.totalCollected)} hint="Dönemde alınan ödeme" comparison={finance.totalCollectedComparison} />
               <MetricCard label="Kalan Borç" value={formatCurrency(finance.outstandingAmount)} hint="Dönem tahakkuklarından" />
               <MetricCard label="Tahsilat Oranı" value={`%${finance.collectionRate.toLocaleString('tr-TR')}`} />
               <MetricCard label="Gecikmiş" value={formatCurrency(finance.overdueAmount)} hint={`${finance.overdueChargeCount} tahakkuk`} />
-              <MetricCard label="Gider" value={formatCurrency(finance.totalExpenses)} />
+              <MetricCard label="Gider" value={formatCurrency(finance.totalExpenses)} comparison={finance.totalExpensesComparison} />
               <MetricCard label="Net Nakit Hareketi" value={formatCurrency(finance.netCashPosition)} hint="Tahsilat − gider" />
             </div>
             <div className="analytics-chart-grid">
@@ -243,12 +271,12 @@ export function AnalyticsManagement() {
           <section className="analytics-domain-section" aria-labelledby="maintenance-analytics-title">
             <div className="section-heading"><p className="eyebrow">Bakım</p><h2 id="maintenance-analytics-title">Talep performansı</h2><p>Seçili dönemde oluşturulan bakım ve arıza taleplerinin güncel dağılımı.</p></div>
             <div className="analytics-metric-grid compact">
-              <MetricCard label="Toplam Talep" value={maintenance.totalRequests} />
+              <MetricCard label="Toplam Talep" value={maintenance.totalRequests} comparison={maintenance.totalRequestsComparison} />
               <MetricCard label="Açık" value={maintenance.openBacklog} />
               <MetricCard label="İşlemde" value={maintenance.inProgress} />
               <MetricCard label="Çözülen / Kapanan" value={maintenance.resolvedOrClosed} />
               <MetricCard label="Yüksek / Acil" value={maintenance.highOrEmergency} />
-              <MetricCard label="Ort. Çözüm Süresi" value={maintenance.averageResolutionHours === null ? '—' : `${maintenance.averageResolutionHours} saat`} />
+              <MetricCard label="Ort. Çözüm Süresi" value={maintenance.averageResolutionHours === null ? '—' : `${maintenance.averageResolutionHours} saat`} comparison={maintenance.averageResolutionHoursComparison} />
             </div>
             <div className="analytics-chart-grid">
               <TrendBars title="Günlük talep trendi" points={maintenance.trend.map((item) => ({ key: item.period, primary: item.count }))} />
@@ -261,11 +289,11 @@ export function AnalyticsManagement() {
           <section className="analytics-domain-section" aria-labelledby="facility-analytics-title">
             <div className="section-heading"><p className="eyebrow">Ortak Alanlar</p><h2 id="facility-analytics-title">Rezervasyon kullanımı</h2><p>Seçili başlangıç tarih aralığındaki rezervasyon sayıları ve onaylı/tamamlanmış rezerve saatler.</p></div>
             <div className="analytics-metric-grid compact">
-              <MetricCard label="Toplam Rezervasyon" value={facilities.totalReservations} />
+              <MetricCard label="Toplam Rezervasyon" value={facilities.totalReservations} comparison={facilities.totalReservationsComparison} />
               <MetricCard label="Onaylı / Tamamlanan" value={facilities.approvedOrCompleted} />
               <MetricCard label="Bekleyen" value={facilities.pending} />
               <MetricCard label="İptal / Red" value={facilities.cancelledOrRejected} />
-              <MetricCard label="Rezerve Saat" value={`${facilities.bookedHours} saat`} hint="Onaylı ve tamamlanan" />
+              <MetricCard label="Rezerve Saat" value={`${facilities.bookedHours} saat`} hint="Onaylı ve tamamlanan" comparison={facilities.bookedHoursComparison} />
             </div>
             <div className="analytics-chart-grid">
               <TrendBars title="Günlük rezervasyon trendi" points={facilities.trend.map((item) => ({ key: item.period, primary: item.count }))} />

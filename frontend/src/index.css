@@ -64,6 +64,14 @@
   margin: 0;
 }
 
+.analytics-comparison-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .analytics-sections,
 .analytics-domain-section {
   display: grid;
@@ -138,6 +146,12 @@
 
 .analytics-metric-card small {
   font-size: 0.72rem;
+}
+
+.analytics-metric-card .analytics-comparison {
+  color: var(--color-text-muted);
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .analytics-chart-grid {

@@ -1272,6 +1272,12 @@ export interface BuildingAmountBreakdown {
   amount: number
 }
 
+export interface AnalyticsKpiComparison {
+  currentValue: number | null
+  previousValue: number | null
+  percentageChange: number | null
+}
+
 export interface FinanceAnalytics {
   fromDate: string
   toDate: string
@@ -1283,6 +1289,9 @@ export interface FinanceAnalytics {
   overdueAmount: number
   totalExpenses: number
   netCashPosition: number
+  totalAssessedComparison: AnalyticsKpiComparison
+  totalCollectedComparison: AnalyticsKpiComparison
+  totalExpensesComparison: AnalyticsKpiComparison
   trend: FinanceTrendPoint[]
   expenseByCategory: AmountBreakdown[]
   outstandingByBuilding: BuildingAmountBreakdown[]
@@ -1313,6 +1322,8 @@ export interface MaintenanceAnalytics {
   resolvedOrClosed: number
   highOrEmergency: number
   averageResolutionHours: number | null
+  totalRequestsComparison: AnalyticsKpiComparison
+  averageResolutionHoursComparison: AnalyticsKpiComparison
   byCategory: CountBreakdown[]
   byStatus: CountBreakdown[]
   trend: CountTrendPoint[]
@@ -1334,6 +1345,8 @@ export interface FacilityAnalytics {
   pending: number
   cancelledOrRejected: number
   bookedHours: number
+  totalReservationsComparison: AnalyticsKpiComparison
+  bookedHoursComparison: AnalyticsKpiComparison
   byFacility: FacilityUsageBreakdown[]
   byStatus: CountBreakdown[]
   trend: CountTrendPoint[]
