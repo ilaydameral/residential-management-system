@@ -48,6 +48,7 @@ import { ManagementFacilities } from './components/ManagementFacilities'
 import { ManagementVisitors } from './components/ManagementVisitors'
 import { ManagementVehicles } from './components/ManagementVehicles'
 import { DocumentManagement } from './components/DocumentManagement'
+import { AnalyticsManagement } from './components/AnalyticsManagement'
 import { ConfirmationDialog } from './components/ConfirmationDialog'
 import { HeaderAccountButton } from './components/HeaderAccountButton'
 import { HeaderLogoutButton } from './components/HeaderLogoutButton'
@@ -160,6 +161,7 @@ export type ManagementView =
   | 'visitors'
   | 'vehicles'
   | 'documents'
+  | 'analytics'
   | 'account'
   | 'settings'
 
@@ -190,6 +192,7 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'visitors', label: 'Ziyaretçiler' },
   { id: 'vehicles', label: 'Araç Dizini' },
   { id: 'documents', label: 'Belgeler' },
+  { id: 'analytics', label: 'Analizler' },
   { id: 'announcements', label: 'Duyurular' },
   { id: 'maintenanceRequests', label: 'Talepler' },
   { id: 'account', label: 'Hesabım' },
@@ -216,6 +219,7 @@ const MANAGEMENT_VIEW_PATHS: Record<ManagementView, string> = {
   visitors: '/management/visitors',
   vehicles: '/management/vehicles',
   documents: '/management/documents',
+  analytics: '/management/analytics',
   announcements: '/management/announcements',
   maintenanceRequests: '/management/maintenance-requests',
   account: '/account',
@@ -1808,6 +1812,8 @@ function App() {
                                 ? 'Sakinlerden gelen bakım taleplerini yönetin ve operasyon sürecini takip edin.'
                                 : activeManagementView === 'documents'
                                   ? 'Yapı, blok ve dairelere ait operasyonel belgeleri güvenli biçimde yönetin.'
+                                : activeManagementView === 'analytics'
+                                  ? 'Finans, bakım ve ortak alan kullanımını yetki kapsamınız içinde değerlendirin.'
                                 : 'Site, blok, daire ve sakin işlemlerini ilgili menülerden yönetin.'
 
   if (isManagementPanel) {
@@ -1827,7 +1833,7 @@ function App() {
       >
         <div className="management-workspace">
           <div className="management-content">
-      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && activeManagementView !== 'units' && activeManagementView !== 'residents' && !['properties', 'buildings', 'users', 'managerAssignments', 'dueDefinitions', 'duePeriods', 'expenses', 'announcements', 'maintenanceRequests', 'documents'].includes(activeManagementView) && <header className="page-header">
+      {activeManagementView !== 'account' && activeManagementView !== 'visitors' && activeManagementView !== 'vehicles' && activeManagementView !== 'units' && activeManagementView !== 'residents' && !['properties', 'buildings', 'users', 'managerAssignments', 'dueDefinitions', 'duePeriods', 'expenses', 'announcements', 'maintenanceRequests', 'documents', 'analytics'].includes(activeManagementView) && <header className="page-header">
         <p className="eyebrow">{isStandaloneSettingsView ? 'Kullanıcı Ayarları' : 'Yönetim Paneli'}</p>
         <h1>{isManagementPanel ? activeViewLabel : isStandaloneSettingsView ? 'Ayarlar' : 'Site & Gayrimenkul Yönetimi'}</h1>
         <p className="page-description">
@@ -1970,6 +1976,10 @@ function App() {
 
       {isManagementPanel && activeManagementView === 'documents' && (
         <DocumentManagement onDirtyChange={handleOccupancyDirtyChange} />
+      )}
+
+      {isManagementPanel && activeManagementView === 'analytics' && (
+        <AnalyticsManagement />
       )}
 
       {isManagementPanel && activeManagementView === 'maintenanceRequests' && (

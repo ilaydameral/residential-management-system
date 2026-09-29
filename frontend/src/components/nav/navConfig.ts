@@ -23,6 +23,7 @@ export const NAV_CATEGORIES: NavCategory[] = [
     iconName: 'home',
     children: [
       { id: 'overview', label: 'Genel Bakış', path: '/dashboard', description: 'Site ve sistem genel özet paneli.' },
+      { id: 'analytics', label: 'Operasyonel Analizler', path: '/management/analytics', description: 'Finans, bakım ve ortak alan kullanım göstergeleri.' },
       { id: 'managerScope', label: 'Yöneticilik Kapsamım', path: '/manager/my-scope', description: 'Atanan yapı ve blok sorumlulukları.', managerOnly: true },
     ],
   },
