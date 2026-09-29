@@ -40,7 +40,9 @@ public class AnalyticsService : IAnalyticsService
                 .Sum(payment => (decimal?)payment.Amount) ?? 0m
         });
 
-        var overdueCutoff = range.ToExclusive < DateTime.UtcNow ? range.ToExclusive : DateTime.UtcNow;
+        var overdueCutoff = range.ToExclusive < DateTime.UtcNow.Date
+            ? range.ToExclusive
+            : DateTime.UtcNow.Date;
         var chargeSummary = await chargeBalances
             .GroupBy(_ => 1)
             .Select(group => new
@@ -152,7 +154,8 @@ public class AnalyticsService : IAnalyticsService
 
         var averageResolutionMinutes = await requests
             .Where(request => (request.Status == "RESOLVED" || request.Status == "CLOSED") &&
-                              (request.ResolvedAt != null || request.ClosedAt != null))
+                              (request.ResolvedAt != null || request.ClosedAt != null) &&
+                              (request.ResolvedAt ?? request.ClosedAt) >= request.CreatedAt)
             .AverageAsync(request => (double?)EF.Functions.DateDiffMinute(
                 request.CreatedAt, request.ResolvedAt ?? request.ClosedAt));
 
@@ -288,6 +291,10 @@ public class AnalyticsService : IAnalyticsService
         if (propertyId.HasValue && !await _context.Properties.AsNoTracking().AnyAsync(item => item.Id == propertyId.Value))
             throw new NotFoundException("Seçilen yapı bulunamadı.");
 
+        if (!isAdmin && propertyId.HasValue &&
+            !await _managerScopeService.CanViewPropertyAsync(userId, propertyId.Value, false))
+            throw new ForbiddenException("Seçilen yapı için analytics erişiminiz bulunmamaktadır.");
+
         int? resolvedPropertyId = propertyId;
         if (buildingId.HasValue)
         {
@@ -296,19 +303,20 @@ public class AnalyticsService : IAnalyticsService
                 .Select(item => new { item.Id, item.PropertyId })
                 .FirstOrDefaultAsync();
             if (building is null) throw new NotFoundException("Seçilen blok veya bina bulunamadı.");
+
+            if (!isAdmin &&
+                !await _managerScopeService.CanAccessBuildingAsync(userId, buildingId.Value, false))
+                throw new ForbiddenException("Seçilen blok için analytics erişiminiz bulunmamaktadır.");
+
             if (propertyId.HasValue && building.PropertyId != propertyId.Value)
                 throw new BadRequestException("Seçilen blok belirtilen yapıya ait değildir.");
             resolvedPropertyId = building.PropertyId;
         }
 
-        if (!isAdmin)
+        if (!isAdmin && !propertyId.HasValue && resolvedPropertyId.HasValue)
         {
-            if (resolvedPropertyId.HasValue &&
-                !await _managerScopeService.CanViewPropertyAsync(userId, resolvedPropertyId.Value, false))
+            if (!await _managerScopeService.CanViewPropertyAsync(userId, resolvedPropertyId.Value, false))
                 throw new ForbiddenException("Seçilen yapı için analytics erişiminiz bulunmamaktadır.");
-            if (buildingId.HasValue &&
-                !await _managerScopeService.CanAccessBuildingAsync(userId, buildingId.Value, false))
-                throw new ForbiddenException("Seçilen blok için analytics erişiminiz bulunmamaktadır.");
         }
 
         var accessibleBuildingIds = isAdmin
