@@ -69,6 +69,7 @@ export const NAV_CATEGORIES: NavCategory[] = [
       { id: 'visitors', label: 'Ziyaretçi Yönetimi', path: '/management/visitors', description: 'Ziyaretçi kayıtları ve giriş-çıkış takibi.' },
       { id: 'vehicles', label: 'Araç Dizini', path: '/management/vehicles', description: 'Site sakinlerine ait kayıtlı araç dizini.' },
       { id: 'announcements', label: 'Duyurular', path: '/management/announcements', description: 'Sakinlere yönelik duyurular.' },
+      { id: 'documents', label: 'Belgeler', path: '/management/documents', description: 'Yapı, blok ve daire belgelerini yönetin.' },
     ],
   },
   {

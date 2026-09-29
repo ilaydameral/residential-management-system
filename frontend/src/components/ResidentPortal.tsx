@@ -9,6 +9,7 @@ import { groupResidentUnits } from '../utils/residentUnits'
 import { Account } from './Account'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { ResidentAnnouncements } from './ResidentAnnouncements'
+import { ResidentDocuments } from './ResidentDocuments'
 import { ResidentFacilities } from './ResidentFacilities'
 import { ResidentFinance } from './ResidentFinance'
 import { ResidentHome } from './ResidentHome'
@@ -65,6 +66,7 @@ export function ResidentPortal() {
   const isFacilities = location.pathname === '/resident/facilities'
   const isVisitors = location.pathname === '/resident/visitors'
   const isVehicles = location.pathname === '/resident/vehicles'
+  const isDocuments = location.pathname === '/resident/documents'
   const isAnnouncements = location.pathname === '/resident/announcements'
   const isRequests = location.pathname === '/resident/requests' || location.pathname === '/resident/maintenance-requests'
   const isAccount = location.pathname === '/account' || location.pathname === '/resident/account'
@@ -93,6 +95,8 @@ export function ResidentPortal() {
           <ResidentVisitors />
         ) : isVehicles ? (
           <ResidentVehicles />
+        ) : isDocuments ? (
+          <ResidentDocuments />
         ) : isAnnouncements ? (
           <ResidentAnnouncements />
         ) : isRequests ? (

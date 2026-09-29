@@ -30,6 +30,23 @@ public class ManagerScopeService : IManagerScopeService
             .ToListAsync();
     }
 
+    public async Task<List<int>> GetManageablePropertyIdsAsync(int userId, bool isAdmin)
+    {
+        if (isAdmin)
+        {
+            return await _context.Properties
+                .AsNoTracking()
+                .Select(property => property.Id)
+                .ToListAsync();
+        }
+
+        return await ActiveAssignments(userId)
+            .Where(assignment => assignment.BuildingId == null)
+            .Select(assignment => assignment.PropertyId)
+            .Distinct()
+            .ToListAsync();
+    }
+
     public async Task<List<int>> GetAccessibleBuildingIdsAsync(int userId, bool isAdmin)
     {
         if (isAdmin)

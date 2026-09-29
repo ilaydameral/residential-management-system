@@ -41,6 +41,7 @@ public class AppDbContext : DbContext
     public DbSet<FacilityMaintenanceBlock> FacilityMaintenanceBlocks { get; set; }
     public DbSet<Visitor> Visitors { get; set; }
     public DbSet<ResidentVehicle> ResidentVehicles { get; set; }
+    public DbSet<Document> Documents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +66,7 @@ public class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new FacilityMaintenanceBlockConfiguration());
         modelBuilder.ApplyConfiguration(new VisitorConfiguration());
         modelBuilder.ApplyConfiguration(new ResidentVehicleConfiguration());
+        modelBuilder.ApplyConfiguration(new DocumentConfiguration());
 
         modelBuilder.Entity<OccupancyType>(entity =>
         {

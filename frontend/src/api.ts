@@ -95,6 +95,14 @@ import type {
   CreateResidentVehiclePayload,
   UpdateResidentVehiclePayload,
   PagedResidentVehicleResult,
+  DocumentCategory,
+  DocumentDetail,
+  DocumentDownload,
+  DocumentFilters,
+  DocumentListResponse,
+  UpdateDocumentMetadataPayload,
+  UpdateDocumentStatusPayload,
+  UploadDocumentPayload,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -1788,4 +1796,145 @@ export async function getManagementVehicles(params?: {
     headers: getAuthHeaders(),
   })
   return handleResponse<PagedResidentVehicleResult>(response)
+}
+
+// ============================================================================
+// Phase 13B: Management Documents API
+// ============================================================================
+
+export async function getDocuments(filters: DocumentFilters = {}): Promise<DocumentListResponse> {
+  const query = new URLSearchParams()
+  if (filters.propertyId) query.set('propertyId', String(filters.propertyId))
+  if (filters.buildingId) query.set('buildingId', String(filters.buildingId))
+  if (filters.unitId) query.set('unitId', String(filters.unitId))
+  if (filters.category) query.set('category', filters.category)
+  if (filters.visibility) query.set('visibility', filters.visibility)
+  if (filters.isActive !== undefined) query.set('isActive', String(filters.isActive))
+  if (filters.search?.trim()) query.set('search', filters.search.trim())
+  if (filters.page) query.set('page', String(filters.page))
+  if (filters.pageSize) query.set('pageSize', String(filters.pageSize))
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/documents${suffix}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DocumentListResponse>(response)
+}
+
+export async function getDocument(id: number): Promise<DocumentDetail> {
+  const response = await safeFetch(`${API_BASE_URL}/api/documents/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DocumentDetail>(response)
+}
+
+export async function uploadDocument(payload: UploadDocumentPayload): Promise<DocumentDetail> {
+  const body = new FormData()
+  body.append('propertyId', String(payload.propertyId))
+  if (payload.buildingId) body.append('buildingId', String(payload.buildingId))
+  if (payload.unitId) body.append('unitId', String(payload.unitId))
+  body.append('title', payload.title)
+  if (payload.description) body.append('description', payload.description)
+  body.append('category', payload.category)
+  body.append('visibility', payload.visibility)
+  body.append('file', payload.file)
+
+  const response = await safeFetch(`${API_BASE_URL}/api/documents`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body,
+  })
+  return handleResponse<DocumentDetail>(response)
+}
+
+export async function updateDocumentMetadata(
+  id: number,
+  payload: UpdateDocumentMetadataPayload,
+): Promise<DocumentDetail> {
+  const response = await safeFetch(`${API_BASE_URL}/api/documents/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<DocumentDetail>(response)
+}
+
+export async function setDocumentStatus(
+  id: number,
+  payload: UpdateDocumentStatusPayload,
+): Promise<DocumentDetail> {
+  const response = await safeFetch(`${API_BASE_URL}/api/documents/${id}/status`, {
+    method: 'PUT',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<DocumentDetail>(response)
+}
+
+export async function downloadDocument(id: number): Promise<DocumentDownload> {
+  const response = await safeFetch(`${API_BASE_URL}/api/documents/${id}/download`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) await handleResponse<never>(response)
+
+  const disposition = response.headers.get('content-disposition')
+  const encodedName = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  const quotedName = disposition?.match(/filename="([^"]+)"/i)?.[1]
+  let fileName: string | null = null
+  try {
+    fileName = encodedName ? decodeURIComponent(encodedName) : quotedName ?? null
+  } catch {
+    fileName = quotedName ?? null
+  }
+
+  return { blob: await response.blob(), fileName }
+}
+
+// ============================================================================
+// Phase 13B: Resident Documents API
+// ============================================================================
+
+export async function getResidentDocuments(filters: {
+  category?: DocumentCategory
+  search?: string
+  page?: number
+  pageSize?: number
+} = {}): Promise<DocumentListResponse> {
+  const query = new URLSearchParams()
+  if (filters.category) query.set('category', filters.category)
+  if (filters.search?.trim()) query.set('search', filters.search.trim())
+  if (filters.page) query.set('page', String(filters.page))
+  if (filters.pageSize) query.set('pageSize', String(filters.pageSize))
+
+  const suffix = query.size > 0 ? `?${query.toString()}` : ''
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/documents${suffix}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DocumentListResponse>(response)
+}
+
+export async function getResidentDocument(id: number): Promise<DocumentDetail> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/documents/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<DocumentDetail>(response)
+}
+
+export async function downloadResidentDocument(id: number): Promise<DocumentDownload> {
+  const response = await safeFetch(`${API_BASE_URL}/api/resident/documents/${id}/download`, {
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) await handleResponse<never>(response)
+
+  const disposition = response.headers.get('content-disposition')
+  const encodedName = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  const quotedName = disposition?.match(/filename="([^"]+)"/i)?.[1]
+  let fileName: string | null = null
+  try {
+    fileName = encodedName ? decodeURIComponent(encodedName) : quotedName ?? null
+  } catch {
+    fileName = quotedName ?? null
+  }
+
+  return { blob: await response.blob(), fileName }
 }
