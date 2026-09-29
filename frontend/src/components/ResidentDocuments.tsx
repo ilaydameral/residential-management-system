@@ -173,12 +173,11 @@ export function ResidentDocuments() {
 
       {/* Toolbar */}
       <section
-        className="panel entity-toolbar"
-        style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '20px', padding: '14px 18px' }}
+        className="panel entity-toolbar resident-document-toolbar"
         aria-label="Belge filtreleri"
       >
-        <div className="form-field" style={{ margin: 0, minWidth: '160px' }}>
-          <label htmlFor="res-doc-category" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px', display: 'block' }}>
+        <div className="form-field resident-document-field">
+          <label htmlFor="res-doc-category">
             Kategori
           </label>
           <select
@@ -188,7 +187,6 @@ export function ResidentDocuments() {
               setCategoryFilter(e.target.value)
               setPage(1)
             }}
-            style={{ height: '38px', borderRadius: '8px', padding: '0 10px', fontSize: '0.86rem' }}
           >
             <option value="all">Tüm Kategoriler</option>
             <option value="GENERAL">Genel</option>
@@ -202,8 +200,8 @@ export function ResidentDocuments() {
           </select>
         </div>
 
-        <div className="form-field" style={{ margin: 0, flex: 1, minWidth: '200px' }}>
-          <label htmlFor="res-doc-search" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '4px', display: 'block' }}>
+        <div className="form-field resident-document-field resident-document-search">
+          <label htmlFor="res-doc-search">
             Arama
           </label>
           <input
@@ -215,15 +213,13 @@ export function ResidentDocuments() {
               setSearchQuery(e.target.value)
               setPage(1)
             }}
-            style={{ height: '38px', borderRadius: '8px', padding: '0 10px', fontSize: '0.86rem', width: '100%' }}
           />
         </div>
 
         {isFiltered && (
           <button
             type="button"
-            className="secondary-button"
-            style={{ height: '38px', alignSelf: 'flex-end', fontSize: '0.82rem' }}
+            className="secondary-button entity-filter-clear resident-document-clear-btn"
             onClick={() => {
               setCategoryFilter('all')
               setSearchQuery('')

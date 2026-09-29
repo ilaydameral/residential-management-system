@@ -654,6 +654,8 @@ function App() {
         location.pathname.startsWith('/resident/visitors') ||
         location.pathname === '/resident/vehicles' ||
         location.pathname.startsWith('/resident/vehicles') ||
+        location.pathname === '/resident/documents' ||
+        location.pathname.startsWith('/resident/documents') ||
         location.pathname === '/resident/announcements' ||
         location.pathname === '/resident/requests' ||
         location.pathname === '/resident/maintenance-requests' ||

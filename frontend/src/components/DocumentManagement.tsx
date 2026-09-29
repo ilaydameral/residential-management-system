@@ -543,7 +543,7 @@ export function DocumentManagement({ onDirtyChange }: { onDirtyChange?: (dirty: 
               <thead><tr><th>Başlık</th><th>Hedef</th><th>Kategori</th><th>Görünürlük</th><th>Dosya</th><th>Boyut</th><th>Yüklenme</th><th>Durum</th><th>İşlemler</th></tr></thead>
               <tbody>{documents.map((item) => (
                 <tr key={item.id}>
-                  <td><strong className="document-title-cell">{item.title}</strong></td>
+                  <td><strong className="document-title-cell" title={item.title}>{item.title}</strong></td>
                   <td><span className="document-target-cell">{targetText(item)}</span><small>{TARGET_LABELS[item.targetType]}</small></td>
                   <td><span className="status-badge secondary">{CATEGORY_LABELS[item.category]}</span></td>
                   <td><span className={`status-badge ${item.visibility === 'RESIDENTS' ? 'info' : 'inactive'}`}>{VISIBILITY_LABELS[item.visibility]}</span></td>
@@ -591,7 +591,40 @@ export function DocumentManagement({ onDirtyChange }: { onDirtyChange?: (dirty: 
                   <div className="form-field form-field-full"><label htmlFor="document-description">Açıklama</label><textarea id="document-description" rows={4} maxLength={1000} value={uploadForm.description} onChange={(event) => setUploadForm((current) => ({ ...current, description: event.target.value }))} /></div>
                   <div className="form-field"><label htmlFor="document-category">Kategori *</label><select id="document-category" value={uploadForm.category} required onChange={(event) => setUploadForm((current) => ({ ...current, category: event.target.value as DocumentCategory }))}>{CATEGORY_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
                   <div className="form-field"><label htmlFor="document-visibility">Görünürlük *</label><select id="document-visibility" value={uploadForm.visibility} required onChange={(event) => setUploadForm((current) => ({ ...current, visibility: event.target.value as DocumentVisibility }))}><option value="MANAGEMENT_ONLY">Yalnızca Yönetim</option><option value="RESIDENTS">Sakinlerle Paylaşılır</option></select></div>
-                  <div className="form-field form-field-full"><label htmlFor="document-file">Dosya *</label><input ref={fileInputRef} id="document-file" type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx" required onChange={(event) => { const file = event.target.files?.[0] ?? null; setUploadForm((current) => ({ ...current, file })); setDrawerError(file ? validateFile(file) ?? '' : '') }} /><small className="field-help">PDF, JPG, PNG, DOCX veya XLSX — en fazla 10 MB.</small></div>
+                  <div className="form-field form-field-full">
+                    <label htmlFor="document-file">Dosya *</label>
+                    <div className="custom-file-picker">
+                      <input
+                        ref={fileInputRef}
+                        id="document-file"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
+                        required
+                        className="custom-file-input-hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null
+                          setUploadForm((current) => ({ ...current, file }))
+                          setDrawerError(file ? validateFile(file) ?? '' : '')
+                        }}
+                      />
+                      <div className="custom-file-picker-control">
+                        <button
+                          type="button"
+                          className="secondary-button custom-file-picker-button"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          Dosya Seç
+                        </button>
+                        <span
+                          className={`custom-file-picker-filename ${uploadForm.file ? 'has-file' : 'empty'}`}
+                          title={uploadForm.file?.name}
+                        >
+                          {uploadForm.file ? uploadForm.file.name : 'Dosya seçilmedi'}
+                        </span>
+                      </div>
+                    </div>
+                    <small className="field-help">PDF, JPG, PNG, DOCX veya XLSX — en fazla 10 MB.</small>
+                  </div>
                 </form>
               )}
 
