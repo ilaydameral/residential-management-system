@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import {
   cancelResidentMaintenanceRequest,
   createResidentMaintenanceRequest,
+  getMaintenanceAiSuggestion,
+  getMyUnits,
   getResidentMaintenanceRequest,
   getResidentMaintenanceRequestAttachmentFile,
   getResidentMaintenanceRequests,
@@ -15,7 +17,7 @@ import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
 import type { MaintenanceRequestUpdatedEvent } from '../realtime/types'
-import type { MaintenanceRequestDetailDto, MaintenanceRequestListItemDto } from '../types'
+import type { MaintenanceAiSuggestion, MaintenanceRequestDetailDto, MaintenanceRequestListItemDto, ResidentUnit } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
@@ -36,6 +38,13 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
   SECURITY: 'Güvenlik',
   STRUCTURAL: 'Yapısal',
   OTHER: 'Diğer',
+}
+
+const PRIORITY_LABEL_MAP: Record<string, string> = {
+  LOW: 'Düşük',
+  NORMAL: 'Normal',
+  HIGH: 'Yüksek',
+  EMERGENCY: 'Acil',
 }
 
 const TIMELINE_EVENT_TITLE_MAP: Record<string, { title: string; color: string }> = {
@@ -102,8 +111,15 @@ export function ResidentMaintenanceRequests() {
   // Create Drawer State
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [formCategory, setFormCategory] = useState('PLUMBING')
+  const [formPriority, setFormPriority] = useState('NORMAL')
+  const [residentUnits, setResidentUnits] = useState<ResidentUnit[]>([])
+  const [formUnitId, setFormUnitId] = useState<number | null>(null)
+  const [unitLoadError, setUnitLoadError] = useState('')
   const [formTitle, setFormTitle] = useState('')
   const [formDescription, setFormDescription] = useState('')
+  const [aiSuggestion, setAiSuggestion] = useState<MaintenanceAiSuggestion | null>(null)
+  const [aiError, setAiError] = useState('')
+  const [isAiLoading, setIsAiLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -119,11 +135,14 @@ export function ResidentMaintenanceRequests() {
 
   const createBodyRef = useRef<HTMLDivElement>(null)
   const detailBodyRef = useRef<HTMLDivElement>(null)
+  const aiRequestVersionRef = useRef(0)
 
   const { shouldRender: shouldRenderCreate, phase: createPhase } = useAnimatedDrawer(isCreateOpen)
   const { shouldRender: shouldRenderDetail, phase: detailPhase } = useAnimatedDrawer(isDetailOpen)
 
-  const isCreateDirty = formTitle.trim() !== '' || formDescription.trim() !== '' || selectedFile !== null
+  const isCreateDirty = formTitle.trim() !== '' || formDescription.trim() !== '' ||
+    formCategory !== 'PLUMBING' || formPriority !== 'NORMAL' ||
+    formUnitId !== (residentUnits[0]?.unitId ?? null) || selectedFile !== null
   const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isCreateDirty)
 
   const closeCreate = useCallback(() => {
@@ -132,7 +151,13 @@ export function ResidentMaintenanceRequests() {
     setFormDescription('')
     setSelectedFile(null)
     setFormCategory('PLUMBING')
-  }, [])
+    setFormPriority('NORMAL')
+    setFormUnitId(residentUnits[0]?.unitId ?? null)
+    setAiSuggestion(null)
+    setAiError('')
+    setIsAiLoading(false)
+    aiRequestVersionRef.current += 1
+  }, [residentUnits])
 
   const handleCloseCreateWithGuard = useCallback(async () => {
     if (await requestDiscard()) {
@@ -174,6 +199,21 @@ export function ResidentMaintenanceRequests() {
     void loadRequests()
   }, [loadRequests])
 
+  useEffect(() => {
+    getMyUnits()
+      .then((items) => {
+        const uniqueUnits = Array.from(new Map(items.map((item) => [item.unitId, item])).values())
+        setResidentUnits(uniqueUnits)
+        setFormUnitId((current) => current ?? uniqueUnits[0]?.unitId ?? null)
+        setUnitLoadError('')
+      })
+      .catch((loadError) => {
+        setResidentUnits([])
+        setFormUnitId(null)
+        setUnitLoadError(loadError instanceof Error ? loadError.message : 'Aktif daireleriniz yüklenemedi.')
+      })
+  }, [])
+
   // Real-Time Maintenance Listener & Reconnect Re-sync
   const isDetailOpenRef = useRef<boolean>(false)
   useEffect(() => {
@@ -201,12 +241,14 @@ export function ResidentMaintenanceRequests() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formTitle.trim() || !formDescription.trim()) return
+    if (!formUnitId || !formTitle.trim() || !formDescription.trim()) return
 
     setIsSubmitting(true)
     try {
       const created = await createResidentMaintenanceRequest({
+        unitId: formUnitId,
         category: formCategory,
+        priority: formPriority,
         title: formTitle.trim(),
         description: formDescription.trim(),
       })
@@ -220,13 +262,52 @@ export function ResidentMaintenanceRequests() {
       }
 
       showToast('Bakım talebiniz başarıyla oluşturuldu.')
-      setIsCreateOpen(false)
+      closeCreate()
       void loadRequests()
     } catch (err: any) {
       showToast(err.message || 'Talep oluşturulamadı.')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleAiSuggestion = async () => {
+    if (formTitle.trim().length < 3 || formDescription.trim().length < 10 || isAiLoading) return
+
+    setIsAiLoading(true)
+    setAiError('')
+    setAiSuggestion(null)
+    const requestVersion = ++aiRequestVersionRef.current
+    try {
+      const suggestion = await getMaintenanceAiSuggestion({
+        title: formTitle.trim(),
+        description: formDescription.trim(),
+      })
+      if (requestVersion === aiRequestVersionRef.current) setAiSuggestion(suggestion)
+    } catch (err) {
+      if (requestVersion === aiRequestVersionRef.current) {
+        setAiError(err instanceof Error
+          ? err.message
+          : 'AI yardımcısı şu anda kullanılamıyor. Talebinizi AI desteği olmadan oluşturabilirsiniz.')
+      }
+    } finally {
+      if (requestVersion === aiRequestVersionRef.current) setIsAiLoading(false)
+    }
+  }
+
+  const invalidateAiSuggestion = () => {
+    aiRequestVersionRef.current += 1
+    setAiSuggestion(null)
+    setAiError('')
+    setIsAiLoading(false)
+  }
+
+  const applyAiSuggestion = () => {
+    if (!aiSuggestion) return
+    setFormCategory(aiSuggestion.suggestedCategory)
+    setFormPriority(aiSuggestion.suggestedPriority)
+    setAiSuggestion(null)
+    showToast('AI önerisi forma uygulandı. Kaydetmeden önce kontrol edebilirsiniz.')
   }
 
   const [searchParams] = useSearchParams()
@@ -503,6 +584,25 @@ export function ResidentMaintenanceRequests() {
             <div className="drawer-body" ref={createBodyRef}>
               <form id="create-resident-request-form" onSubmit={handleCreateSubmit}>
                 <div className="form-group">
+                  <label htmlFor="res-create-unit">Daire *</label>
+                  <select
+                    id="res-create-unit"
+                    value={formUnitId ?? ''}
+                    onChange={(e) => setFormUnitId(Number(e.target.value))}
+                    disabled={residentUnits.length === 0}
+                    required
+                  >
+                    {residentUnits.length === 0 && <option value="">Aktif daire bulunamadı</option>}
+                    {residentUnits.map((unit) => (
+                      <option key={unit.unitId} value={unit.unitId}>
+                        {unit.propertyName} · {unit.buildingName} · {unit.unitNumber}
+                      </option>
+                    ))}
+                  </select>
+                  {unitLoadError && <p className="status-message error-message">{unitLoadError}</p>}
+                </div>
+
+                <div className="form-group">
                   <label htmlFor="res-create-category">Kategori *</label>
                   <select
                     id="res-create-category"
@@ -519,13 +619,30 @@ export function ResidentMaintenanceRequests() {
                 </div>
 
                 <div className="form-group">
+                  <label htmlFor="res-create-priority">Öncelik *</label>
+                  <select
+                    id="res-create-priority"
+                    value={formPriority}
+                    onChange={(e) => setFormPriority(e.target.value)}
+                    required
+                  >
+                    {Object.entries(PRIORITY_LABEL_MAP).map(([code, label]) => (
+                      <option key={code} value={code}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label htmlFor="res-create-title">Konu / Başlık *</label>
                   <input
                     id="res-create-title"
                     type="text"
                     placeholder="Örn: Banyo bataryası su sızdırıyor"
                     value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
+                    onChange={(e) => {
+                      setFormTitle(e.target.value)
+                      invalidateAiSuggestion()
+                    }}
                     maxLength={200}
                     required
                   />
@@ -538,10 +655,48 @@ export function ResidentMaintenanceRequests() {
                     rows={6}
                     placeholder="Sorununuzu ve varsa uygun zamanlarınızı detaylıca açıklayın..."
                     value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
+                    onChange={(e) => {
+                      setFormDescription(e.target.value)
+                      invalidateAiSuggestion()
+                    }}
                     required
                   />
                 </div>
+
+                <section className="ai-assistant-panel" aria-labelledby="maintenance-ai-title">
+                  <div className="ai-assistant-heading">
+                    <div>
+                      <h3 id="maintenance-ai-title">AI desteği</h3>
+                      <p>Kategori ve öncelik için isteğe bağlı bir öneri alın. Öneri siz uygulamadıkça forma aktarılmaz.</p>
+                    </div>
+                    <button
+                      className="secondary-button compact-button"
+                      type="button"
+                      disabled={isAiLoading || formTitle.trim().length < 3 || formDescription.trim().length < 10 || formDescription.trim().length > 2000}
+                      onClick={() => void handleAiSuggestion()}
+                    >
+                      {isAiLoading ? 'Öneri hazırlanıyor...' : 'AI ile Öner'}
+                    </button>
+                  </div>
+
+                  {aiError && <p className="status-message info-message ai-assistant-message" role="status">{aiError}</p>}
+                  {aiSuggestion && (
+                    <div className="ai-suggestion-result" role="status">
+                      <div className="ai-suggestion-badges">
+                        <span className="status-badge info">{CATEGORY_LABEL_MAP[aiSuggestion.suggestedCategory]}</span>
+                        <span className="status-badge secondary">{PRIORITY_LABEL_MAP[aiSuggestion.suggestedPriority]}</span>
+                      </div>
+                      <p>{aiSuggestion.explanation}</p>
+                      {aiSuggestion.warnings.length > 0 && (
+                        <ul>{aiSuggestion.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                      )}
+                      <div className="ai-suggestion-actions">
+                        <button className="primary-button compact-button" type="button" onClick={applyAiSuggestion}>Öneriyi Uygula</button>
+                        <button className="secondary-button compact-button" type="button" onClick={() => setAiSuggestion(null)}>Yoksay</button>
+                      </div>
+                    </div>
+                  )}
+                </section>
 
                 <div className="form-group">
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 650, color: 'var(--color-text-secondary)' }}>
@@ -608,10 +763,10 @@ export function ResidentMaintenanceRequests() {
             </div>
 
             <div className="drawer-footer">
-              <button className="secondary-button" type="button" onClick={() => setIsCreateOpen(false)}>
+              <button className="secondary-button" type="button" onClick={() => void handleCloseCreateWithGuard()}>
                 Vazgeç
               </button>
-              <button className="primary-button" type="submit" form="create-resident-request-form" disabled={isSubmitting}>
+              <button className="primary-button" type="submit" form="create-resident-request-form" disabled={isSubmitting || !formUnitId}>
                 {isSubmitting ? 'Oluşturuluyor...' : 'Talep Oluştur'}
               </button>
             </div>

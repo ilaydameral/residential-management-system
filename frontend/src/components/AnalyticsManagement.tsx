@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   getBuildingsByProperty,
   getFacilityAnalytics,
   getFinanceAnalytics,
   getMaintenanceAnalytics,
   getProperties,
+  generateAnalyticsAiInsight,
 } from '../api'
 import type {
+  AnalyticsAiInsight,
   AnalyticsKpiComparison,
   AnalyticsFilters,
   Building,
@@ -173,6 +175,16 @@ export function AnalyticsManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [filterError, setFilterError] = useState('')
+  const [aiInsight, setAiInsight] = useState<AnalyticsAiInsight | null>(null)
+  const [aiError, setAiError] = useState('')
+  const [isAiLoading, setIsAiLoading] = useState(false)
+  const aiRequestVersionRef = useRef(0)
+
+  const hasUnappliedFilters =
+    (propertyId === 'all' ? undefined : propertyId) !== appliedFilters.propertyId ||
+    (buildingId === 'all' ? undefined : buildingId) !== appliedFilters.buildingId ||
+    fromDate !== appliedFilters.fromDate ||
+    toDate !== appliedFilters.toDate
 
   useEffect(() => {
     getProperties(false).then((items) => setProperties(items.filter((item) => item.isActive))).catch(() => setProperties([]))
@@ -222,6 +234,13 @@ export function AnalyticsManagement() {
 
   useEffect(() => { void loadAnalytics() }, [loadAnalytics])
 
+  useEffect(() => {
+    aiRequestVersionRef.current += 1
+    setAiInsight(null)
+    setAiError('')
+    setIsAiLoading(false)
+  }, [propertyId, buildingId, fromDate, toDate])
+
   const selectPreset = (value: Exclude<Preset, 'custom'>) => {
     const dates = presetDates(value)
     setPreset(value)
@@ -239,12 +258,35 @@ export function AnalyticsManagement() {
       return
     }
     setFilterError('')
+    setAiInsight(null)
+    setAiError('')
     setAppliedFilters({
       propertyId: propertyId === 'all' ? undefined : propertyId,
       buildingId: buildingId === 'all' ? undefined : buildingId,
       fromDate,
       toDate,
     })
+  }
+
+  const generateAiInsight = async () => {
+    if (isAiLoading || isLoading || hasUnappliedFilters || !finance || !maintenance || !facilities) return
+
+    setIsAiLoading(true)
+    setAiError('')
+    setAiInsight(null)
+    const requestVersion = ++aiRequestVersionRef.current
+    try {
+      const insight = await generateAnalyticsAiInsight(appliedFilters)
+      if (requestVersion === aiRequestVersionRef.current) setAiInsight(insight)
+    } catch (insightError) {
+      if (requestVersion === aiRequestVersionRef.current) {
+        setAiError(insightError instanceof Error
+          ? insightError.message
+          : 'AI içgörüsü şu anda oluşturulamıyor. Analiz verilerini kullanmaya devam edebilirsiniz.')
+      }
+    } finally {
+      if (requestVersion === aiRequestVersionRef.current) setIsAiLoading(false)
+    }
   }
 
   return (
@@ -265,6 +307,44 @@ export function AnalyticsManagement() {
         <button className="primary-button analytics-apply-button" type="button" disabled={isLoading} onClick={applyFilters}>Uygula</button>
         {filterError && <p className="status-message error-message analytics-filter-error" role="alert">{filterError}</p>}
         <p className="analytics-comparison-note">Karşılaştırmalar, seçilen tarih aralığından hemen önceki eşit uzunluktaki dönemle yapılır.</p>
+      </section>
+
+      <section className="panel analytics-ai-panel" aria-labelledby="analytics-ai-title">
+        <div className="analytics-ai-heading">
+          <div>
+            <p className="eyebrow">İsteğe Bağlı AI Desteği</p>
+            <h2 id="analytics-ai-title">Operasyonel içgörü</h2>
+            <p>Yalnızca ekrandaki yetkili kapsam ve tarih aralığına ait toplu veriler değerlendirilir.</p>
+          </div>
+          <button
+            className="primary-button compact-button"
+            type="button"
+            disabled={isAiLoading || isLoading || hasUnappliedFilters || Boolean(error) || !finance || !maintenance || !facilities}
+            onClick={() => void generateAiInsight()}
+          >
+            {isAiLoading ? 'İçgörü hazırlanıyor...' : 'AI İçgörüsü Oluştur'}
+          </button>
+        </div>
+        {hasUnappliedFilters && <p className="analytics-ai-note">İçgörü oluşturmadan önce filtre değişikliklerini uygulayın.</p>}
+        {aiError && <p className="status-message info-message analytics-ai-message" role="status">{aiError}</p>}
+        {aiInsight && (
+          <div className="analytics-ai-result" role="status">
+            <p>{aiInsight.summary}</p>
+            <div className="analytics-ai-lists">
+              <div>
+                <h3>Öne çıkanlar</h3>
+                <ul>{aiInsight.highlights.map((item) => <li key={item}>{item}</li>)}</ul>
+              </div>
+              {aiInsight.attentionPoints.length > 0 && (
+                <div>
+                  <h3>Dikkat noktaları</h3>
+                  <ul>{aiInsight.attentionPoints.map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+              )}
+            </div>
+            <small>{new Date(aiInsight.generatedAt).toLocaleString('tr-TR')} tarihinde oluşturuldu.</small>
+          </div>
+        )}
       </section>
 
       {isLoading ? <LoadingSkeleton variant="dashboard" /> : error ? (

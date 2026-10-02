@@ -107,6 +107,8 @@ import type {
   FinanceAnalytics,
   MaintenanceAnalytics,
   FacilityAnalytics,
+  MaintenanceAiSuggestion,
+  AnalyticsAiInsight,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -1271,7 +1273,9 @@ export async function getResidentAnnouncement(id: number): Promise<AnnouncementD
 // RESIDENT MAINTENANCE REQUESTS API
 // ==========================================
 export async function createResidentMaintenanceRequest(payload: {
+  unitId: number
   category: string
+  priority: string
   title: string
   description: string
 }): Promise<MaintenanceRequestDetailDto> {
@@ -1281,6 +1285,18 @@ export async function createResidentMaintenanceRequest(payload: {
     body: JSON.stringify(payload),
   })
   return handleResponse<MaintenanceRequestDetailDto>(response)
+}
+
+export async function getMaintenanceAiSuggestion(payload: {
+  title: string
+  description: string
+}): Promise<MaintenanceAiSuggestion> {
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/maintenance/suggest`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<MaintenanceAiSuggestion>(response)
 }
 
 export async function getResidentMaintenanceRequests(params?: {
@@ -1973,4 +1989,13 @@ export async function getFacilityAnalytics(filters: AnalyticsFilters): Promise<F
     headers: getAuthHeaders(),
   })
   return handleResponse<FacilityAnalytics>(response)
+}
+
+export async function generateAnalyticsAiInsight(filters: AnalyticsFilters): Promise<AnalyticsAiInsight> {
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/analytics/insight`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(filters),
+  })
+  return handleResponse<AnalyticsAiInsight>(response)
 }
