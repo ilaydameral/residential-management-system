@@ -1247,3 +1247,107 @@ export interface DocumentDownload {
   blob: Blob
   fileName: string | null
 }
+
+export interface AnalyticsFilters {
+  propertyId?: number
+  buildingId?: number
+  fromDate: string
+  toDate: string
+}
+
+export interface FinanceTrendPoint {
+  period: string
+  charged: number
+  collected: number
+}
+
+export interface AmountBreakdown {
+  key: string
+  amount: number
+}
+
+export interface BuildingAmountBreakdown {
+  buildingId: number
+  buildingName: string
+  amount: number
+}
+
+export interface AnalyticsKpiComparison {
+  currentValue: number | null
+  previousValue: number | null
+  percentageChange: number | null
+}
+
+export interface FinanceAnalytics {
+  fromDate: string
+  toDate: string
+  totalCharged: number
+  totalCollected: number
+  outstandingAmount: number
+  collectionRate: number
+  overdueChargeCount: number
+  overdueAmount: number
+  totalExpenses: number
+  netCashPosition: number
+  totalAssessedComparison: AnalyticsKpiComparison
+  totalCollectedComparison: AnalyticsKpiComparison
+  totalExpensesComparison: AnalyticsKpiComparison
+  trend: FinanceTrendPoint[]
+  expenseByCategory: AmountBreakdown[]
+  outstandingByBuilding: BuildingAmountBreakdown[]
+}
+
+export interface CountBreakdown {
+  key: string
+  count: number
+}
+
+export interface CountTrendPoint {
+  period: string
+  count: number
+}
+
+export interface BuildingCountBreakdown {
+  buildingId: number
+  buildingName: string
+  count: number
+}
+
+export interface MaintenanceAnalytics {
+  fromDate: string
+  toDate: string
+  totalRequests: number
+  openBacklog: number
+  inProgress: number
+  resolvedOrClosed: number
+  highOrEmergency: number
+  averageResolutionHours: number | null
+  totalRequestsComparison: AnalyticsKpiComparison
+  averageResolutionHoursComparison: AnalyticsKpiComparison
+  byCategory: CountBreakdown[]
+  byStatus: CountBreakdown[]
+  trend: CountTrendPoint[]
+  topBuildings: BuildingCountBreakdown[]
+}
+
+export interface FacilityUsageBreakdown {
+  facilityId: number
+  facilityName: string
+  reservationCount: number
+  bookedHours: number
+}
+
+export interface FacilityAnalytics {
+  fromDate: string
+  toDate: string
+  totalReservations: number
+  approvedOrCompleted: number
+  pending: number
+  cancelledOrRejected: number
+  bookedHours: number
+  totalReservationsComparison: AnalyticsKpiComparison
+  bookedHoursComparison: AnalyticsKpiComparison
+  byFacility: FacilityUsageBreakdown[]
+  byStatus: CountBreakdown[]
+  trend: CountTrendPoint[]
+}

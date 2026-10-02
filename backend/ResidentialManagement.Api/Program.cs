@@ -74,6 +74,7 @@ builder.Services.AddScoped<IResidentVehicleService, ResidentVehicleService>();
 builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 builder.Services.AddScoped<IDocumentFileStorageService, DocumentFileStorageService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddScoped<IRealtimePublisher, RealtimePublisher>();
 
 builder.Services.AddSignalR();

@@ -103,6 +103,10 @@ import type {
   UpdateDocumentMetadataPayload,
   UpdateDocumentStatusPayload,
   UploadDocumentPayload,
+  AnalyticsFilters,
+  FinanceAnalytics,
+  MaintenanceAnalytics,
+  FacilityAnalytics,
 } from './types'
 
 let unauthorizedHandler: (() => void) | null = null
@@ -1937,4 +1941,36 @@ export async function downloadResidentDocument(id: number): Promise<DocumentDown
   }
 
   return { blob: await response.blob(), fileName }
+}
+
+// ============================================================================
+// Phase 14: Management Analytics API
+// ============================================================================
+
+function analyticsQuery(filters: AnalyticsFilters): string {
+  const query = new URLSearchParams({ fromDate: filters.fromDate, toDate: filters.toDate })
+  if (filters.propertyId) query.set('propertyId', String(filters.propertyId))
+  if (filters.buildingId) query.set('buildingId', String(filters.buildingId))
+  return query.toString()
+}
+
+export async function getFinanceAnalytics(filters: AnalyticsFilters): Promise<FinanceAnalytics> {
+  const response = await safeFetch(`${API_BASE_URL}/api/analytics/finance?${analyticsQuery(filters)}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FinanceAnalytics>(response)
+}
+
+export async function getMaintenanceAnalytics(filters: AnalyticsFilters): Promise<MaintenanceAnalytics> {
+  const response = await safeFetch(`${API_BASE_URL}/api/analytics/maintenance?${analyticsQuery(filters)}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<MaintenanceAnalytics>(response)
+}
+
+export async function getFacilityAnalytics(filters: AnalyticsFilters): Promise<FacilityAnalytics> {
+  const response = await safeFetch(`${API_BASE_URL}/api/analytics/facilities?${analyticsQuery(filters)}`, {
+    headers: getAuthHeaders(),
+  })
+  return handleResponse<FacilityAnalytics>(response)
 }
