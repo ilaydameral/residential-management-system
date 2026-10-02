@@ -51,6 +51,14 @@ function presetDates(preset: Exclude<Preset, 'custom'>): Pick<AnalyticsFilters, 
   return { fromDate: toInputDate(start), toDate: toInputDate(end) }
 }
 
+function inclusiveCalendarDayCount(fromDate: string, toDate: string): number {
+  const [fromYear, fromMonth, fromDay] = fromDate.split('-').map(Number)
+  const [toYear, toMonth, toDay] = toDate.split('-').map(Number)
+  const fromUtc = Date.UTC(fromYear, fromMonth - 1, fromDay)
+  const toUtc = Date.UTC(toYear, toMonth - 1, toDay)
+  return Math.floor((toUtc - fromUtc) / 86_400_000) + 1
+}
+
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(value)
 }
@@ -176,9 +184,18 @@ export function AnalyticsManagement() {
       setBuildingId('all')
       return
     }
+
+    let isCurrentRequest = true
+    setBuildings([])
     getBuildingsByProperty(propertyId, false)
-      .then((items) => setBuildings(items.filter((item) => item.isActive)))
-      .catch(() => setBuildings([]))
+      .then((items) => {
+        if (isCurrentRequest) setBuildings(items.filter((item) => item.isActive))
+      })
+      .catch(() => {
+        if (isCurrentRequest) setBuildings([])
+      })
+
+    return () => { isCurrentRequest = false }
   }, [propertyId])
 
   const loadAnalytics = useCallback(async () => {
@@ -217,6 +234,10 @@ export function AnalyticsManagement() {
       setFilterError('Geçerli bir başlangıç ve bitiş tarihi seçin.')
       return
     }
+    if (inclusiveCalendarDayCount(fromDate, toDate) > 366) {
+      setFilterError('Tarih aralığı en fazla 366 gün olabilir.')
+      return
+    }
     setFilterError('')
     setAppliedFilters({
       propertyId: propertyId === 'all' ? undefined : propertyId,
@@ -251,7 +272,7 @@ export function AnalyticsManagement() {
       ) : finance && maintenance && facilities && (
         <div className="analytics-sections">
           <section className="analytics-domain-section" aria-labelledby="finance-analytics-title">
-            <div className="section-heading"><p className="eyebrow">Finans</p><h2 id="finance-analytics-title">Finansal görünüm</h2><p>Seçili dönemde tahakkuk, gerçek tahsilat ve gider hareketleri.</p></div>
+            <div className="section-heading"><p className="eyebrow">Finans</p><h2 id="finance-analytics-title">Finansal görünüm</h2><p>Tahsilat seçili dönemde alınan ödemeyi; tahsilat oranı ise bu dönemde vadelenen tahakkukların dönem sonundaki kapanma düzeyini gösterir.</p></div>
             <div className="analytics-metric-grid">
               <MetricCard label="Tahakkuk" value={formatCurrency(finance.totalCharged)} comparison={finance.totalAssessedComparison} />
               <MetricCard label="Tahsilat" value={formatCurrency(finance.totalCollected)} hint="Dönemde alınan ödeme" comparison={finance.totalCollectedComparison} />

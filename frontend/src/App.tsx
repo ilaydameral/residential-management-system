@@ -192,7 +192,7 @@ const MANAGEMENT_MENU: Array<{ id: ManagementView; label: string }> = [
   { id: 'visitors', label: 'Ziyaretçiler' },
   { id: 'vehicles', label: 'Araç Dizini' },
   { id: 'documents', label: 'Belgeler' },
-  { id: 'analytics', label: 'Analizler' },
+  { id: 'analytics', label: 'Operasyonel Analizler' },
   { id: 'announcements', label: 'Duyurular' },
   { id: 'maintenanceRequests', label: 'Talepler' },
   { id: 'account', label: 'Hesabım' },
