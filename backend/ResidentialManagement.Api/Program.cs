@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using ResidentialManagement.Api.Configurations;
 using ResidentialManagement.Api.Data;
 using ResidentialManagement.Api.Entities;
 using ResidentialManagement.Api.Middleware;
@@ -12,6 +13,7 @@ using ResidentialManagement.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
 
 builder.Services.AddCors(options =>
 {
@@ -75,6 +77,8 @@ builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 builder.Services.AddScoped<IDocumentFileStorageService, DocumentFileStorageService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddSingleton<IAiProvider, UnavailableAiProvider>();
+builder.Services.AddScoped<IAiAssistantService, AiAssistantService>();
 builder.Services.AddScoped<IRealtimePublisher, RealtimePublisher>();
 
 builder.Services.AddSignalR();

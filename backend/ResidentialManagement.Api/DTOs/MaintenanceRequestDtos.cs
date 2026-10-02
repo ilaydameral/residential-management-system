@@ -12,6 +12,10 @@ public class MaintenanceRequestCreateDto
     [StringLength(50, ErrorMessage = "Kategori en fazla 50 karakter olabilir.")]
     public string Category { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "Öncelik derecesi belirtilmelidir.")]
+    [StringLength(30, ErrorMessage = "Öncelik en fazla 30 karakter olabilir.")]
+    public string Priority { get; set; } = "NORMAL";
+
     [Required(ErrorMessage = "Talep başlığı boş olamaz.")]
     [StringLength(200, ErrorMessage = "Talep başlığı en fazla 200 karakter olabilir.")]
     public string Title { get; set; } = string.Empty;

@@ -29,7 +29,18 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message);
+            if (ex is AiUnavailableException or AiTimeoutException or AiRateLimitException)
+            {
+                _logger.LogWarning("Optional AI operation is unavailable. ErrorType={ErrorType}", ex.GetType().Name);
+            }
+            else if (ex is AiInvalidResponseException)
+            {
+                _logger.LogWarning("Optional AI operation returned an invalid response.");
+            }
+            else
+            {
+                _logger.LogError(ex, "An unhandled exception occurred: {Message}", ex.Message);
+            }
             await HandleExceptionAsync(context, ex);
         }
     }
@@ -45,7 +56,12 @@ public class ExceptionHandlingMiddleware
             BadRequestException => (int)HttpStatusCode.BadRequest,
             ConflictException => (int)HttpStatusCode.Conflict,
             InvalidOperationException => (int)HttpStatusCode.Conflict,
+            NotFoundException => (int)HttpStatusCode.NotFound,
             KeyNotFoundException => (int)HttpStatusCode.NotFound,
+            AiUnavailableException => (int)HttpStatusCode.ServiceUnavailable,
+            AiInvalidResponseException => (int)HttpStatusCode.BadGateway,
+            AiTimeoutException => (int)HttpStatusCode.GatewayTimeout,
+            AiRateLimitException => (int)HttpStatusCode.TooManyRequests,
             _ => (int)HttpStatusCode.InternalServerError
         };
 
