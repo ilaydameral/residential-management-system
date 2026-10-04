@@ -22,6 +22,19 @@ public sealed class MaintenanceAiSuggestionDto
     public List<string> Warnings { get; set; } = new();
 }
 
+public sealed class MaintenanceDescriptionImprovementRequestDto
+{
+    [Required(ErrorMessage = "Talep açıklaması boş olamaz.")]
+    [StringLength(2000, MinimumLength = 1, ErrorMessage = "Talep açıklaması en fazla 2000 karakter olabilir.")]
+    public string Description { get; set; } = string.Empty;
+}
+
+public sealed class MaintenanceDescriptionImprovementDto
+{
+    public string ImprovedDescription { get; set; } = string.Empty;
+    public DateTime GeneratedAt { get; set; }
+}
+
 public sealed class AnalyticsAiInsightRequestDto
 {
     public int? PropertyId { get; set; }

@@ -108,6 +108,7 @@ import type {
   MaintenanceAnalytics,
   FacilityAnalytics,
   MaintenanceAiSuggestion,
+  MaintenanceDescriptionImprovement,
   AnalyticsAiInsight,
 } from './types'
 
@@ -1297,6 +1298,17 @@ export async function getMaintenanceAiSuggestion(payload: {
     body: JSON.stringify(payload),
   })
   return handleResponse<MaintenanceAiSuggestion>(response)
+}
+
+export async function improveMaintenanceDescription(payload: {
+  description: string
+}): Promise<MaintenanceDescriptionImprovement> {
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/maintenance/improve-description`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<MaintenanceDescriptionImprovement>(response)
 }
 
 export async function getResidentMaintenanceRequests(params?: {

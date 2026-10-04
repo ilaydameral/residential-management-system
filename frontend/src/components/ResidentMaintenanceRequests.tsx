@@ -4,6 +4,7 @@ import {
   cancelResidentMaintenanceRequest,
   createResidentMaintenanceRequest,
   getMaintenanceAiSuggestion,
+  improveMaintenanceDescription,
   getMyUnits,
   getResidentMaintenanceRequest,
   getResidentMaintenanceRequestAttachmentFile,
@@ -17,7 +18,7 @@ import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
 import type { MaintenanceRequestUpdatedEvent } from '../realtime/types'
-import type { MaintenanceAiSuggestion, MaintenanceRequestDetailDto, MaintenanceRequestListItemDto, ResidentUnit } from '../types'
+import type { MaintenanceAiSuggestion, MaintenanceDescriptionImprovement, MaintenanceRequestDetailDto, MaintenanceRequestListItemDto, ResidentUnit } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
@@ -120,6 +121,9 @@ export function ResidentMaintenanceRequests() {
   const [aiSuggestion, setAiSuggestion] = useState<MaintenanceAiSuggestion | null>(null)
   const [aiError, setAiError] = useState('')
   const [isAiLoading, setIsAiLoading] = useState(false)
+  const [descriptionImprovement, setDescriptionImprovement] = useState<MaintenanceDescriptionImprovement | null>(null)
+  const [descriptionImprovementError, setDescriptionImprovementError] = useState('')
+  const [isDescriptionImprovementLoading, setIsDescriptionImprovementLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -136,6 +140,7 @@ export function ResidentMaintenanceRequests() {
   const createBodyRef = useRef<HTMLDivElement>(null)
   const detailBodyRef = useRef<HTMLDivElement>(null)
   const aiRequestVersionRef = useRef(0)
+  const descriptionImprovementRequestVersionRef = useRef(0)
 
   const { shouldRender: shouldRenderCreate, phase: createPhase } = useAnimatedDrawer(isCreateOpen)
   const { shouldRender: shouldRenderDetail, phase: detailPhase } = useAnimatedDrawer(isDetailOpen)
@@ -157,6 +162,10 @@ export function ResidentMaintenanceRequests() {
     setAiError('')
     setIsAiLoading(false)
     aiRequestVersionRef.current += 1
+    setDescriptionImprovement(null)
+    setDescriptionImprovementError('')
+    setIsDescriptionImprovementLoading(false)
+    descriptionImprovementRequestVersionRef.current += 1
   }, [residentUnits])
 
   const handleCloseCreateWithGuard = useCallback(async () => {
@@ -300,6 +309,52 @@ export function ResidentMaintenanceRequests() {
     setAiSuggestion(null)
     setAiError('')
     setIsAiLoading(false)
+  }
+
+  const invalidateDescriptionImprovement = () => {
+    descriptionImprovementRequestVersionRef.current += 1
+    setDescriptionImprovement(null)
+    setDescriptionImprovementError('')
+    setIsDescriptionImprovementLoading(false)
+  }
+
+  const handleDescriptionImprovement = async () => {
+    const descriptionSnapshot = formDescription.trim()
+    if (!descriptionSnapshot || descriptionSnapshot.length > 2000 || isDescriptionImprovementLoading) return
+
+    setIsDescriptionImprovementLoading(true)
+    setDescriptionImprovementError('')
+    setDescriptionImprovement(null)
+    const requestVersion = ++descriptionImprovementRequestVersionRef.current
+    try {
+      const improvement = await improveMaintenanceDescription({ description: descriptionSnapshot })
+      if (
+        requestVersion === descriptionImprovementRequestVersionRef.current &&
+        formDescription.trim() === descriptionSnapshot
+      ) {
+        setDescriptionImprovement(improvement)
+      }
+    } catch {
+      if (requestVersion === descriptionImprovementRequestVersionRef.current) {
+        setDescriptionImprovementError(
+          'AI açıklama önerisi şu anda kullanılamıyor. Açıklamanızı kendiniz düzenleyerek devam edebilirsiniz.',
+        )
+      }
+    } finally {
+      if (requestVersion === descriptionImprovementRequestVersionRef.current) {
+        setIsDescriptionImprovementLoading(false)
+      }
+    }
+  }
+
+  const applyDescriptionImprovement = () => {
+    if (!descriptionImprovement) return
+    setFormDescription(descriptionImprovement.improvedDescription)
+    descriptionImprovementRequestVersionRef.current += 1
+    setDescriptionImprovement(null)
+    setDescriptionImprovementError('')
+    invalidateAiSuggestion()
+    showToast('AI açıklama önerisi uygulandı. Kaydetmeden önce metni kontrol edebilirsiniz.')
   }
 
   const applyAiSuggestion = () => {
@@ -658,9 +713,39 @@ export function ResidentMaintenanceRequests() {
                     onChange={(e) => {
                       setFormDescription(e.target.value)
                       invalidateAiSuggestion()
+                      invalidateDescriptionImprovement()
                     }}
                     required
                   />
+                  <div className="description-ai-action-row">
+                    <button
+                      className="secondary-button compact-button"
+                      type="button"
+                      disabled={isDescriptionImprovementLoading || !formDescription.trim() || formDescription.trim().length > 2000}
+                      onClick={() => void handleDescriptionImprovement()}
+                    >
+                      {isDescriptionImprovementLoading ? 'Açıklama iyileştiriliyor...' : 'AI ile Açıklamayı İyileştir'}
+                    </button>
+                  </div>
+                  {descriptionImprovementError && (
+                    <p className="status-message info-message ai-assistant-message" role="status">
+                      {descriptionImprovementError}
+                    </p>
+                  )}
+                  {descriptionImprovement && (
+                    <div className="ai-suggestion-result description-ai-result" role="status" aria-live="polite">
+                      <strong>AI açıklama önerisi</strong>
+                      <p>{descriptionImprovement.improvedDescription}</p>
+                      <div className="ai-suggestion-actions">
+                        <button className="primary-button compact-button" type="button" onClick={applyDescriptionImprovement}>
+                          Açıklamaya Uygula
+                        </button>
+                        <button className="secondary-button compact-button" type="button" onClick={invalidateDescriptionImprovement}>
+                          Yoksay
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <section className="ai-assistant-panel" aria-labelledby="maintenance-ai-title">

@@ -903,6 +903,11 @@ export interface MaintenanceAiSuggestion {
   warnings: string[]
 }
 
+export interface MaintenanceDescriptionImprovement {
+  improvedDescription: string
+  generatedAt: string
+}
+
 export interface MaintenanceRequestAssignPayload {
   assignedToUserId: number
 }

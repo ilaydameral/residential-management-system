@@ -27,6 +27,13 @@ public sealed class AiController : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await _aiAssistantService.SuggestMaintenanceAsync(request, cancellationToken));
 
+    [HttpPost("maintenance/improve-description")]
+    [Authorize(Roles = AppRoles.Resident)]
+    public async Task<ActionResult<MaintenanceDescriptionImprovementDto>> ImproveMaintenanceDescription(
+        [FromBody] MaintenanceDescriptionImprovementRequestDto request,
+        CancellationToken cancellationToken)
+        => Ok(await _aiAssistantService.ImproveMaintenanceDescriptionAsync(request, cancellationToken));
+
     [HttpPost("analytics/insight")]
     [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<AnalyticsAiInsightDto>> GenerateAnalyticsInsight(

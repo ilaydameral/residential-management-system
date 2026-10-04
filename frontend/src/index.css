@@ -445,6 +445,28 @@
   margin-top: 12px;
 }
 
+.description-ai-action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.description-ai-result {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.description-ai-result > strong {
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+}
+
+.description-ai-result > p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 1180px) {
   .analytics-filter-panel {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -507,6 +529,10 @@
 
   .analytics-ai-lists {
     grid-template-columns: 1fr;
+  }
+
+  .description-ai-action-row {
+    justify-content: flex-start;
   }
 }
 
