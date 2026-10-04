@@ -8,6 +8,14 @@ public sealed class AiUnavailableException : Exception
     }
 }
 
+public sealed class AiModelUnavailableException : Exception
+{
+    public AiModelUnavailableException()
+        : base("AI yardımcısı için yapılandırılmış model bulunamadı. Lütfen daha sonra tekrar deneyin.")
+    {
+    }
+}
+
 public sealed class AiInvalidResponseException : Exception
 {
     public AiInvalidResponseException()

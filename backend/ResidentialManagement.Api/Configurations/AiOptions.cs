@@ -8,5 +8,5 @@ public sealed class AiOptions
     public string Model { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
     public string BaseUrl { get; set; } = string.Empty;
-    public int TimeoutSeconds { get; set; } = 20;
+    public int TimeoutSeconds { get; set; } = 60;
 }

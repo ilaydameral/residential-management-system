@@ -29,7 +29,7 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            if (ex is AiUnavailableException or AiTimeoutException or AiRateLimitException)
+            if (ex is AiUnavailableException or AiModelUnavailableException or AiTimeoutException or AiRateLimitException)
             {
                 _logger.LogWarning("Optional AI operation is unavailable. ErrorType={ErrorType}", ex.GetType().Name);
             }
@@ -59,6 +59,7 @@ public class ExceptionHandlingMiddleware
             NotFoundException => (int)HttpStatusCode.NotFound,
             KeyNotFoundException => (int)HttpStatusCode.NotFound,
             AiUnavailableException => (int)HttpStatusCode.ServiceUnavailable,
+            AiModelUnavailableException => (int)HttpStatusCode.ServiceUnavailable,
             AiInvalidResponseException => (int)HttpStatusCode.BadGateway,
             AiTimeoutException => (int)HttpStatusCode.GatewayTimeout,
             AiRateLimitException => (int)HttpStatusCode.TooManyRequests,

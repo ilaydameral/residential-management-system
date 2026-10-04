@@ -260,6 +260,10 @@ public sealed class AiAssistantService : IAiAssistantService
         {
             throw;
         }
+        catch (AiModelUnavailableException)
+        {
+            throw;
+        }
         catch (AiInvalidResponseException)
         {
             throw;

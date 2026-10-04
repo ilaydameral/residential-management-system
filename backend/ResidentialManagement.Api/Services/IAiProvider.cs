@@ -1,10 +1,14 @@
+using System.Text.Json;
+
 namespace ResidentialManagement.Api.Services;
 
 public sealed record AiProviderRequest(
     string UseCase,
     string SystemInstruction,
     string UserContent,
-    int MaxOutputCharacters);
+    int MaxOutputCharacters,
+    JsonElement? ResponseSchema = null,
+    int MaxOutputTokens = 500);
 
 public sealed record AiProviderResponse(string Content);
 
