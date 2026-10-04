@@ -343,6 +343,9 @@ export function AnalyticsManagement() {
               )}
             </div>
             <small>{new Date(aiInsight.generatedAt).toLocaleString('tr-TR')} tarihinde oluşturuldu.</small>
+            {!aiInsight.aiEnhanced && (
+              <small>AI sağlayıcısı kullanılamadığı için doğrulanmış analiz bulguları gösteriliyor.</small>
+            )}
           </div>
         )}
       </section>

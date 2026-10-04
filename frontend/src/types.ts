@@ -1267,6 +1267,7 @@ export interface AnalyticsAiInsight {
   summary: string
   highlights: string[]
   attentionPoints: string[]
+  aiEnhanced: boolean
   generatedAt: string
 }
 

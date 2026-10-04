@@ -77,6 +77,7 @@ builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 builder.Services.AddScoped<IDocumentFileStorageService, DocumentFileStorageService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddScoped<IAnalyticsInsightFactService, AnalyticsInsightFactService>();
 var aiProviderName = builder.Configuration[$"{AiOptions.SectionName}:Provider"];
 if (string.Equals(aiProviderName, "Ollama", StringComparison.OrdinalIgnoreCase))
 {
