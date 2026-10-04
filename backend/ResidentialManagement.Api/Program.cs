@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using ResidentialManagement.Api.Configurations;
 using ResidentialManagement.Api.Data;
 using ResidentialManagement.Api.Entities;
 using ResidentialManagement.Api.Middleware;
@@ -12,6 +13,7 @@ using ResidentialManagement.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
 
 builder.Services.AddCors(options =>
 {
@@ -75,6 +77,21 @@ builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 builder.Services.AddScoped<IDocumentFileStorageService, DocumentFileStorageService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddScoped<IAnalyticsInsightFactService, AnalyticsInsightFactService>();
+var aiProviderName = builder.Configuration[$"{AiOptions.SectionName}:Provider"];
+if (string.Equals(aiProviderName, "Ollama", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHttpClient<IAiProvider, OllamaAiProvider>(client =>
+    {
+        // AiAssistantService owns the bounded timeout and distinguishes it from caller cancellation.
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    });
+}
+else
+{
+    builder.Services.AddSingleton<IAiProvider, UnavailableAiProvider>();
+}
+builder.Services.AddScoped<IAiAssistantService, AiAssistantService>();
 builder.Services.AddScoped<IRealtimePublisher, RealtimePublisher>();
 
 builder.Services.AddSignalR();

@@ -895,6 +895,14 @@ export interface MaintenanceRequestListResponseDto {
   items: MaintenanceRequestListItemDto[]
 }
 
+export interface MaintenanceAiSuggestion {
+  suggestedCategory: string
+  suggestedPriority: string
+  confidence: number | null
+  explanation: string
+  warnings: string[]
+}
+
 export interface MaintenanceRequestAssignPayload {
   assignedToUserId: number
 }
@@ -1253,6 +1261,14 @@ export interface AnalyticsFilters {
   buildingId?: number
   fromDate: string
   toDate: string
+}
+
+export interface AnalyticsAiInsight {
+  summary: string
+  highlights: string[]
+  attentionPoints: string[]
+  aiEnhanced: boolean
+  generatedAt: string
 }
 
 export interface FinanceTrendPoint {

@@ -331,6 +331,29 @@ npm --prefix frontend run dev
 ```
 Runs at `http://localhost:5173`.
 
+### Optional Local AI with Ollama
+
+AI support is optional and disabled by default. The application and its maintenance and analytics workflows continue to work when Ollama is not installed or configured.
+
+To enable local inference, install and start [Ollama](https://ollama.com/download) manually, then download a small instruction model. `qwen2.5:3b` is a practical development default for Turkish and structured JSON output:
+
+```bash
+ollama pull qwen2.5:3b
+```
+
+Configure the backend through environment variables or .NET User Secrets. Do not commit machine-specific URLs, model choices, or credentials:
+
+```bash
+export Ai__Provider=Ollama
+export Ai__Model=qwen2.5:3b
+export Ai__BaseUrl=http://localhost:11434
+export Ai__TimeoutSeconds=60
+
+dotnet run --project backend/ResidentialManagement.Api
+```
+
+To return to provider-free operation, unset these variables or set `Ai__Provider=Disabled`. No OpenAI API key or other external credential is required for the Ollama provider.
+
 ### Local Development Ports & Process Management
 
 - **Backend**: Runs on `http://localhost:5006`

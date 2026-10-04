@@ -47,6 +47,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
     public async Task<MaintenanceRequestDetailDto> CreateRequestAsync(MaintenanceRequestCreateDto dto, int residentUserId)
     {
         var category = NormalizeCategory(dto.Category);
+        var priority = NormalizePriority(dto.Priority);
         var now = DateTime.UtcNow;
 
         // Verify resident has active occupancy for unit
@@ -84,7 +85,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
                 Category = category,
                 Title = dto.Title.Trim(),
                 Description = dto.Description.Trim(),
-                Priority = "NORMAL",
+                Priority = priority,
                 Status = "OPEN",
                 CreatedAt = now
             };
