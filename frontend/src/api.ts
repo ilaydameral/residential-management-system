@@ -109,6 +109,7 @@ import type {
   FacilityAnalytics,
   MaintenanceAiSuggestion,
   MaintenanceDescriptionImprovement,
+  MaintenanceImageAnalysis,
   AnalyticsAiInsight,
 } from './types'
 
@@ -1309,6 +1310,25 @@ export async function improveMaintenanceDescription(payload: {
     body: JSON.stringify(payload),
   })
   return handleResponse<MaintenanceDescriptionImprovement>(response)
+}
+
+export async function analyzeMaintenanceImage(payload: {
+  image: File
+  title?: string
+  description?: string
+}, signal?: AbortSignal): Promise<MaintenanceImageAnalysis> {
+  const body = new FormData()
+  body.append('image', payload.image)
+  if (payload.title) body.append('title', payload.title)
+  if (payload.description) body.append('description', payload.description)
+
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/maintenance/analyze-image`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body,
+    signal,
+  })
+  return handleResponse<MaintenanceImageAnalysis>(response)
 }
 
 export async function getResidentMaintenanceRequests(params?: {

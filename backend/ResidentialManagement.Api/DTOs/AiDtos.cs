@@ -35,6 +35,28 @@ public sealed class MaintenanceDescriptionImprovementDto
     public DateTime GeneratedAt { get; set; }
 }
 
+public sealed class MaintenanceImageAnalysisRequestDto
+{
+    [Required(ErrorMessage = "Analiz edilecek görsel zorunludur.")]
+    public IFormFile Image { get; set; } = null!;
+
+    [StringLength(200, ErrorMessage = "Talep başlığı en fazla 200 karakter olabilir.")]
+    public string? Title { get; set; }
+
+    [StringLength(2000, ErrorMessage = "Talep açıklaması en fazla 2000 karakter olabilir.")]
+    public string? Description { get; set; }
+}
+
+public sealed class MaintenanceImageAnalysisDto
+{
+    public string Observation { get; set; } = string.Empty;
+    public string SuggestedCategory { get; set; } = string.Empty;
+    public string SuggestedPriority { get; set; } = string.Empty;
+    public decimal? Confidence { get; set; }
+    public List<string> Warnings { get; set; } = new();
+    public DateTime GeneratedAt { get; set; }
+}
+
 public sealed class AnalyticsAiInsightRequestDto
 {
     public int? PropertyId { get; set; }

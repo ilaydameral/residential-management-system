@@ -354,6 +354,21 @@ dotnet run --project backend/ResidentialManagement.Api
 
 To return to provider-free operation, unset these variables or set `Ai__Provider=Disabled`. No OpenAI API key or other external credential is required for the Ollama provider.
 
+#### Optional Local Vision Analysis
+
+Text AI and maintenance-photo analysis are independent. Vision is disabled by default, and the normal maintenance form plus text AI features continue to work without a vision model. For a 24 GB Apple Silicon development machine, the optional `gemma3:12b` model provides multilingual image understanding and structured output:
+
+```bash
+ollama pull gemma3:12b
+
+export Ai__Vision__Provider=Ollama
+export Ai__Vision__Model=gemma3:12b
+export Ai__Vision__BaseUrl=http://localhost:11434
+export Ai__Vision__TimeoutSeconds=90
+```
+
+Local Ollama vision analysis does not require an API key. Keep `Ai__Vision__Provider=Disabled` (or leave it unset) on environments that should not offer the optional feature. Model files remain in Ollama's local model store and are never part of this repository.
+
 ### Local Development Ports & Process Management
 
 - **Backend**: Runs on `http://localhost:5006`

@@ -467,6 +467,41 @@
   overflow-wrap: anywhere;
 }
 
+.vision-ai-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+
+.vision-ai-action-row > span {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.vision-ai-result {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.vision-ai-result > strong {
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+}
+
+.vision-ai-result > p {
+  overflow-wrap: anywhere;
+}
+
+.vision-ai-result .ai-suggestion-badges {
+  margin: 0;
+}
+
 @media (max-width: 1180px) {
   .analytics-filter-panel {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -533,6 +568,17 @@
 
   .description-ai-action-row {
     justify-content: flex-start;
+  }
+
+  .vision-ai-action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vision-ai-action-row .secondary-button {
+    align-self: flex-start;
+    max-width: 100%;
+    white-space: normal;
   }
 }
 

@@ -908,6 +908,15 @@ export interface MaintenanceDescriptionImprovement {
   generatedAt: string
 }
 
+export interface MaintenanceImageAnalysis {
+  observation: string
+  suggestedCategory: string
+  suggestedPriority: string
+  confidence: number | null
+  warnings: string[]
+  generatedAt: string
+}
+
 export interface MaintenanceRequestAssignPayload {
   assignedToUserId: number
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
+  analyzeMaintenanceImage,
   cancelResidentMaintenanceRequest,
   createResidentMaintenanceRequest,
   getMaintenanceAiSuggestion,
@@ -18,7 +19,7 @@ import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import { useRealtimeMaintenance } from '../realtime/useRealtimeMaintenance'
 import type { MaintenanceRequestUpdatedEvent } from '../realtime/types'
-import type { MaintenanceAiSuggestion, MaintenanceDescriptionImprovement, MaintenanceRequestDetailDto, MaintenanceRequestListItemDto, ResidentUnit } from '../types'
+import type { MaintenanceAiSuggestion, MaintenanceDescriptionImprovement, MaintenanceImageAnalysis, MaintenanceRequestDetailDto, MaintenanceRequestListItemDto, ResidentUnit } from '../types'
 import { ConfirmationDialog } from './ConfirmationDialog'
 import { LoadingSkeleton } from './LoadingSkeleton'
 
@@ -46,6 +47,15 @@ const PRIORITY_LABEL_MAP: Record<string, string> = {
   NORMAL: 'Normal',
   HIGH: 'Yüksek',
   EMERGENCY: 'Acil',
+}
+
+const MAX_VISION_IMAGE_BYTES = 5 * 1024 * 1024
+
+function isVisionCompatibleFile(file: File | null): file is File {
+  if (!file || file.size <= 0 || file.size > MAX_VISION_IMAGE_BYTES) return false
+  const extension = file.name.toLowerCase()
+  return (file.type === 'image/jpeg' && (extension.endsWith('.jpg') || extension.endsWith('.jpeg'))) ||
+    (file.type === 'image/png' && extension.endsWith('.png'))
 }
 
 const TIMELINE_EVENT_TITLE_MAP: Record<string, { title: string; color: string }> = {
@@ -125,6 +135,9 @@ export function ResidentMaintenanceRequests() {
   const [descriptionImprovementError, setDescriptionImprovementError] = useState('')
   const [isDescriptionImprovementLoading, setIsDescriptionImprovementLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [imageAnalysis, setImageAnalysis] = useState<MaintenanceImageAnalysis | null>(null)
+  const [imageAnalysisError, setImageAnalysisError] = useState('')
+  const [isImageAnalysisLoading, setIsImageAnalysisLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Detail Drawer State
@@ -141,6 +154,8 @@ export function ResidentMaintenanceRequests() {
   const detailBodyRef = useRef<HTMLDivElement>(null)
   const aiRequestVersionRef = useRef(0)
   const descriptionImprovementRequestVersionRef = useRef(0)
+  const imageAnalysisRequestVersionRef = useRef(0)
+  const imageAnalysisAbortRef = useRef<AbortController | null>(null)
 
   const { shouldRender: shouldRenderCreate, phase: createPhase } = useAnimatedDrawer(isCreateOpen)
   const { shouldRender: shouldRenderDetail, phase: detailPhase } = useAnimatedDrawer(isDetailOpen)
@@ -151,6 +166,8 @@ export function ResidentMaintenanceRequests() {
   const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isCreateDirty)
 
   const closeCreate = useCallback(() => {
+    imageAnalysisAbortRef.current?.abort()
+    imageAnalysisAbortRef.current = null
     setIsCreateOpen(false)
     setFormTitle('')
     setFormDescription('')
@@ -166,6 +183,10 @@ export function ResidentMaintenanceRequests() {
     setDescriptionImprovementError('')
     setIsDescriptionImprovementLoading(false)
     descriptionImprovementRequestVersionRef.current += 1
+    setImageAnalysis(null)
+    setImageAnalysisError('')
+    setIsImageAnalysisLoading(false)
+    imageAnalysisRequestVersionRef.current += 1
   }, [residentUnits])
 
   const handleCloseCreateWithGuard = useCallback(async () => {
@@ -318,6 +339,72 @@ export function ResidentMaintenanceRequests() {
     setIsDescriptionImprovementLoading(false)
   }
 
+  const invalidateImageAnalysis = () => {
+    imageAnalysisAbortRef.current?.abort()
+    imageAnalysisAbortRef.current = null
+    imageAnalysisRequestVersionRef.current += 1
+    setImageAnalysis(null)
+    setImageAnalysisError('')
+    setIsImageAnalysisLoading(false)
+  }
+
+  const handleSelectedFileChange = (file: File | null) => {
+    setSelectedFile(file)
+    invalidateImageAnalysis()
+  }
+
+  const handleImageAnalysis = async () => {
+    if (!isVisionCompatibleFile(selectedFile) || isImageAnalysisLoading) return
+
+    const fileSnapshot = selectedFile
+    const titleSnapshot = formTitle.trim()
+    const descriptionSnapshot = formDescription.trim()
+    setIsImageAnalysisLoading(true)
+    setImageAnalysisError('')
+    setImageAnalysis(null)
+    const requestVersion = ++imageAnalysisRequestVersionRef.current
+    const abortController = new AbortController()
+    imageAnalysisAbortRef.current = abortController
+
+    try {
+      const analysis = await analyzeMaintenanceImage({
+        image: fileSnapshot,
+        title: titleSnapshot || undefined,
+        description: descriptionSnapshot || undefined,
+      }, abortController.signal)
+      if (
+        requestVersion === imageAnalysisRequestVersionRef.current &&
+        selectedFile === fileSnapshot &&
+        formTitle.trim() === titleSnapshot &&
+        formDescription.trim() === descriptionSnapshot
+      ) {
+        setImageAnalysis(analysis)
+      }
+    } catch {
+      if (requestVersion === imageAnalysisRequestVersionRef.current) {
+        setImageAnalysisError(
+          'Görsel analizi şu anda kullanılamıyor. Bakım talebinizi normal şekilde oluşturmaya devam edebilirsiniz.',
+        )
+      }
+    } finally {
+      if (imageAnalysisAbortRef.current === abortController) {
+        imageAnalysisAbortRef.current = null
+      }
+      if (requestVersion === imageAnalysisRequestVersionRef.current) {
+        setIsImageAnalysisLoading(false)
+      }
+    }
+  }
+
+  const applyImageAnalysis = () => {
+    if (!imageAnalysis) return
+    setFormCategory(imageAnalysis.suggestedCategory)
+    setFormPriority(imageAnalysis.suggestedPriority)
+    invalidateImageAnalysis()
+    invalidateAiSuggestion()
+    showToast('Görsel analizi önerisi forma uygulandı. Kaydetmeden önce kontrol edebilirsiniz.')
+  }
+
   const handleDescriptionImprovement = async () => {
     const descriptionSnapshot = formDescription.trim()
     if (!descriptionSnapshot || descriptionSnapshot.length > 2000 || isDescriptionImprovementLoading) return
@@ -354,6 +441,7 @@ export function ResidentMaintenanceRequests() {
     setDescriptionImprovement(null)
     setDescriptionImprovementError('')
     invalidateAiSuggestion()
+    invalidateImageAnalysis()
     showToast('AI açıklama önerisi uygulandı. Kaydetmeden önce metni kontrol edebilirsiniz.')
   }
 
@@ -362,6 +450,7 @@ export function ResidentMaintenanceRequests() {
     setFormCategory(aiSuggestion.suggestedCategory)
     setFormPriority(aiSuggestion.suggestedPriority)
     setAiSuggestion(null)
+    invalidateImageAnalysis()
     showToast('AI önerisi forma uygulandı. Kaydetmeden önce kontrol edebilirsiniz.')
   }
 
@@ -697,6 +786,7 @@ export function ResidentMaintenanceRequests() {
                     onChange={(e) => {
                       setFormTitle(e.target.value)
                       invalidateAiSuggestion()
+                      invalidateImageAnalysis()
                     }}
                     maxLength={200}
                     required
@@ -714,6 +804,7 @@ export function ResidentMaintenanceRequests() {
                       setFormDescription(e.target.value)
                       invalidateAiSuggestion()
                       invalidateDescriptionImprovement()
+                      invalidateImageAnalysis()
                     }}
                     required
                   />
@@ -801,7 +892,8 @@ export function ResidentMaintenanceRequests() {
                     <input
                       id="res-create-file"
                       type="file"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                      onChange={(e) => handleSelectedFileChange(e.target.files?.[0] || null)}
                       style={{ display: 'none' }}
                     />
                     <label
@@ -834,15 +926,60 @@ export function ResidentMaintenanceRequests() {
                           padding: '0 4px',
                         }}
                         title="Dosyayı kaldır"
-                        onClick={() => setSelectedFile(null)}
+                        aria-label="Seçilen dosyayı kaldır"
+                        onClick={() => handleSelectedFileChange(null)}
                       >
                         ✕
                       </button>
                     )}
                   </div>
                   <small style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem', marginTop: '4px', display: 'block' }}>
-                    Desteklenen formatlar: Görsel (JPG, PNG) veya Doküman (PDF, DOCX). Maksimum 10 MB.
+                    Desteklenen formatlar: Görsel (JPG, PNG) veya Doküman (PDF). Maksimum 5 MB.
                   </small>
+                  <div className="vision-ai-action-row">
+                    <button
+                      className="secondary-button compact-button"
+                      type="button"
+                      disabled={!isVisionCompatibleFile(selectedFile) || isImageAnalysisLoading}
+                      onClick={() => void handleImageAnalysis()}
+                    >
+                      {isImageAnalysisLoading ? 'Görsel analiz ediliyor...' : 'AI ile Görseli Analiz Et'}
+                    </button>
+                    {selectedFile && !isVisionCompatibleFile(selectedFile) && (
+                      <span>AI görsel analizi için en fazla 5 MB boyutunda bir JPG veya PNG seçin.</span>
+                    )}
+                  </div>
+                  {imageAnalysisError && (
+                    <p className="status-message info-message ai-assistant-message" role="status">
+                      {imageAnalysisError}
+                    </p>
+                  )}
+                  {imageAnalysis && (
+                    <div className="ai-suggestion-result vision-ai-result" role="status" aria-live="polite">
+                      <strong>AI görsel analizi</strong>
+                      <p>{imageAnalysis.observation}</p>
+                      <div className="ai-suggestion-badges">
+                        <span className="status-badge info">{CATEGORY_LABEL_MAP[imageAnalysis.suggestedCategory]}</span>
+                        <span className="status-badge secondary">{PRIORITY_LABEL_MAP[imageAnalysis.suggestedPriority]}</span>
+                        {imageAnalysis.confidence !== null && (
+                          <span className="status-badge status-badge-neutral">
+                            Güven: %{Math.round(imageAnalysis.confidence * 100)}
+                          </span>
+                        )}
+                      </div>
+                      {imageAnalysis.warnings.length > 0 && (
+                        <ul>{imageAnalysis.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+                      )}
+                      <div className="ai-suggestion-actions">
+                        <button className="primary-button compact-button" type="button" onClick={applyImageAnalysis}>
+                          Öneriyi Uygula
+                        </button>
+                        <button className="secondary-button compact-button" type="button" onClick={invalidateImageAnalysis}>
+                          Yoksay
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </form>
             </div>

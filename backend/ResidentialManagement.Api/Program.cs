@@ -91,7 +91,22 @@ else
 {
     builder.Services.AddSingleton<IAiProvider, UnavailableAiProvider>();
 }
+var aiVisionProviderName = builder.Configuration[$"{AiOptions.SectionName}:Vision:Provider"];
+if (string.Equals(aiVisionProviderName, "Ollama", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHttpClient<IAiVisionProvider, OllamaAiVisionProvider>(client =>
+    {
+        // MaintenanceVisionAnalysisService owns the bounded timeout.
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    });
+}
+else
+{
+    builder.Services.AddSingleton<IAiVisionProvider, UnavailableAiVisionProvider>();
+}
 builder.Services.AddScoped<IAiAssistantService, AiAssistantService>();
+builder.Services.AddSingleton<IMaintenanceImageValidator, MaintenanceImageValidator>();
+builder.Services.AddScoped<IMaintenanceVisionAnalysisService, MaintenanceVisionAnalysisService>();
 builder.Services.AddScoped<IRealtimePublisher, RealtimePublisher>();
 
 builder.Services.AddSignalR();

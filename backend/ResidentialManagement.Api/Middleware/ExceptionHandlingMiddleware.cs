@@ -27,6 +27,10 @@ public class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogDebug("Request was cancelled by the client. Path={Path}", context.Request.Path);
+        }
         catch (Exception ex)
         {
             if (ex is AiUnavailableException or AiModelUnavailableException or AiTimeoutException or AiRateLimitException)
