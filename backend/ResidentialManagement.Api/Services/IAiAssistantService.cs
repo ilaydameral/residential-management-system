@@ -12,6 +12,10 @@ public interface IAiAssistantService
         MaintenanceDescriptionImprovementRequestDto request,
         CancellationToken cancellationToken);
 
+    Task<AnnouncementTextImprovementDto> ImproveAnnouncementTextAsync(
+        AnnouncementTextImprovementRequestDto request,
+        CancellationToken cancellationToken);
+
     Task<AnalyticsAiInsightDto> GenerateAnalyticsInsightAsync(
         int userId,
         bool isAdmin,

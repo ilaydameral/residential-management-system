@@ -38,6 +38,13 @@ public sealed class AiController : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await _aiAssistantService.ImproveMaintenanceDescriptionAsync(request, cancellationToken));
 
+    [HttpPost("announcements/improve")]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
+    public async Task<ActionResult<AnnouncementTextImprovementDto>> ImproveAnnouncementText(
+        [FromBody] AnnouncementTextImprovementRequestDto request,
+        CancellationToken cancellationToken)
+        => Ok(await _aiAssistantService.ImproveAnnouncementTextAsync(request, cancellationToken));
+
     [HttpPost("maintenance/analyze-image")]
     [Authorize(Roles = AppRoles.Resident)]
     [Consumes("multipart/form-data")]

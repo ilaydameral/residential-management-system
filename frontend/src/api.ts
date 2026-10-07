@@ -109,6 +109,8 @@ import type {
   FacilityAnalytics,
   MaintenanceAiSuggestion,
   MaintenanceDescriptionImprovement,
+  AnnouncementImprovementMode,
+  AnnouncementTextImprovement,
   MaintenanceImageAnalysis,
   AnalyticsAiInsight,
 } from './types'
@@ -1145,6 +1147,19 @@ export async function cancelAnnouncement(id: number): Promise<AnnouncementDto> {
     headers: getAuthHeaders(),
   })
   return handleResponse<AnnouncementDto>(response)
+}
+
+export async function improveAnnouncementText(payload: {
+  text: string
+  mode: AnnouncementImprovementMode
+}, signal?: AbortSignal): Promise<AnnouncementTextImprovement> {
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/announcements/improve`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+    signal,
+  })
+  return handleResponse<AnnouncementTextImprovement>(response)
 }
 
 // Maintenance Requests Management API

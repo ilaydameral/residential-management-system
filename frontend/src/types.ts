@@ -908,6 +908,13 @@ export interface MaintenanceDescriptionImprovement {
   generatedAt: string
 }
 
+export type AnnouncementImprovementMode = 'CLEARER' | 'SHORTER' | 'MORE_FORMAL' | 'FIX_WRITING'
+
+export interface AnnouncementTextImprovement {
+  improvedText: string
+  generatedAt: string
+}
+
 export interface MaintenanceImageAnalysis {
   observation: string
   suggestedCategory: string

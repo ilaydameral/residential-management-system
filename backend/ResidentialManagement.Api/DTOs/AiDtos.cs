@@ -35,6 +35,23 @@ public sealed class MaintenanceDescriptionImprovementDto
     public DateTime GeneratedAt { get; set; }
 }
 
+public sealed class AnnouncementTextImprovementRequestDto
+{
+    [Required(ErrorMessage = "Duyuru metni boş olamaz.")]
+    [StringLength(5000, MinimumLength = 1, ErrorMessage = "Duyuru metni en fazla 5000 karakter olabilir.")]
+    public string Text { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "İyileştirme modu zorunludur.")]
+    [StringLength(30, ErrorMessage = "Geçerli bir iyileştirme modu seçin.")]
+    public string Mode { get; set; } = string.Empty;
+}
+
+public sealed class AnnouncementTextImprovementDto
+{
+    public string ImprovedText { get; set; } = string.Empty;
+    public DateTime GeneratedAt { get; set; }
+}
+
 public sealed class MaintenanceImageAnalysisRequestDto
 {
     [Required(ErrorMessage = "Analiz edilecek görsel zorunludur.")]
