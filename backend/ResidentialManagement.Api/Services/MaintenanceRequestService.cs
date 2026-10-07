@@ -15,21 +15,6 @@ public class MaintenanceRequestService : IMaintenanceRequestService
     private readonly IRequestFileStorageService _fileStorageService;
     private readonly IRealtimePublisher _realtimePublisher;
 
-    private static readonly HashSet<string> AllowedCategories = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "PLUMBING", "ELECTRICAL", "HEATING_COOLING", "ELEVATOR", "CLEANING", "SECURITY", "STRUCTURAL", "OTHER"
-    };
-
-    private static readonly HashSet<string> AllowedPriorities = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "LOW", "NORMAL", "HIGH", "EMERGENCY"
-    };
-
-    private static readonly HashSet<string> AllowedStatuses = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "CANCELLED"
-    };
-
     public MaintenanceRequestService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
@@ -46,8 +31,8 @@ public class MaintenanceRequestService : IMaintenanceRequestService
 
     public async Task<MaintenanceRequestDetailDto> CreateRequestAsync(MaintenanceRequestCreateDto dto, int residentUserId)
     {
-        var category = NormalizeCategory(dto.Category);
-        var priority = NormalizePriority(dto.Priority);
+        var category = MaintenanceRequestRules.NormalizeCategory(dto.Category);
+        var priority = MaintenanceRequestRules.NormalizePriority(dto.Priority);
         var now = DateTime.UtcNow;
 
         // Verify resident has active occupancy for unit
@@ -707,7 +692,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
             }
         }
 
-        var normPriority = NormalizePriority(priority);
+        var normPriority = MaintenanceRequestRules.NormalizePriority(priority);
         if (request.Priority.Equals(normPriority, StringComparison.OrdinalIgnoreCase))
         {
             return ToDetailDto(await FetchRequestDetailByIdAsync(requestId) ?? request);
@@ -779,7 +764,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         }
 
         var targetStatus = newStatus.Trim().ToUpperInvariant();
-        if (!AllowedStatuses.Contains(targetStatus))
+        if (!MaintenanceRequestRules.IsAllowedStatus(targetStatus))
         {
             throw new BadRequestException("Geçersiz durum değeri.");
         }
@@ -791,7 +776,7 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         }
 
         // Validate state machine transitions
-        ValidateStatusTransition(currentStatus, targetStatus, isTechStaff);
+        MaintenanceRequestRules.ValidateStatusTransition(currentStatus, targetStatus, isTechStaff);
 
         var now = DateTime.UtcNow;
         request.Status = targetStatus;
@@ -1020,52 +1005,6 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         return await _context.UserRoles
             .AsNoTracking()
             .AnyAsync(ur => ur.UserId == userId && ur.Role.Code == AppRoles.TechnicalStaff);
-    }
-
-    private static void ValidateStatusTransition(string currentStatus, string targetStatus, bool isTechStaff)
-    {
-        if (currentStatus == "CLOSED" || currentStatus == "CANCELLED")
-        {
-            throw new BadRequestException($"Durumu '{currentStatus}' olan kapatılmış/iptal edilmiş talepler tekrar değiştirilemez.");
-        }
-
-        if (isTechStaff)
-        {
-            // Technical staff can only do: OPEN -> IN_PROGRESS, IN_PROGRESS -> RESOLVED
-            if (currentStatus == "OPEN" && targetStatus == "IN_PROGRESS") return;
-            if (currentStatus == "IN_PROGRESS" && targetStatus == "RESOLVED") return;
-            throw new ForbiddenException($"Teknik personel '{currentStatus}' -> '{targetStatus}' geçişini yapamaz.");
-        }
-
-        // Manager / Admin transitions
-        if (currentStatus == "OPEN")
-        {
-            if (targetStatus == "IN_PROGRESS" || targetStatus == "RESOLVED" || targetStatus == "CANCELLED") return;
-        }
-        else if (currentStatus == "IN_PROGRESS")
-        {
-            if (targetStatus == "RESOLVED" || targetStatus == "CANCELLED") return;
-        }
-        else if (currentStatus == "RESOLVED")
-        {
-            if (targetStatus == "CLOSED" || targetStatus == "IN_PROGRESS") return;
-        }
-
-        throw new BadRequestException($"Geçersiz durum geçişi: '{currentStatus}' -> '{targetStatus}'.");
-    }
-
-    private static string NormalizeCategory(string category)
-    {
-        if (string.IsNullOrWhiteSpace(category)) return "OTHER";
-        var norm = category.Trim().ToUpperInvariant();
-        return AllowedCategories.Contains(norm) ? norm : "OTHER";
-    }
-
-    private static string NormalizePriority(string priority)
-    {
-        if (string.IsNullOrWhiteSpace(priority)) return "NORMAL";
-        var norm = priority.Trim().ToUpperInvariant();
-        return AllowedPriorities.Contains(norm) ? norm : "NORMAL";
     }
 
     private static MaintenanceRequestListItemDto ToListItemDto(MaintenanceRequest r)
