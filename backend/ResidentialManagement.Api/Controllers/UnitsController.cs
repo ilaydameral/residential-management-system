@@ -25,7 +25,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<List<UnitDto>>> GetUnits([FromQuery] bool includeInactive = false)
     {
         var units = await _unitService.GetAllUnitsAsync(
@@ -36,7 +36,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<UnitDto>> GetUnitById(int id)
     {
         await EnsureManagerCanAccessUnitAsync(id);
@@ -56,7 +56,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet("building/{buildingId:int}")]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByBuildingId(int buildingId, [FromQuery] bool includeInactive = false)
     {
         await EnsureManagerCanAccessBuildingAsync(buildingId);
@@ -80,7 +80,7 @@ public class UnitsController : ControllerBase
     }
 
     [HttpGet("property/{propertyId:int}")]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<List<UnitDto>>> GetUnitsByPropertyId(int propertyId, [FromQuery] bool includeInactive = false)
     {
         if (IsManagerOnly() && !await _managerScopeService.CanViewPropertyAsync(

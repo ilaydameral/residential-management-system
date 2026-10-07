@@ -33,7 +33,22 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
-            if (ex is AiUnavailableException or AiModelUnavailableException or AiTimeoutException or AiRateLimitException)
+            if (ex is UnauthorizedException or ForbiddenException)
+            {
+                _logger.LogWarning(
+                    "Request authorization was rejected. Path={Path} ErrorType={ErrorType}",
+                    context.Request.Path,
+                    ex.GetType().Name);
+            }
+            else if (ex is BadRequestException or ConflictException or InvalidOperationException or
+                     NotFoundException or KeyNotFoundException)
+            {
+                _logger.LogInformation(
+                    "Request was rejected by a domain rule. Path={Path} ErrorType={ErrorType}",
+                    context.Request.Path,
+                    ex.GetType().Name);
+            }
+            else if (ex is AiUnavailableException or AiModelUnavailableException or AiTimeoutException or AiRateLimitException)
             {
                 _logger.LogWarning("Optional AI operation is unavailable. ErrorType={ErrorType}", ex.GetType().Name);
             }

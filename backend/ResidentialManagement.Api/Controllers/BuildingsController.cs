@@ -25,7 +25,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<List<BuildingDto>>> GetBuildings([FromQuery] bool includeInactive = false)
     {
         IReadOnlyCollection<int>? accessibleBuildingIds = null;
@@ -43,7 +43,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<BuildingDto>> GetBuildingById(int id)
     {
         await EnsureManagerCanAccessBuildingAsync(id);
@@ -83,7 +83,7 @@ public class BuildingsController : ControllerBase
     }
 
     [HttpGet("property/{propertyId:int}")]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<List<BuildingDto>>> GetBuildingsByPropertyId(int propertyId, [FromQuery] bool includeInactive = false)
     {
         IReadOnlyCollection<int>? accessibleBuildingIds = null;
