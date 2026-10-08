@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import { RealtimeContext } from './RealtimeContext'
+import { REALTIME_HUB_PATH } from '../config'
 import type { ActivityFeedInvalidatedEvent, FacilityAvailabilityInvalidatedEvent, FacilityReservationUpdatedEvent, MaintenanceRequestUpdatedEvent, NotificationCreatedEvent, RealtimeConnectionState, UserScopeInvalidatedEvent, VisitorStatusChangedEvent } from './types'
 
 interface RealtimeProviderProps {
@@ -45,7 +46,7 @@ export function RealtimeProvider({ user, children }: RealtimeProviderProps) {
     isStartingRef.current = true
 
     const conn = new HubConnectionBuilder()
-      .withUrl('/hubs/realtime', {
+      .withUrl(REALTIME_HUB_PATH, {
         accessTokenFactory: () => localStorage.getItem('rms_access_token') || '',
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])

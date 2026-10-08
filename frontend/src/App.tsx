@@ -73,6 +73,7 @@ import { useUnsavedChangesGuard } from './hooks/useUnsavedChangesGuard'
 import { useRouteChangeGuard } from './hooks/useRouteChangeGuard'
 import { useDrawerAccessibility } from './hooks/useDrawerAccessibility'
 import { useAnimatedDrawer } from './hooks/useAnimatedDrawer'
+import { getProtectedRouteRedirect } from './routeAccess'
 import { SaveShortcutHint } from './components/SaveShortcutHint'
 import { formatUnitDisplay, formatUnitNumber } from './utils/unitDisplay'
 import type {
@@ -612,94 +613,14 @@ function App() {
 
   useEffect(() => {
     if (loading) return
-
-    if (!isAuthenticated) {
-      if (location.pathname !== '/login') navigate('/login', { replace: true })
-      return
-    }
-
-    const isKnownManagementRoute =
-      Object.values(MANAGEMENT_VIEW_PATHS).includes(location.pathname) ||
-      Boolean(matchPath('/units/:unitId', location.pathname))
-
-    if (isManagementPanel) {
-      if (location.pathname === MANAGEMENT_VIEW_PATHS.users && !hasRole('ADMIN')) {
-        navigate('/dashboard', { replace: true })
-        return
-      }
-      if (location.pathname === MANAGEMENT_VIEW_PATHS.managerAssignments && !hasRole('ADMIN')) {
-        navigate('/dashboard', { replace: true })
-        return
-      }
-      if (location.pathname === MANAGEMENT_VIEW_PATHS.dataImport && !hasRole('ADMIN')) {
-        navigate('/dashboard', { replace: true })
-        return
-      }
-      if (
-        location.pathname === MANAGEMENT_VIEW_PATHS.managerScope &&
-        (!hasRole('MANAGER') || hasRole('ADMIN'))
-      ) {
-        navigate('/dashboard', { replace: true })
-        return
-      }
-      if (!isKnownManagementRoute) navigate('/dashboard', { replace: true })
-      return
-    }
-
-    if (isResidentView) {
-      const isKnownResidentRoute =
-        location.pathname === '/resident/home' ||
-        location.pathname === '/resident/my-units' ||
-        Boolean(matchPath('/resident/my-units/:unitId', location.pathname)) ||
-        location.pathname === '/resident/finance' ||
-        location.pathname === '/resident/facilities' ||
-        location.pathname.startsWith('/resident/facilities') ||
-        location.pathname === '/resident/visitors' ||
-        location.pathname.startsWith('/resident/visitors') ||
-        location.pathname === '/resident/vehicles' ||
-        location.pathname.startsWith('/resident/vehicles') ||
-        location.pathname === '/resident/documents' ||
-        location.pathname.startsWith('/resident/documents') ||
-        location.pathname === '/resident/announcements' ||
-        location.pathname === '/resident/requests' ||
-        location.pathname === '/resident/maintenance-requests' ||
-        location.pathname === '/resident/account' ||
-        location.pathname === '/account' ||
-        location.pathname === '/settings'
-
-      if (!isKnownResidentRoute) {
-        navigate('/resident/home', { replace: true })
-      }
-      return
-    }
-
-    if (isTechnicalStaffView) {
-      const isKnownTechnicalRoute =
-        location.pathname === '/technical/requests' ||
-        location.pathname.startsWith('/technical/requests/') ||
-        location.pathname === '/technical/maintenance-requests' ||
-        location.pathname === '/technical/account' ||
-        location.pathname === '/account' ||
-        location.pathname === '/settings'
-
-      if (!isKnownTechnicalRoute) {
-        navigate('/technical/requests', { replace: true })
-      }
-      return
-    }
-
-    if (location.pathname !== '/' && location.pathname !== '/account' && location.pathname !== '/settings') {
-      navigate('/', { replace: true })
-    }
+    const redirect = getProtectedRouteRedirect(location.pathname, user?.roles ?? [], isAuthenticated)
+    if (redirect && redirect !== location.pathname) navigate(redirect, { replace: true })
   }, [
     isAuthenticated,
-    isManagementPanel,
-    isResidentView,
-    isTechnicalStaffView,
-    hasRole,
     loading,
     location.pathname,
     navigate,
+    user?.roles,
   ])
 
   useEffect(() => {
