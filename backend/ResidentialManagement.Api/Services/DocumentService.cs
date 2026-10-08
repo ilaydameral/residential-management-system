@@ -11,15 +11,18 @@ public class DocumentService : IDocumentService
     private readonly AppDbContext _context;
     private readonly IManagerScopeService _managerScopeService;
     private readonly IDocumentFileStorageService _storage;
+    private readonly ILogger<DocumentService> _logger;
 
     public DocumentService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
-        IDocumentFileStorageService storage)
+        IDocumentFileStorageService storage,
+        ILogger<DocumentService> logger)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _storage = storage;
+        _logger = logger;
     }
 
     public async Task<DocumentListResponseDto> GetManagementAsync(
@@ -120,7 +123,7 @@ public class DocumentService : IDocumentService
         }
         catch
         {
-            if (storageKey is not null) _storage.Delete(storageKey);
+            if (storageKey is not null) FailedUploadCleanup.Run(() => _storage.Delete(storageKey), _logger);
             throw;
         }
     }

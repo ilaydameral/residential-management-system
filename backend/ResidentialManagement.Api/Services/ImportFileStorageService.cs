@@ -6,14 +6,16 @@ namespace ResidentialManagement.Api.Services;
 public class ImportFileStorageService : IImportFileStorageService
 {
     private readonly string _storagePath;
+    private readonly ILogger<ImportFileStorageService> _logger;
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".csv",
         ".xlsx"
     };
 
-    public ImportFileStorageService(IHostEnvironment environment)
+    public ImportFileStorageService(IHostEnvironment environment, ILogger<ImportFileStorageService> logger)
     {
+        _logger = logger;
         var rawPath = Path.GetFullPath(Path.Combine(environment.ContentRootPath, "App_Data", "imports"));
         _storagePath = rawPath.EndsWith(Path.DirectorySeparatorChar) ? rawPath : rawPath + Path.DirectorySeparatorChar;
         if (!Directory.Exists(_storagePath))
@@ -71,21 +73,28 @@ public class ImportFileStorageService : IImportFileStorageService
         }
 
         using var sha256 = SHA256.Create();
-        using var targetStream = File.Create(fullPath);
-
-        var buffer = new byte[8192];
-        int read;
-        while ((read = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        try
         {
-            await targetStream.WriteAsync(buffer, 0, read);
-            sha256.TransformBlock(buffer, 0, read, null, 0);
+            using var targetStream = File.Create(fullPath);
+            var buffer = new byte[8192];
+            int read;
+            while ((read = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            {
+                await targetStream.WriteAsync(buffer, 0, read);
+                sha256.TransformBlock(buffer, 0, read, null, 0);
+            }
+            sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+
+            var hashBytes = sha256.Hash ?? Array.Empty<byte>();
+            var hashHex = Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+            return (storageKey, hashHex, fileStream.Length);
         }
-        sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-
-        var hashBytes = sha256.Hash ?? Array.Empty<byte>();
-        var hashHex = Convert.ToHexString(hashBytes).ToLowerInvariant();
-
-        return (storageKey, hashHex, fileStream.Length);
+        catch
+        {
+            FailedUploadCleanup.Run(() => { File.Delete(fullPath); return true; }, _logger);
+            throw;
+        }
     }
 
     public Stream OpenImportFileStream(string storageKey)
@@ -128,6 +137,7 @@ public class ImportFileStorageService : IImportFileStorageService
             }
             catch
             {
+                _logger.LogWarning("Import file cleanup failed.");
                 return false;
             }
         }

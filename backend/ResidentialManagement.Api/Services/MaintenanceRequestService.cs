@@ -14,19 +14,22 @@ public class MaintenanceRequestService : IMaintenanceRequestService
     private readonly INotificationService _notificationService;
     private readonly IRequestFileStorageService _fileStorageService;
     private readonly IRealtimePublisher _realtimePublisher;
+    private readonly ILogger<MaintenanceRequestService> _logger;
 
     public MaintenanceRequestService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
         INotificationService notificationService,
         IRequestFileStorageService fileStorageService,
-        IRealtimePublisher realtimePublisher)
+        IRealtimePublisher realtimePublisher,
+        ILogger<MaintenanceRequestService> logger)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _notificationService = notificationService;
         _fileStorageService = fileStorageService;
         _realtimePublisher = realtimePublisher;
+        _logger = logger;
     }
 
     public async Task<MaintenanceRequestDetailDto> CreateRequestAsync(MaintenanceRequestCreateDto dto, int residentUserId)
@@ -431,7 +434,12 @@ public class MaintenanceRequestService : IMaintenanceRequestService
         };
 
         _context.MaintenanceRequestAttachments.Add(attachment);
-        await _context.SaveChangesAsync();
+        try { await _context.SaveChangesAsync(); }
+        catch
+        {
+            FailedUploadCleanup.Run(() => _fileStorageService.DeleteAttachmentFile(storageKey), _logger);
+            throw;
+        }
 
         var uploader = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
         return new MaintenanceRequestAttachmentDto

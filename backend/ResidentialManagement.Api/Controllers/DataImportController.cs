@@ -32,6 +32,8 @@ public class DataImportController : ControllerBase
     }
 
     [HttpPost("upload")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("upload")]
+    [RequestSizeLimit(21 * 1024 * 1024)]
     public async Task<ActionResult<ImportUploadResponseDto>> Upload(
         [FromForm] UploadImportFileRequestDto request)
     {
@@ -58,6 +60,7 @@ public class DataImportController : ControllerBase
     }
 
     [HttpPost("{id:int}/validate")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("upload")]
     public async Task<ActionResult<ImportPreviewResponseDto>> ValidateBatch(
         int id,
         [FromBody] ValidateImportBatchRequestDto request)
@@ -78,6 +81,7 @@ public class DataImportController : ControllerBase
     }
 
     [HttpPost("{id:int}/confirm")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("upload")]
     public async Task<ActionResult<ImportConfirmResponseDto>> ConfirmBatch(int id)
     {
         var result = await _importService.ConfirmBatchAsync(id, GetCurrentUserId(), IsAdmin());

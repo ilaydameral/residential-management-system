@@ -8,6 +8,7 @@ namespace ResidentialManagement.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [AllowAnonymous]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;

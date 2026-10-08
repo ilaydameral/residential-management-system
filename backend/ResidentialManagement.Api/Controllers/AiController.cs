@@ -11,6 +11,7 @@ namespace ResidentialManagement.Api.Controllers;
 [ApiController]
 [Route("api/ai")]
 [Authorize]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
 public sealed class AiController : ControllerBase
 {
     private readonly IAiAssistantService _aiAssistantService;

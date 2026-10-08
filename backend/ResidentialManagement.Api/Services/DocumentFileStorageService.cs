@@ -20,9 +20,11 @@ public class DocumentFileStorageService : IDocumentFileStorageService
         };
 
     private readonly string _storageRoot;
+    private readonly ILogger<DocumentFileStorageService> _logger;
 
-    public DocumentFileStorageService(IHostEnvironment environment)
+    public DocumentFileStorageService(IHostEnvironment environment, ILogger<DocumentFileStorageService> logger)
     {
+        _logger = logger;
         var root = Path.GetFullPath(Path.Combine(environment.ContentRootPath, "App_Data", "documents"));
         _storageRoot = root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(_storageRoot);
@@ -78,7 +80,7 @@ public class DocumentFileStorageService : IDocumentFileStorageService
         }
         catch
         {
-            if (File.Exists(path)) File.Delete(path);
+            FailedUploadCleanup.Run(() => Delete(storageKey), _logger);
             throw;
         }
     }

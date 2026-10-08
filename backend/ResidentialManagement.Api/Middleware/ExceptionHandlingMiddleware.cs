@@ -40,7 +40,7 @@ public class ExceptionHandlingMiddleware
                     context.Request.Path,
                     ex.GetType().Name);
             }
-            else if (ex is BadRequestException or ConflictException or InvalidOperationException or
+            else if (ex is BadHttpRequestException or BadRequestException or ConflictException or InvalidOperationException or
                      NotFoundException or KeyNotFoundException)
             {
                 _logger.LogInformation(
@@ -70,6 +70,7 @@ public class ExceptionHandlingMiddleware
 
         var statusCode = exception switch
         {
+            BadHttpRequestException requestError => requestError.StatusCode,
             UnauthorizedException => (int)HttpStatusCode.Unauthorized,
             ForbiddenException => (int)HttpStatusCode.Forbidden,
             BadRequestException => (int)HttpStatusCode.BadRequest,
@@ -90,8 +91,8 @@ public class ExceptionHandlingMiddleware
         var response = new ErrorResponse
         {
             StatusCode = statusCode,
-            Message = statusCode != (int)HttpStatusCode.InternalServerError ? exception.Message : "Sunucuda beklenmeyen bir hata oluştu.",
-            Details = _env.IsDevelopment() ? exception.Message : null,
+            Message = exception is BadHttpRequestException ? "İstek okunamadı veya izin verilen boyutu aşıyor." : statusCode != (int)HttpStatusCode.InternalServerError ? exception.Message : "Sunucuda beklenmeyen bir hata oluştu.",
+            Details = exception is not BadHttpRequestException && _env.IsDevelopment() ? exception.Message : null,
             Timestamp = DateTime.UtcNow
         };
 

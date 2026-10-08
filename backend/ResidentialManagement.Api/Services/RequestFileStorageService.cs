@@ -5,6 +5,7 @@ namespace ResidentialManagement.Api.Services;
 public class RequestFileStorageService : IRequestFileStorageService
 {
     private readonly string _storagePath;
+    private readonly ILogger<RequestFileStorageService> _logger;
     private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -15,8 +16,9 @@ public class RequestFileStorageService : IRequestFileStorageService
         ".pdf"
     };
 
-    public RequestFileStorageService(IHostEnvironment environment)
+    public RequestFileStorageService(IHostEnvironment environment, ILogger<RequestFileStorageService> logger)
     {
+        _logger = logger;
         _storagePath = Path.Combine(environment.ContentRootPath, "App_Data", "request_attachments");
         if (!Directory.Exists(_storagePath))
         {
@@ -86,9 +88,15 @@ public class RequestFileStorageService : IRequestFileStorageService
             throw new BadRequestException("Geçersiz dosya yolu.");
         }
 
-        using (var targetStream = File.Create(canonicalPath))
+        try
         {
+            using var targetStream = File.Create(canonicalPath);
             await fileStream.CopyToAsync(targetStream);
+        }
+        catch
+        {
+            FailedUploadCleanup.Run(() => DeleteAttachmentFile(storageKey), _logger);
+            throw;
         }
 
         return (storageKey, fileStream.Length);

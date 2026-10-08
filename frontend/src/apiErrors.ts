@@ -3,6 +3,8 @@ import type { ApiErrorResponse } from './types'
 export const NETWORK_ERROR_MESSAGE = 'Sunucuya ulaşılamadı. Backend servisinin çalıştığını kontrol edin.'
 
 export async function getApiErrorMessage(response: Response, isAuthEndpoint = false): Promise<string> {
+  if (response.status === 429) return 'Çok fazla istek gönderdiniz. Lütfen kısa bir süre bekleyip tekrar deneyin.'
+  if (response.status === 413) return 'Yüklenen dosya veya istek çok büyük. Lütfen boyutunu küçültüp tekrar deneyin.'
   const defaultMessage = response.status === 401
     ? isAuthEndpoint
       ? 'Kullanıcı adı/e-posta veya parola hatalı.'

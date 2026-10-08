@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using ResidentialManagement.Api.Configurations;
 using ResidentialManagement.Api.Data;
 using ResidentialManagement.Api.Entities;
@@ -13,6 +14,8 @@ using ResidentialManagement.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddReleaseRateLimiting(builder.Configuration);
+builder.Services.AddHealthChecks().AddCheck<DatabaseReadinessCheck>("database", tags: ["ready"]);
 builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
 
 var allowedOrigins = builder.Configuration
@@ -191,6 +194,37 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
+app.UseStatusCodePages(async context =>
+{
+    if (context.HttpContext.Response.StatusCode is 400 or 413)
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            statusCode = context.HttpContext.Response.StatusCode,
+            message = "İstek okunamadı veya izin verilen boyutu aşıyor."
+        });
+});
+app.Use(async (context, next) =>
+{
+    // Reject known oversized bodies before multipart model binding. Chunked bodies remain server-bounded.
+    var limit = context.GetEndpoint()?.Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>();
+    if (limit?.MaxRequestBodySize is { } maximum && context.Request.ContentLength > maximum)
+    {
+        context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+        await context.Response.WriteAsJsonAsync(new { statusCode = 413, message = "Yüklenen dosya veya istek izin verilen boyutu aşıyor." });
+        return;
+    }
+    await next(context);
+});
+
+// Probe bodies contain no dependency details. Optional AI is intentionally not a readiness dependency.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = async (context, report) =>
+        await context.Response.WriteAsJsonAsync(new { status = report.Status.ToString() })
+}).AllowAnonymous();
 
 app.MapControllers();
 app.MapHub<ResidentialManagement.Api.Hubs.RealtimeHub>("/hubs/realtime");

@@ -133,39 +133,50 @@ public class DataImportService : IDataImportService
 
         using var stream = file.OpenReadStream();
         var (storageKey, fileHashSha256, fileSizeBytes) = await _storageService.SaveImportFileAsync(stream, file.FileName);
-        var validatedTargetPropertyId = target.Property?.Id;
-        var validatedTargetBuildingId = target.Building?.Id;
-
-        var existingBatch = await _context.ImportBatches
-            .AsNoTracking()
-            .Where(b => b.CreatedByUserId == currentUserId &&
-                        b.ImportType == normalizedType &&
-                        b.TargetPropertyId == validatedTargetPropertyId &&
-                        b.TargetBuildingId == validatedTargetBuildingId &&
-                        b.FileHashSha256 == fileHashSha256)
-            .OrderByDescending(b => b.CreatedAt)
-            .FirstOrDefaultAsync();
-
-        bool isDuplicateUpload = existingBatch != null;
-        string? duplicateWarning = isDuplicateUpload
-            ? $"Daha önce bu dosya içeriğiyle bir içe aktarım oluşturulmuş (Parti ID: #{existingBatch!.Id}, Yüklenme: {existingBatch.CreatedAt:g})."
-            : null;
-
-        var batch = new ImportBatch
+        ImportBatch batch;
+        bool isDuplicateUpload;
+        string? duplicateWarning;
+        try
         {
-            ImportType = normalizedType,
-            OriginalFileName = file.FileName,
-            StorageKey = storageKey,
-            FileHashSha256 = fileHashSha256,
-            Status = "UPLOADED",
-            TargetPropertyId = target.Property?.Id,
-            TargetBuildingId = target.Building?.Id,
-            CreatedByUserId = currentUserId,
-            CreatedAt = DateTime.UtcNow
-        };
+            var validatedTargetPropertyId = target.Property?.Id;
+            var validatedTargetBuildingId = target.Building?.Id;
 
-        _context.ImportBatches.Add(batch);
-        await _context.SaveChangesAsync();
+            var existingBatch = await _context.ImportBatches
+                .AsNoTracking()
+                .Where(b => b.CreatedByUserId == currentUserId &&
+                            b.ImportType == normalizedType &&
+                            b.TargetPropertyId == validatedTargetPropertyId &&
+                            b.TargetBuildingId == validatedTargetBuildingId &&
+                            b.FileHashSha256 == fileHashSha256)
+                .OrderByDescending(b => b.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            isDuplicateUpload = existingBatch != null;
+            duplicateWarning = isDuplicateUpload
+                ? $"Daha önce bu dosya içeriğiyle bir içe aktarım oluşturulmuş (Parti ID: #{existingBatch!.Id}, Yüklenme: {existingBatch.CreatedAt:g})."
+                : null;
+
+            batch = new ImportBatch
+            {
+                ImportType = normalizedType,
+                OriginalFileName = file.FileName,
+                StorageKey = storageKey,
+                FileHashSha256 = fileHashSha256,
+                Status = "UPLOADED",
+                TargetPropertyId = target.Property?.Id,
+                TargetBuildingId = target.Building?.Id,
+                CreatedByUserId = currentUserId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.ImportBatches.Add(batch);
+            await _context.SaveChangesAsync();
+        }
+        catch
+        {
+            FailedUploadCleanup.Run(() => _storageService.DeleteImportFile(storageKey), _logger);
+            throw;
+        }
 
         var user = await _context.Users.FindAsync(currentUserId);
 

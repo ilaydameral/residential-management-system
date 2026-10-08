@@ -3,6 +3,10 @@ import { getProperties } from '../api'
 import { getApiErrorMessage, NETWORK_ERROR_MESSAGE } from '../apiErrors'
 
 describe('API error messages', () => {
+  it.each([429, 413])('provides a safe message for an empty HTTP %i response', async status => {
+    const message = await getApiErrorMessage(new Response('', { status }))
+    expect(message).toContain(status === 429 ? 'Çok fazla istek' : 'çok büyük')
+  })
   it.each([400, 403, 404, 409, 503, 504])('uses safe backend message for HTTP %i', async (status) => {
     const response = new Response(JSON.stringify({ message: `Güvenli mesaj ${status}` }), {
       status,
