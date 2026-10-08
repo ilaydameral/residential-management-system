@@ -391,6 +391,8 @@ pkill -f "vite"
 
 ## Verification & Checks
 
+Deployment preparation: see the provider-neutral [deployment contract](docs/deployment.md) for configuration, proxy/TLS and persistent storage, and the [release runbook](docs/release-runbook.md) for migrations, coordinated backups/restore, smoke checks and rollback. A first green GitHub-hosted CI run and staging acceptance remain release prerequisites; no automatic production deployment is configured.
+
 ### CI quality gate
 
 GitHub Actions runs `backend`, `integration`, `frontend`, and `security` on pull requests and pushes to `main`. Use the .NET 10 SDK selected by `global.json`, Node 22 LTS, and Docker for integration tests. Local equivalents:
