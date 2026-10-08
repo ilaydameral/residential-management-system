@@ -59,7 +59,9 @@ public class ResidentMaintenanceRequestsController : ControllerBase
         return Ok(result);
     }
 
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("upload")]
     [HttpPost("{id:int}/attachments")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<MaintenanceRequestAttachmentDto>> UploadAttachment(int id, IFormFile file)
     {

@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  Ai__Provider: Disabled
+  Ai__Vision__Provider: Disabled
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      # No NuGet lock files yet. Cache packages only; always restore project assets.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-10-${{ hashFiles('global.json', 'backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-10-
+      - name: Restore unit test project and API
+        run: dotnet restore backend/ResidentialManagement.Api.UnitTests/ResidentialManagement.Api.UnitTests.csproj
+      - name: Build API
+        run: dotnet build backend/ResidentialManagement.Api/ResidentialManagement.Api.csproj --no-restore --warnaserror
+      - name: Unit tests
+        run: dotnet test backend/ResidentialManagement.Api.UnitTests/ResidentialManagement.Api.UnitTests.csproj --no-restore --warnaserror
+      - name: Install matching EF design-time tool
+        run: dotnet tool install dotnet-ef --version 10.0.10 --tool-path "$RUNNER_TEMP/ef-tools"
+      - name: Check pending model changes without a database
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          DOTNET_HOST_FACTORY_RESOLVER_DEFAULT_TIMEOUT_IN_SECONDS: '30'
+          ConnectionStrings__DefaultConnection: 'Server=127.0.0.1,1;Database=CiDesignTimeOnly;Integrated Security=True;Connect Timeout=1;TrustServerCertificate=True'
+          # Public dummy signing material for model construction only. Never used to run the API.
+          Jwt__Key: CiDesignTimeOnly-NotAProductionSigningKey-2026
+        run: '"$RUNNER_TEMP/ef-tools/dotnet-ef" migrations has-pending-model-changes --project backend/ResidentialManagement.Api/ResidentialManagement.Api.csproj --no-build'
+      - name: Verify tracked files unchanged
+        run: git diff --exit-code
+
+  integration:
+    name: integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-10-${{ hashFiles('global.json', 'backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-10-
+      - name: Verify runner Docker daemon
+        run: docker info
+      # Fixture owns the SQL Server container, random credentials and isolated DB.
+      - name: SQL Server integration tests
+        run: dotnet test backend/ResidentialManagement.Api.IntegrationTests/ResidentialManagement.Api.IntegrationTests.csproj --warnaserror
+      - name: Verify tracked files unchanged
+        run: git diff --exit-code
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run test:run
+      - run: npm run build
+      - name: Verify tracked files unchanged
+        run: git diff --exit-code
+
+  security:
+    name: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.x'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-10-${{ hashFiles('global.json', 'backend/**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-10-
+      - name: Install frontend dependencies from lock
+        working-directory: frontend
+        run: npm ci
+      - name: Audit production npm dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev
+      - name: Audit NuGet dependencies (failure gate and diagnostic report)
+        shell: bash
+        run: |
+          for project in backend/*/*.csproj; do
+            dotnet restore "$project" --force -p:NuGetAudit=true -p:NuGetAuditMode=all -p:TreatWarningsAsErrors=true
+            dotnet list "$project" package --vulnerable --include-transitive --no-restore
+          done
+      - name: Verify tracked files unchanged
+        run: git diff --exit-code

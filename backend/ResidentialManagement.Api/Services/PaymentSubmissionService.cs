@@ -14,19 +14,22 @@ public class PaymentSubmissionService : IPaymentSubmissionService
     private readonly IReceiptStorageService _receiptStorageService;
     private readonly INotificationService _notificationService;
     private readonly IRealtimePublisher _realtimePublisher;
+    private readonly ILogger<PaymentSubmissionService> _logger;
 
     public PaymentSubmissionService(
         AppDbContext context,
         IManagerScopeService managerScopeService,
         IReceiptStorageService receiptStorageService,
         INotificationService notificationService,
-        IRealtimePublisher realtimePublisher)
+        IRealtimePublisher realtimePublisher,
+        ILogger<PaymentSubmissionService> logger)
     {
         _context = context;
         _managerScopeService = managerScopeService;
         _receiptStorageService = receiptStorageService;
         _notificationService = notificationService;
         _realtimePublisher = realtimePublisher;
+        _logger = logger;
     }
 
     public async Task<List<ResidentUnitChargeDto>> GetMyUnitChargesAsync(int residentUserId)
@@ -128,6 +131,7 @@ public class PaymentSubmissionService : IPaymentSubmissionService
         }
 
         var storageKey = await _receiptStorageService.SaveReceiptFileAsync(requestDto.ReceiptFile);
+        var persisted = false;
 
         try
         {
@@ -147,6 +151,7 @@ public class PaymentSubmissionService : IPaymentSubmissionService
 
             _context.PaymentSubmissions.Add(submission);
             await _context.SaveChangesAsync();
+            persisted = true;
 
             await _realtimePublisher.PublishActivityFeedInvalidatedAsync("FINANCE");
 
@@ -155,7 +160,7 @@ public class PaymentSubmissionService : IPaymentSubmissionService
         }
         catch
         {
-            _receiptStorageService.DeleteReceiptFile(storageKey);
+            if (!persisted) FailedUploadCleanup.Run(() => { _receiptStorageService.DeleteReceiptFile(storageKey); return true; }, _logger);
             throw;
         }
     }

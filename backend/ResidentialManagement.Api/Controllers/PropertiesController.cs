@@ -25,7 +25,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<List<PropertyDto>>> GetProperties([FromQuery] bool includeInactive = false)
     {
         IReadOnlyCollection<int>? accessiblePropertyIds = null;
@@ -49,7 +49,7 @@ public class PropertiesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [Authorize(Roles = AppRoles.AnyRole)]
+    [Authorize(Roles = AppRoles.AdminOrManager)]
     public async Task<ActionResult<PropertyDto>> GetPropertyById(int id)
     {
         await EnsureManagerCanViewPropertyAsync(id);

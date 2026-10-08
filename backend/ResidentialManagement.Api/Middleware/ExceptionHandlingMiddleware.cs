@@ -27,9 +27,28 @@ public class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogDebug("Request was cancelled by the client. Path={Path}", context.Request.Path);
+        }
         catch (Exception ex)
         {
-            if (ex is AiUnavailableException or AiModelUnavailableException or AiTimeoutException or AiRateLimitException)
+            if (ex is UnauthorizedException or ForbiddenException)
+            {
+                _logger.LogWarning(
+                    "Request authorization was rejected. Path={Path} ErrorType={ErrorType}",
+                    context.Request.Path,
+                    ex.GetType().Name);
+            }
+            else if (ex is BadHttpRequestException or BadRequestException or ConflictException or InvalidOperationException or
+                     NotFoundException or KeyNotFoundException)
+            {
+                _logger.LogInformation(
+                    "Request was rejected by a domain rule. Path={Path} ErrorType={ErrorType}",
+                    context.Request.Path,
+                    ex.GetType().Name);
+            }
+            else if (ex is AiUnavailableException or AiModelUnavailableException or AiTimeoutException or AiRateLimitException)
             {
                 _logger.LogWarning("Optional AI operation is unavailable. ErrorType={ErrorType}", ex.GetType().Name);
             }
@@ -51,6 +70,7 @@ public class ExceptionHandlingMiddleware
 
         var statusCode = exception switch
         {
+            BadHttpRequestException requestError => requestError.StatusCode,
             UnauthorizedException => (int)HttpStatusCode.Unauthorized,
             ForbiddenException => (int)HttpStatusCode.Forbidden,
             BadRequestException => (int)HttpStatusCode.BadRequest,
@@ -71,8 +91,8 @@ public class ExceptionHandlingMiddleware
         var response = new ErrorResponse
         {
             StatusCode = statusCode,
-            Message = statusCode != (int)HttpStatusCode.InternalServerError ? exception.Message : "Sunucuda beklenmeyen bir hata oluştu.",
-            Details = _env.IsDevelopment() ? exception.Message : null,
+            Message = exception is BadHttpRequestException ? "İstek okunamadı veya izin verilen boyutu aşıyor." : statusCode != (int)HttpStatusCode.InternalServerError ? exception.Message : "Sunucuda beklenmeyen bir hata oluştu.",
+            Details = exception is not BadHttpRequestException && _env.IsDevelopment() ? exception.Message : null,
             Timestamp = DateTime.UtcNow
         };
 

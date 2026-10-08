@@ -29,6 +29,7 @@ public class DocumentsController : ControllerBase
     public async Task<ActionResult<DocumentDto>> GetById(int id)
         => Ok(await _documentService.GetManagementByIdAsync(id, CurrentUserId(), IsAdmin()));
 
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("upload")]
     [HttpPost]
     // Leave room for multipart headers while the storage service enforces the exact 10 MB file limit.
     [RequestSizeLimit(DocumentFileStorageService.MaxFileSizeBytes + 1024 * 1024)]

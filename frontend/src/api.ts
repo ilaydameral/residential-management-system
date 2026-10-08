@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './config'
+import { getApiErrorMessage, NETWORK_ERROR_MESSAGE } from './apiErrors'
 import type { PagedActivityFeedDto } from './realtime/types'
 import type {
-  ApiErrorResponse,
   GlobalSearchResponse,
   AccountProfile,
   AuthenticatedUser,
@@ -108,6 +108,10 @@ import type {
   MaintenanceAnalytics,
   FacilityAnalytics,
   MaintenanceAiSuggestion,
+  MaintenanceDescriptionImprovement,
+  AnnouncementImprovementMode,
+  AnnouncementTextImprovement,
+  MaintenanceImageAnalysis,
   AnalyticsAiInsight,
 } from './types'
 
@@ -129,8 +133,8 @@ function getAuthHeaders(customHeaders: Record<string, string> = {}): Record<stri
 async function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
     return await fetch(input, init)
-  } catch (error: unknown) {
-    throw new Error('Sunucuya ulaşılamadı. Backend servisinin çalıştığını kontrol edin.')
+  } catch {
+    throw new Error(NETWORK_ERROR_MESSAGE)
   }
 }
 
@@ -139,36 +143,11 @@ async function handleResponse<T>(response: Response, isAuthEndpoint = false): Pr
     if (!isAuthEndpoint && unauthorizedHandler) {
       unauthorizedHandler()
     }
-    let errorText = isAuthEndpoint
-      ? 'Kullanıcı adı/e-posta veya parola hatalı.'
-      : 'Oturumunuz sona erdi. Lütfen tekrar giriş yapın.'
-    try {
-      const errorJson: ApiErrorResponse = await response.json()
-      if (errorJson.message) {
-        errorText = errorJson.message
-      }
-    } catch {
-      // fallback message
-    }
-    throw new Error(errorText)
+    throw new Error(await getApiErrorMessage(response, isAuthEndpoint))
   }
 
   if (!response.ok) {
-    let errorText = 'Sunucuda bir hata oluştu.'
-    try {
-      const errorJson: ApiErrorResponse = await response.json()
-      if (errorJson.message) {
-        errorText = errorJson.message
-      } else if (errorJson.errors) {
-        const firstErrorKey = Object.keys(errorJson.errors)[0]
-        if (firstErrorKey && errorJson.errors[firstErrorKey]?.[0]) {
-          errorText = errorJson.errors[firstErrorKey][0]
-        }
-      }
-    } catch {
-      errorText = `İstek başarısız oldu (HTTP ${response.status}).`
-    }
-    throw new Error(errorText)
+    throw new Error(await getApiErrorMessage(response))
   }
 
   if (response.status === 204) {
@@ -1145,6 +1124,19 @@ export async function cancelAnnouncement(id: number): Promise<AnnouncementDto> {
   return handleResponse<AnnouncementDto>(response)
 }
 
+export async function improveAnnouncementText(payload: {
+  text: string
+  mode: AnnouncementImprovementMode
+}, signal?: AbortSignal): Promise<AnnouncementTextImprovement> {
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/announcements/improve`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+    signal,
+  })
+  return handleResponse<AnnouncementTextImprovement>(response)
+}
+
 // Maintenance Requests Management API
 export async function getMaintenanceRequests(params?: {
   propertyId?: number
@@ -1297,6 +1289,36 @@ export async function getMaintenanceAiSuggestion(payload: {
     body: JSON.stringify(payload),
   })
   return handleResponse<MaintenanceAiSuggestion>(response)
+}
+
+export async function improveMaintenanceDescription(payload: {
+  description: string
+}): Promise<MaintenanceDescriptionImprovement> {
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/maintenance/improve-description`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<MaintenanceDescriptionImprovement>(response)
+}
+
+export async function analyzeMaintenanceImage(payload: {
+  image: File
+  title?: string
+  description?: string
+}, signal?: AbortSignal): Promise<MaintenanceImageAnalysis> {
+  const body = new FormData()
+  body.append('image', payload.image)
+  if (payload.title) body.append('title', payload.title)
+  if (payload.description) body.append('description', payload.description)
+
+  const response = await safeFetch(`${API_BASE_URL}/api/ai/maintenance/analyze-image`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body,
+    signal,
+  })
+  return handleResponse<MaintenanceImageAnalysis>(response)
 }
 
 export async function getResidentMaintenanceRequests(params?: {

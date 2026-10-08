@@ -903,6 +903,27 @@ export interface MaintenanceAiSuggestion {
   warnings: string[]
 }
 
+export interface MaintenanceDescriptionImprovement {
+  improvedDescription: string
+  generatedAt: string
+}
+
+export type AnnouncementImprovementMode = 'CLEARER' | 'SHORTER' | 'MORE_FORMAL' | 'FIX_WRITING'
+
+export interface AnnouncementTextImprovement {
+  improvedText: string
+  generatedAt: string
+}
+
+export interface MaintenanceImageAnalysis {
+  observation: string
+  suggestedCategory: string
+  suggestedPriority: string
+  confidence: number | null
+  warnings: string[]
+  generatedAt: string
+}
+
 export interface MaintenanceRequestAssignPayload {
   assignedToUserId: number
 }

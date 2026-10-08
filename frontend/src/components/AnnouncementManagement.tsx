@@ -7,6 +7,7 @@ import {
   updateAnnouncement,
   publishAnnouncement,
   cancelAnnouncement,
+  improveAnnouncementText,
   getProperties,
   getBuildingsByProperty,
 } from '../api'
@@ -20,6 +21,8 @@ import { useDrawerAccessibility } from '../hooks/useDrawerAccessibility'
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
 import type {
   AnnouncementDto,
+  AnnouncementImprovementMode,
+  AnnouncementTextImprovement,
   Building,
   CreateAnnouncementPayload,
   Property,
@@ -36,6 +39,13 @@ const STATUS_LABEL_MAP: Record<string, { label: string; className: string }> = {
   PUBLISHED: { label: 'Yayında', className: 'active' },
   CANCELLED: { label: 'İptal Edildi', className: 'inactive' },
 }
+
+const ANNOUNCEMENT_AI_MODE_OPTIONS: Array<{ value: AnnouncementImprovementMode; label: string }> = [
+  { value: 'CLEARER', label: 'Daha açık yaz' },
+  { value: 'SHORTER', label: 'Daha kısa yaz' },
+  { value: 'MORE_FORMAL', label: 'Daha resmî yaz' },
+  { value: 'FIX_WRITING', label: 'Yazım hatalarını düzelt' },
+]
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '-'
@@ -90,6 +100,14 @@ export function AnnouncementManagement() {
   const [formBuildings, setFormBuildings] = useState<Building[]>([])
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
 
+  // Advisory AI state; it never mutates or publishes an announcement by itself.
+  const [announcementAiMode, setAnnouncementAiMode] = useState<AnnouncementImprovementMode>('CLEARER')
+  const [announcementAiResult, setAnnouncementAiResult] = useState<AnnouncementTextImprovement | null>(null)
+  const [announcementAiError, setAnnouncementAiError] = useState<string>('')
+  const [isAnnouncementAiLoading, setIsAnnouncementAiLoading] = useState<boolean>(false)
+  const announcementAiRequestVersionRef = useRef(0)
+  const announcementAiAbortRef = useRef<AbortController | null>(null)
+
   // Confirmation dialogs
   const [publishConfirmId, setPublishConfirmId] = useState<number | null>(null)
   const [cancelConfirmId, setCancelConfirmId] = useState<number | null>(null)
@@ -102,18 +120,38 @@ export function AnnouncementManagement() {
   const { shouldRender: shouldRenderDetail, phase: detailPhase } = useAnimatedDrawer(isDetailDrawerOpen)
   const { shouldRender: shouldRenderCreate, phase: createPhase } = useAnimatedDrawer(isCreateDrawerOpen)
 
-  const closeDetailDrawer = useCallback(() => {
-    setIsDetailDrawerOpen(false)
-    setIsEditing(false)
+  const invalidateAnnouncementAi = useCallback(() => {
+    announcementAiRequestVersionRef.current += 1
+    announcementAiAbortRef.current?.abort()
+    announcementAiAbortRef.current = null
+    setAnnouncementAiResult(null)
+    setAnnouncementAiError('')
+    setIsAnnouncementAiLoading(false)
   }, [])
 
+  const resetAnnouncementAi = useCallback(() => {
+    invalidateAnnouncementAi()
+    setAnnouncementAiMode('CLEARER')
+  }, [invalidateAnnouncementAi])
+
+  useEffect(() => () => {
+    announcementAiAbortRef.current?.abort()
+  }, [])
+
+  const closeDetailDrawer = useCallback(() => {
+    resetAnnouncementAi()
+    setIsDetailDrawerOpen(false)
+    setIsEditing(false)
+  }, [resetAnnouncementAi])
+
   const closeCreateDrawer = useCallback(() => {
+    resetAnnouncementAi()
     setIsCreateDrawerOpen(false)
     setFormTitle('')
     setFormContent('')
     setFormPriority('NORMAL')
     setFormBuildingId(null)
-  }, [])
+  }, [resetAnnouncementAi])
 
   const isCreateDirty = formTitle.trim() !== '' || formContent.trim() !== ''
   const { requestDiscard, unsavedChangesDialog } = useUnsavedChangesGuard(isCreateDirty)
@@ -218,6 +256,7 @@ export function AnnouncementManagement() {
 
   // Open Create Drawer
   const handleOpenCreate = () => {
+    resetAnnouncementAi()
     const defaultProp = properties[0]?.id || 0
     setFormPropertyId(defaultProp)
     setFormBuildingId(null)
@@ -259,6 +298,7 @@ export function AnnouncementManagement() {
   const handleViewDetail = async (announcement: AnnouncementDto) => {
     try {
       const full = await getAnnouncement(announcement.id)
+      resetAnnouncementAi()
       setSelectedAnnouncement(full)
       setFormTitle(full.title)
       setFormContent(full.content)
@@ -269,6 +309,100 @@ export function AnnouncementManagement() {
       showToast(err.message || 'Duyuru detayı alınamadı.')
     }
   }
+
+  const handleAnnouncementContentChange = (value: string) => {
+    invalidateAnnouncementAi()
+    setFormContent(value)
+  }
+
+  const handleAnnouncementAiModeChange = (mode: AnnouncementImprovementMode) => {
+    invalidateAnnouncementAi()
+    setAnnouncementAiMode(mode)
+  }
+
+  const handleImproveAnnouncementText = async () => {
+    const textSnapshot = formContent.trim()
+    if (!textSnapshot || textSnapshot.length > 5000 || isAnnouncementAiLoading) return
+
+    announcementAiAbortRef.current?.abort()
+    const controller = new AbortController()
+    announcementAiAbortRef.current = controller
+    const requestVersion = ++announcementAiRequestVersionRef.current
+    setAnnouncementAiResult(null)
+    setAnnouncementAiError('')
+    setIsAnnouncementAiLoading(true)
+
+    try {
+      const result = await improveAnnouncementText(
+        { text: textSnapshot, mode: announcementAiMode },
+        controller.signal,
+      )
+      if (requestVersion !== announcementAiRequestVersionRef.current || controller.signal.aborted) return
+      setAnnouncementAiResult(result)
+    } catch {
+      if (requestVersion !== announcementAiRequestVersionRef.current || controller.signal.aborted) return
+      setAnnouncementAiError('AI metin önerisi şu anda oluşturulamadı. Metni normal şekilde düzenlemeye devam edebilirsiniz.')
+    } finally {
+      if (requestVersion === announcementAiRequestVersionRef.current) {
+        announcementAiAbortRef.current = null
+        setIsAnnouncementAiLoading(false)
+      }
+    }
+  }
+
+  const handleApplyAnnouncementAiResult = () => {
+    if (!announcementAiResult) return
+    const improvedText = announcementAiResult.improvedText
+    invalidateAnnouncementAi()
+    setFormContent(improvedText)
+  }
+
+  const renderAnnouncementAiAssistant = (idPrefix: string) => (
+    <section className="announcement-ai-assistant" aria-label="Duyuru metni AI desteği">
+      <div className="announcement-ai-controls">
+        <div className="form-group">
+          <label htmlFor={`${idPrefix}-ai-mode`}>AI metin desteği</label>
+          <select
+            id={`${idPrefix}-ai-mode`}
+            value={announcementAiMode}
+            onChange={(event) => handleAnnouncementAiModeChange(event.target.value as AnnouncementImprovementMode)}
+            disabled={isAnnouncementAiLoading}
+          >
+            {ANNOUNCEMENT_AI_MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => void handleImproveAnnouncementText()}
+          disabled={isAnnouncementAiLoading || !formContent.trim() || formContent.trim().length > 5000}
+        >
+          {isAnnouncementAiLoading ? 'İyileştiriliyor...' : 'AI ile Metni İyileştir'}
+        </button>
+      </div>
+
+      {announcementAiError && (
+        <p className="error-message ai-assistant-message" role="alert">{announcementAiError}</p>
+      )}
+
+      {announcementAiResult && (
+        <div className="ai-suggestion-result announcement-ai-result" aria-live="polite">
+          <strong>{ANNOUNCEMENT_AI_MODE_OPTIONS.find((option) => option.value === announcementAiMode)?.label}</strong>
+          <p>{announcementAiResult.improvedText}</p>
+          <div className="ai-suggestion-actions">
+            <button className="primary-button" type="button" onClick={handleApplyAnnouncementAiResult}>
+              Metne Uygula
+            </button>
+            <button className="secondary-button" type="button" onClick={invalidateAnnouncementAi}>
+              Yoksay
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
 
   // Handle Edit Submit
   const handleUpdateSubmit = async (e: React.FormEvent) => {
@@ -630,10 +764,11 @@ export function AnnouncementManagement() {
                     rows={7}
                     placeholder="Duyuru metnini detaylıca yazın..."
                     value={formContent}
-                    onChange={(e) => setFormContent(e.target.value)}
+                    onChange={(e) => handleAnnouncementContentChange(e.target.value)}
                     required
                   />
                 </div>
+                {renderAnnouncementAiAssistant('create-announcement')}
               </form>
             </div>
 
@@ -746,10 +881,11 @@ export function AnnouncementManagement() {
                       id="edit-content"
                       rows={8}
                       value={formContent}
-                      onChange={(e) => setFormContent(e.target.value)}
+                      onChange={(e) => handleAnnouncementContentChange(e.target.value)}
                       required
                     />
                   </div>
+                  {renderAnnouncementAiAssistant('edit-announcement')}
                 </form>
               ) : (
                 <div className="announcement-detail-content" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -835,7 +971,7 @@ export function AnnouncementManagement() {
               <div className="drawer-footer">
                 {isEditing ? (
                   <>
-                    <button className="button outline" type="button" onClick={() => setIsEditing(false)}>
+                    <button className="button outline" type="button" onClick={() => { resetAnnouncementAi(); setIsEditing(false) }}>
                       İptal
                     </button>
                     <button className="primary-button" type="submit" form="edit-announcement-form" disabled={isSubmitting}>

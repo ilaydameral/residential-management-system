@@ -37,6 +37,8 @@ public class ResidentFinanceController : ControllerBase
     }
 
     [HttpPost("payment-submissions")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("upload")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<PaymentSubmissionDto>> CreatePaymentSubmission([FromForm] CreatePaymentSubmissionRequestDto requestDto)
     {

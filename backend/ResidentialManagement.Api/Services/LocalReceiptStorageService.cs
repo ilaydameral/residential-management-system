@@ -5,6 +5,7 @@ namespace ResidentialManagement.Api.Services;
 public class LocalReceiptStorageService : IReceiptStorageService
 {
     private readonly string _storagePath;
+    private readonly ILogger<LocalReceiptStorageService> _logger;
     private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
     private static readonly Dictionary<string, (string ContentType, byte[][] MagicBytes)> AllowedTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -15,8 +16,9 @@ public class LocalReceiptStorageService : IReceiptStorageService
         { ".jpeg", ("image/jpeg", new[] { new byte[] { 0xFF, 0xD8, 0xFF } }) }
     };
 
-    public LocalReceiptStorageService(IHostEnvironment environment)
+    public LocalReceiptStorageService(IHostEnvironment environment, ILogger<LocalReceiptStorageService> logger)
     {
+        _logger = logger;
         _storagePath = Path.Combine(environment.ContentRootPath, "App_Data", "receipts");
         if (!Directory.Exists(_storagePath))
         {
@@ -63,8 +65,16 @@ public class LocalReceiptStorageService : IReceiptStorageService
         var targetFilePath = Path.Combine(_storagePath, storageKey);
 
         stream.Position = 0;
-        using var targetStream = File.Create(targetFilePath);
-        await stream.CopyToAsync(targetStream);
+        try
+        {
+            using var targetStream = File.Create(targetFilePath);
+            await stream.CopyToAsync(targetStream);
+        }
+        catch
+        {
+            DeleteReceiptFile(storageKey);
+            throw;
+        }
 
         return storageKey;
     }
@@ -108,7 +118,7 @@ public class LocalReceiptStorageService : IReceiptStorageService
         }
         catch
         {
-            // Ignore file deletion errors during orphan cleanup
+            _logger.LogWarning("Failed receipt file cleanup failed.");
         }
     }
 }

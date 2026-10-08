@@ -335,17 +335,17 @@ Runs at `http://localhost:5173`.
 
 AI support is optional and disabled by default. The application and its maintenance and analytics workflows continue to work when Ollama is not installed or configured.
 
-To enable local inference, install and start [Ollama](https://ollama.com/download) manually, then download a small instruction model. `qwen2.5:3b` is a practical development default for Turkish and structured JSON output:
+To enable local inference, install and start [Ollama](https://ollama.com/download) manually, then download a capable instruction model. `qwen2.5:7b-instruct` is the tested development default for Turkish and structured JSON output:
 
 ```bash
-ollama pull qwen2.5:3b
+ollama pull qwen2.5:7b-instruct
 ```
 
 Configure the backend through environment variables or .NET User Secrets. Do not commit machine-specific URLs, model choices, or credentials:
 
 ```bash
 export Ai__Provider=Ollama
-export Ai__Model=qwen2.5:3b
+export Ai__Model=qwen2.5:7b-instruct
 export Ai__BaseUrl=http://localhost:11434
 export Ai__TimeoutSeconds=60
 
@@ -353,6 +353,21 @@ dotnet run --project backend/ResidentialManagement.Api
 ```
 
 To return to provider-free operation, unset these variables or set `Ai__Provider=Disabled`. No OpenAI API key or other external credential is required for the Ollama provider.
+
+#### Optional Local Vision Analysis
+
+Text AI and maintenance-photo analysis are independent. Vision is disabled by default, and the normal maintenance form plus text AI features continue to work without a vision model. For a 24 GB Apple Silicon development machine, the optional `gemma3:12b` model provides multilingual image understanding and structured output:
+
+```bash
+ollama pull gemma3:12b
+
+export Ai__Vision__Provider=Ollama
+export Ai__Vision__Model=gemma3:12b
+export Ai__Vision__BaseUrl=http://localhost:11434
+export Ai__Vision__TimeoutSeconds=90
+```
+
+Local Ollama vision analysis does not require an API key. Keep `Ai__Vision__Provider=Disabled` (or leave it unset) on environments that should not offer the optional feature. Model files remain in Ollama's local model store and are never part of this repository.
 
 ### Local Development Ports & Process Management
 
@@ -375,6 +390,25 @@ pkill -f "vite"
 
 
 ## Verification & Checks
+
+Deployment preparation: see the provider-neutral [deployment contract](docs/deployment.md) for configuration, proxy/TLS and persistent storage, and the [release runbook](docs/release-runbook.md) for migrations, coordinated backups/restore, smoke checks and rollback. A first green GitHub-hosted CI run and staging acceptance remain release prerequisites; no automatic production deployment is configured.
+
+### CI quality gate
+
+GitHub Actions runs `backend`, `integration`, `frontend`, and `security` on pull requests and pushes to `main`. Use the .NET 10 SDK selected by `global.json`, Node 22 LTS, and Docker for integration tests. Local equivalents:
+
+```bash
+dotnet restore backend/ResidentialManagement.Api.UnitTests/ResidentialManagement.Api.UnitTests.csproj
+dotnet build backend/ResidentialManagement.Api/ResidentialManagement.Api.csproj --no-restore --warnaserror
+dotnet test backend/ResidentialManagement.Api.UnitTests/ResidentialManagement.Api.UnitTests.csproj --no-restore --warnaserror
+dotnet test backend/ResidentialManagement.Api.IntegrationTests/ResidentialManagement.Api.IntegrationTests.csproj --warnaserror
+npm --prefix frontend ci
+npm --prefix frontend run test:run
+npm --prefix frontend run build
+npm --prefix frontend audit --omit=dev
+```
+
+Integration tests create and remove their own SQL Server Testcontainer; no application database, production credentials, or Ollama model is needed. Full ESLint is intentionally excluded while existing lint debt is tracked. See [CI notes](docs/release-hardening.md#ci-quality-gate) for dependency checks and branch protection.
 
 ### SQL Verification Scripts
 
