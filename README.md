@@ -391,6 +391,23 @@ pkill -f "vite"
 
 ## Verification & Checks
 
+### CI quality gate
+
+GitHub Actions runs `backend`, `integration`, `frontend`, and `security` on pull requests and pushes to `main`. Use the .NET 10 SDK selected by `global.json`, Node 22 LTS, and Docker for integration tests. Local equivalents:
+
+```bash
+dotnet restore backend/ResidentialManagement.Api.UnitTests/ResidentialManagement.Api.UnitTests.csproj
+dotnet build backend/ResidentialManagement.Api/ResidentialManagement.Api.csproj --no-restore --warnaserror
+dotnet test backend/ResidentialManagement.Api.UnitTests/ResidentialManagement.Api.UnitTests.csproj --no-restore --warnaserror
+dotnet test backend/ResidentialManagement.Api.IntegrationTests/ResidentialManagement.Api.IntegrationTests.csproj --warnaserror
+npm --prefix frontend ci
+npm --prefix frontend run test:run
+npm --prefix frontend run build
+npm --prefix frontend audit --omit=dev
+```
+
+Integration tests create and remove their own SQL Server Testcontainer; no application database, production credentials, or Ollama model is needed. Full ESLint is intentionally excluded while existing lint debt is tracked. See [CI notes](docs/release-hardening.md#ci-quality-gate) for dependency checks and branch protection.
+
 ### SQL Verification Scripts
 
 Execute T-SQL read-only verification scripts under `database/queries/`:
