@@ -72,7 +72,7 @@ public sealed class AiAssistantService : IAiAssistantService
         {
             ["CLEARER"] = "Make awkward wording clearer and easier to understand. You may restructure sentences, but preserve every fact. Example: 'Yarın 14:00-16:00 arası sular olmayacak lütfen ona göre hazırlıklı olun.' becomes 'Yarın 14:00-16:00 arasında su kesintisi yaşanacaktır. Lütfen buna göre hazırlıklı olun.'",
             ["SHORTER"] = "Remove redundancy and make the text shorter. Preserve every date, time, location, reason, and other critical fact. Example: 'Değerli sakinlerimiz, bina girişinde yapılacak çalışma nedeniyle giriş alanında kısa süreli bir yoğunluk yaşanabilir. Bu süreçte dikkatli olmanızı rica ederiz.' becomes 'Bina girişindeki çalışma kısa süreli yoğunluğa neden olabilir. Lütfen dikkatli olun.'",
-            ["MORE_FORMAL"] = "Use a professional residential-management tone without bureaucratic exaggeration or new claims. Example: '5 Ekim saat 10:00'da toplantı var, katılmanızı rica ediyoruz.' becomes '5 Ekim saat 10:00'da toplantı yapılacaktır. Katılımınızı rica ederiz.' Example: '12 Ekim'de 09:30-11:00 arasında 2. blokta çalışma yapılacaktır.' becomes '12 Ekim'de 2. blokta 09:30-11:00 saatleri arasında çalışma gerçekleştirilecektir.' Never label a generic çalışma as maintenance, repair, service, technical work, or a fault.",
+            ["MORE_FORMAL"] = "Use a professional residential-management tone without bureaucratic exaggeration or new claims. Example: '5 Ekim saat 10:00'da toplantı var, katılmanızı rica ediyoruz.' becomes '5 Ekim saat 10:00'da toplantı yapılacaktır. Katılımınızı rica ederiz.' Example: '12 Ekim'de 09:30-11:00 arasında 2. blokta çalışma yapılacaktır.' becomes '12 Ekim'de 2. blokta 09:30-11:00 saatleri arasında çalışma gerçekleştirilecektir.' Example: 'Yarın 14:00-16:00 arası sular olmayacak lütfen ona göre hazırlıklı olun.' becomes 'Yarın 14:00-16:00 saatleri arasında su kesintisi yaşanacaktır. Lütfen buna göre hazırlıklı olun.' Never label a generic çalışma as maintenance, repair, service, technical work, or a fault.",
             ["FIX_WRITING"] = "Correct only Turkish spelling, grammar, capitalization, and punctuation with minimal semantic change. Example: 'yarın asansör bakımı yapılcak lütfen dikkat edinz' becomes 'Yarın asansör bakımı yapılacak, lütfen dikkat ediniz.'"
         };
 
@@ -95,7 +95,7 @@ public sealed class AiAssistantService : IAiAssistantService
     };
     private static readonly string[] AnnouncementCauseRoots =
     {
-        "arıza", "bakım", "onarım", "servis", "teknik"
+        "arıza", "bakım", "onarım", "servis", "teknik", "tahliye"
     };
 
     private static readonly HashSet<string> AllowedCategories = new(StringComparer.Ordinal)
@@ -319,6 +319,9 @@ public sealed class AiAssistantService : IAiAssistantService
                 location, property/building name, outage reason, maintenance cause, decision, cost, contact detail,
                 deadline, event detail, legal claim, obligation, or management policy. Preserve numbers, percentages,
                 monetary values, and proper nouns. Do not introduce a reason or cause that is absent from the input.
+                Keep relative dates such as "yarın" as relative dates; never turn a clock hour into a calendar date.
+                Keep each stated date/time/number exactly as written and exactly as many times as in the input.
+                Do not duplicate numbers or calculate and append a duration from a time range.
                 In particular, Turkish wording such as "sular olmayacak" means a water outage and must remain about
                 water; it may become "su kesintisi yaşanacaktır" but never "servis/bakım yapılacaktır". Likewise,
                 "toplantı var" must remain a meeting and must not gain a topic or location.
